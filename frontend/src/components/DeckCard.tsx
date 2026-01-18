@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardMedia, Box, Typography, IconButton } from '@mui/material';
+import { Card, CardMedia, Box, Typography, IconButton, Button } from '@mui/material';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
 import type { DeckCard as DeckCardType } from '../types/mtg';
@@ -10,7 +10,7 @@ interface DeckCardProps {
     onRemove: (cardId: string) => void;
 }
 
-export const DeckCard: React.FC<DeckCardProps> = ({ deckCard, onUpdateQuantity, onRemove }) => {
+export const DeckCard = React.memo<DeckCardProps>(({ deckCard, onUpdateQuantity, onRemove }) => {
     return (
         <Box sx={{ position: 'relative', width: '100%', aspectRatio: '2.5/3.5' }}>
              {/* Quantity Badge (Always Visible initially, hidden on hover via CSS) */}
@@ -62,6 +62,7 @@ export const DeckCard: React.FC<DeckCardProps> = ({ deckCard, onUpdateQuantity, 
                             component="img"
                             image={deckCard.card.image_uris.normal}
                             alt={deckCard.card.name}
+                            loading="lazy"
                             sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                     ) : (
@@ -119,5 +120,4 @@ export const DeckCard: React.FC<DeckCardProps> = ({ deckCard, onUpdateQuantity, 
             </Card>
         </Box>
     );
-};
-import { Button } from '@mui/material';
+});

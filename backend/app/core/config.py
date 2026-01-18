@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = (
-        "sqlite+aiosqlite:///./sql_app.db"  # Default to local sqlite async
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/deck_builder"
     )
 
     # Security

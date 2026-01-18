@@ -92,22 +92,35 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false, // Prevent jarring refetches
+      staleTime: 1000 * 60 * 5, // Data is fresh for 5 minutes
+    },
+  },
+});
+
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AuthProvider>
-        <Router>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Navigate to="/decks" replace />} />
-              <Route path="/decks" element={<DeckList />} />
-              <Route path="/decks/:deckId" element={<DeckBuilder />} />
-              <Route path="/decks/new" element={<DeckBuilder />} />
-            </Routes>
-          </Layout>
-        </Router>
-      </AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <Router>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Navigate to="/decks" replace />} />
+                <Route path="/decks" element={<DeckList />} />
+                <Route path="/decks/:deckId" element={<DeckBuilder />} />
+                <Route path="/decks/new" element={<DeckBuilder />} />
+              </Routes>
+            </Layout>
+          </Router>
+        </AuthProvider>
+      </QueryClientProvider>
     </ThemeProvider>
   );
 }

@@ -1,66 +1,94 @@
-from typing import List, cast
+from typing import List, cast, Sequence
 
 from app.core.db import get_db
+from app.models.card import Card
 from app.models.deck import (
     Deck,
     DeckCard,
     DeckCreate,
     DeckPublic,
     DeckUpdate,
-    ScryfallCardPublic,
 )
 from app.services.scryfall import ScryfallService, get_scryfall_service
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import QueryableAttribute, selectinload
-from sqlmodel import select
+from sqlmodel import select, col
 
 router = APIRouter()
 
 
-async def enrich_deck(deck: Deck, scryfall: ScryfallService) -> DeckPublic:
-    card_ids = [dc.card_id for dc in deck.cards]
+async def sync_cards(db: AsyncSession, card_ids: List[str], scryfall: ScryfallService):
+    """
+    Ensure cards exist in the local database. Fetch missing ones from Scryfall.
+    """
     if not card_ids:
-        return DeckPublic.model_validate(deck)
+        return
 
-    scryfall_cards = await scryfall.get_cards_by_ids(card_ids)
-    scryfall_map = {c["id"]: c for c in scryfall_cards}
+    # Check which cards exist
+    result = await db.execute(select(Card.id).where(col(Card.id).in_(card_ids)))
+    existing_ids = set(result.scalars().all())
+    
+    missing_ids = list(set(card_ids) - existing_ids)
+    if not missing_ids:
+        return
 
-    # Use model_validate to get started, then manually add cards
-    deck_public = DeckPublic.model_validate(deck)
-    for dc_public in deck_public.cards:
-        if dc_public.card_id in scryfall_map:
-            dc_public.card = ScryfallCardPublic.model_validate(
-                scryfall_map[dc_public.card_id]
-            )
-
-    return deck_public
+    # Fetch missing cards from Scryfall
+    scryfall_cards = await scryfall.get_cards_by_ids(missing_ids)
+    
+    # Insert new cards
+    for card_data in scryfall_cards:
+        # Map Scryfall JSON to Card model
+        # Note: Scryfall JSON keys roughly match Card fields
+        card = Card(
+            id=card_data["id"],
+            name=card_data["name"],
+            mana_cost=card_data.get("mana_cost"),
+            type_line=card_data.get("type_line"),
+            oracle_text=card_data.get("oracle_text"),
+            colors=card_data.get("colors"),
+            image_uris=card_data.get("image_uris"),
+        )
+        db.add(card)
+    
+    await db.commit()
 
 
 @router.get("/", response_model=List[DeckPublic])
 async def read_decks(
     db: AsyncSession = Depends(get_db),
-    scryfall: ScryfallService = Depends(get_scryfall_service),
 ):
     """
-    Retrieve decks.
+    Retrieve decks (fast, from local DB).
     """
+    # Eager load cards AND the nested card definition
     result = await db.execute(
-        select(Deck).options(selectinload(cast(QueryableAttribute, Deck.cards)))
+        select(Deck).options(
+            selectinload(Deck.cards).selectinload(DeckCard.card)
+        )
     )
     decks = result.scalars().all()
-    return [await enrich_deck(deck, scryfall) for deck in decks]
+    return decks
 
 
 @router.post("/", response_model=DeckPublic)
-async def create_deck(deck_in: DeckCreate, db: AsyncSession = Depends(get_db)):
+async def create_deck(
+    deck_in: DeckCreate, 
+    db: AsyncSession = Depends(get_db),
+    scryfall: ScryfallService = Depends(get_scryfall_service)
+):
     """
-    Create new deck.
+    Create new deck. Safely syncs cards to local DB first.
     """
-    # Create the deck object without the nested cards first
+    # 1. Sync cards to DB
+    if deck_in.cards:
+        card_ids = [dc.card_id for dc in deck_in.cards]
+        await sync_cards(db, card_ids, scryfall)
+
+    # 2. Create Deck
     db_deck = Deck.model_validate(deck_in, update={"cards": []})
 
-    # Add nested cards if any
+    # 3. Create DeckCards
     if deck_in.cards:
         db_deck.cards = [
             DeckCard.model_validate(card, update={"deck_id": db_deck.id})
@@ -71,60 +99,62 @@ async def create_deck(deck_in: DeckCreate, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(db_deck)
 
-    # Reload with cards joined
+    # 4. Reload with relations
     result = await db.execute(
         select(Deck)
         .where(Deck.id == db_deck.id)
-        .options(selectinload(cast(QueryableAttribute, Deck.cards)))
+        .options(selectinload(Deck.cards).selectinload(DeckCard.card))
     )
-    db_deck = result.scalar_one()
-
-    # Enrich with Scryfall data
-    scryfall = await anext(get_scryfall_service())
-    return await enrich_deck(db_deck, scryfall)
+    return result.scalar_one()
 
 
 @router.get("/{deck_id}", response_model=DeckPublic)
 async def read_deck(
     deck_id: int,
     db: AsyncSession = Depends(get_db),
-    scryfall: ScryfallService = Depends(get_scryfall_service),
 ):
     """
-    Get deck by ID.
+    Get deck by ID (fast).
     """
     result = await db.execute(
         select(Deck)
         .where(Deck.id == deck_id)
-        .options(selectinload(cast(QueryableAttribute, Deck.cards)))
+        .options(selectinload(Deck.cards).selectinload(DeckCard.card))
     )
     deck = result.scalar_one_or_none()
     if not deck:
         raise HTTPException(status_code=404, detail="Deck not found")
-    return await enrich_deck(deck, scryfall)
+    return deck
 
 
 @router.put("/{deck_id}", response_model=DeckPublic)
 async def update_deck(
-    deck_id: int, deck_in: DeckUpdate, db: AsyncSession = Depends(get_db)
+    deck_id: int, 
+    deck_in: DeckUpdate, 
+    db: AsyncSession = Depends(get_db),
+    scryfall: ScryfallService = Depends(get_scryfall_service)
 ):
     """
-    Update deck.
+    Update deck. Syncs new cards if added.
     """
     result = await db.execute(
         select(Deck)
         .where(Deck.id == deck_id)
-        .options(selectinload(cast(QueryableAttribute, Deck.cards)))
+        .options(selectinload(Deck.cards))
     )
     db_deck = result.scalar_one_or_none()
     if not db_deck:
         raise HTTPException(status_code=404, detail="Deck not found")
 
+    # Sync any new cards in the update payload
+    if deck_in.cards:
+        card_ids = [dc.card_id for dc in deck_in.cards]
+        await sync_cards(db, card_ids, scryfall)
+
     update_data = deck_in.model_dump(exclude_unset=True)
 
     if "cards" in update_data:
-        # Simple approach for POC: replace all cards
-        # In a real app, you might want a more surgical sync
+        # Replace strategy
         if deck_in.cards:
             db_deck.cards = [
                 DeckCard.model_validate(card, update={"deck_id": db_deck.id})
@@ -140,9 +170,13 @@ async def update_deck(
     await db.commit()
     await db.refresh(db_deck)
 
-    # Enrich with Scryfall data
-    scryfall = await anext(get_scryfall_service())
-    return await enrich_deck(db_deck, scryfall)
+    # Reload with deep relations
+    result = await db.execute(
+        select(Deck)
+        .where(Deck.id == deck_id)
+        .options(selectinload(Deck.cards).selectinload(DeckCard.card))
+    )
+    return result.scalar_one()
 
 
 @router.delete("/{deck_id}")

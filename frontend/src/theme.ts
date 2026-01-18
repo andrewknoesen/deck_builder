@@ -48,7 +48,7 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none', // Remove default elevation gradient
-          borderRadius: 24,
+          borderRadius: 0,
         },
       },
     },

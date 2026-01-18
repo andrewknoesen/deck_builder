@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { Container, Grid, Typography, Button, Box, CircularProgress } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
@@ -9,23 +9,16 @@ import { apiClient } from '../api/client';
 import type { Deck } from '../types/mtg';
 import { DeckListItem } from '../components/DeckListItem';
 
-export const DeckList: React.FC = () => {
-    const [decks, setDecks] = useState<Deck[]>([]);
-    const [loading, setLoading] = useState(true);
+import { useQuery } from '@tanstack/react-query';
 
-    useEffect(() => {
-        const fetchDecks = async () => {
-            try {
-                const res = await apiClient.get('/decks');
-                setDecks(res.data);
-            } catch (err) {
-                console.error("Failed to fetch decks", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchDecks();
-    }, []);
+export const DeckList: React.FC = () => {
+    const { data: decks = [], isLoading: loading } = useQuery({
+        queryKey: ['decks'],
+        queryFn: async () => {
+            const res = await apiClient.get('/decks');
+            return res.data;
+        }
+    });
 
     if (loading) {
         return (

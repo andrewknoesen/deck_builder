@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
     Box,
@@ -44,35 +45,36 @@ export const DeckBuilder: React.FC = () => {
     const { deckId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
+    const queryClient = useQueryClient();
+
+    const isNew = !deckId || deckId === 'new';
+
+    // Fetch deck data
+    const { data: deck, isLoading: loadingDecks } = useQuery({
+        queryKey: ['deck', deckId],
+        queryFn: async () => {
+             if (isNew) return null;
+             const res = await apiClient.get(`/decks/${deckId}`);
+             return res.data as Deck;
+        },
+        enabled: !isNew
+    });
 
     const [title, setTitle] = useState('New Deck');
     const [deckCards, setDeckCards] = useState<DeckCard[]>([]);
+    
+    // Sync remote data to local state when loaded
+    useEffect(() => {
+        if (deck) {
+            setTitle(deck.title);
+            setDeckCards(deck.cards || []);
+        }
+    }, [deck]);
+
     const [query, setQuery] = useState('');
     const [searchResults, setSearchResults] = useState<ScryfallCard[]>([]);
     const [searching, setSearching] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [loading, setLoading] = useState(false);
-
-    const isNew = !deckId || deckId === 'new';
-
-    const fetchDeck = useCallback(async () => {
-        if (isNew) return;
-        setLoading(true);
-        try {
-            const res = await apiClient.get(`/decks/${deckId}`);
-            const deck: Deck = res.data;
-            setTitle(deck.title);
-            setDeckCards(deck.cards || []);
-        } catch (err) {
-            console.error("Failed to fetch deck", err);
-        } finally {
-            setLoading(false);
-        }
-    }, [deckId, isNew]);
-
-    useEffect(() => {
-        fetchDeck();
-    }, [fetchDeck]);
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -88,7 +90,7 @@ export const DeckBuilder: React.FC = () => {
         }
     };
 
-    const addCard = (card: ScryfallCard) => {
+    const addCard = useCallback((card: ScryfallCard) => {
         setDeckCards(prev => {
             const existing = prev.find(dc => dc.card_id === card.id);
             if (existing) {
@@ -99,9 +101,9 @@ export const DeckBuilder: React.FC = () => {
             }
             return [...prev, { card_id: card.id, quantity: 1, board: 'main', card }];
         });
-    };
+    }, []);
 
-    const updateQuantity = (cardId: string, delta: number) => {
+    const updateQuantity = useCallback((cardId: string, delta: number) => {
         setDeckCards(prev => prev.map(dc => {
             if (dc.card_id === cardId) {
                 const newQty = Math.max(0, dc.quantity + delta);
@@ -109,11 +111,11 @@ export const DeckBuilder: React.FC = () => {
             }
             return dc;
         }).filter(dc => dc.quantity > 0));
-    };
+    }, []);
 
-    const removeCard = (cardId: string) => {
+    const removeCard = useCallback((cardId: string) => {
         setDeckCards(prev => prev.filter(dc => dc.card_id !== cardId));
-    };
+    }, []);
 
     const handleSave = async () => {
         setSaving(true);
@@ -126,9 +128,12 @@ export const DeckBuilder: React.FC = () => {
 
             if (isNew) {
                 const res = await apiClient.post('/decks/', deckData);
+                queryClient.invalidateQueries({ queryKey: ['decks'] });
                 navigate(`/decks/${res.data.id}`, { replace: true });
             } else {
                 await apiClient.put(`/decks/${deckId}`, deckData);
+                queryClient.invalidateQueries({ queryKey: ['decks'] });
+                queryClient.invalidateQueries({ queryKey: ['deck', deckId] });
             }
         } catch (err) {
             console.error("Save failed", err);
@@ -155,7 +160,7 @@ export const DeckBuilder: React.FC = () => {
     }, [groupedCards]);
 
 
-    if (loading) {
+    if (loadingDecks) {
         return (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 64px)', gap: 2 }}>
                 <CircularProgress size={48} color="primary" />

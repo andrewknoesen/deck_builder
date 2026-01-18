@@ -1,22 +1,21 @@
 from typing import Dict, List, Optional
-
 from sqlmodel import Field, Relationship, SQLModel
 
-# --- DeckCard ---
-
+from app.models.card import Card
 
 class DeckCardBase(SQLModel):
     card_id: str = Field(primary_key=True)  # Scryfall ID
     quantity: int = 1
     board: str = "main"  # main, side, commander
 
-
 class DeckCard(DeckCardBase, table=True):
     deck_id: Optional[int] = Field(
         default=None, foreign_key="deck.id", primary_key=True
     )
+    card_id: str = Field(foreign_key="card.id", primary_key=True)
 
     deck: "Deck" = Relationship(back_populates="cards")
+    card: "Card" = Relationship()
 
 
 class DeckCardCreate(DeckCardBase):

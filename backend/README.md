@@ -4,7 +4,7 @@ FastAPI backend for the MTG Deck Builder app.
 
 ## Features
 - **Scryfall Integration:** Real-time card search and retrieval via `app/services/scryfall.py`.
-- **Database:** SQLite with `SQLModel` and `aiosqlite` for full async operations.
+- **Database:** PostgreSQL (with `asyncpg`) using `SQLModel` for full async operations.
 - **Migrations:** Managed by Alembic.
 - **API Versioning:** All routes follow `/api/v1/...` prefix.
 - **Robust Testing:** 100% async testing with `pytest` and `httpx.AsyncClient`.
