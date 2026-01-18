@@ -1,9 +1,44 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Minus, Trash2, Save, ArrowLeft, Loader2, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
+import {
+    Box,
+    TextField,
+    Typography,
+    Button,
+    IconButton,
+    Grid,
+    Paper,
+    CircularProgress,
+    InputAdornment,
+    Divider,
+    Stack
+} from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import SaveIcon from '@mui/icons-material/Save';
+import SearchIcon from '@mui/icons-material/Search';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import GridViewIcon from '@mui/icons-material/GridView';
 import { apiClient } from '../api/client';
-import { useParams, useNavigate, Link } from 'react-router-dom';
 import type { ScryfallCard, Deck, DeckCard } from '../types/mtg';
 import { useAuth } from '../context/AuthContext';
+import { SearchCard } from '../components/SearchCard';
+import { DeckCard as DeckCardComponent } from '../components/DeckCard';
+
+// Helper to determine primary type for grouping
+const getCardType = (typeLine?: string): string => {
+    if (!typeLine) return 'Unknown';
+    const lower = typeLine.toLowerCase();
+    if (lower.includes('creature')) return 'Creatures';
+    if (lower.includes('planeswalker')) return 'Planeswalkers';
+    if (lower.includes('instant')) return 'Instants';
+    if (lower.includes('sorcery')) return 'Sorceries';
+    if (lower.includes('artifact')) return 'Artifacts';
+    if (lower.includes('enchantment')) return 'Enchantments';
+    if (lower.includes('land')) return 'Lands';
+    return 'Other';
+};
+
+const TYPE_ORDER = ['Creatures', 'Planeswalkers', 'Instants', 'Sorceries', 'Artifacts', 'Enchantments', 'Lands', 'Other', 'Unknown'];
 
 export const DeckBuilder: React.FC = () => {
     const { deckId } = useParams();
@@ -102,171 +137,197 @@ export const DeckBuilder: React.FC = () => {
         }
     };
 
+    // Group cards
+    const groupedCards = useMemo(() => {
+        const groups: Record<string, DeckCard[]> = {};
+        deckCards.forEach(dc => {
+            const type = getCardType(dc.card?.type_line);
+            if (!groups[type]) groups[type] = [];
+            groups[type].push(dc);
+        });
+        return groups;
+    }, [deckCards]);
+
+    const sortedGroups = useMemo(() => {
+        return Object.keys(groupedCards).sort((a, b) => {
+            return TYPE_ORDER.indexOf(a) - TYPE_ORDER.indexOf(b);
+        });
+    }, [groupedCards]);
+
+
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] space-y-4">
-                <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
-                <p className="text-gray-500 font-medium">Loading your deck...</p>
-            </div>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 64px)', gap: 2 }}>
+                <CircularProgress size={48} color="primary" />
+                <Typography variant="body1" color="text.secondary">Conjuring your deck...</Typography>
+            </Box>
         );
     }
 
     return (
-        <div className="flex h-[calc(100vh-64px)] bg-[#f8fafc]">
+        <Box sx={{ display: 'flex', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
             {/* Left Column: Deck Inventory */}
-            <div className="w-1/3 border-r bg-white shadow-sm flex flex-col">
-                <div className="p-6 border-b flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-10">
-                    <div className="flex items-center gap-3">
-                        <Link to="/decks" className="p-2 hover:bg-gray-100 rounded-lg transition">
-                            <ArrowLeft className="w-5 h-5 text-gray-600" />
-                        </Link>
-                        <input
-                            type="text"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            className="text-xl font-bold bg-transparent border-b border-transparent hover:border-gray-300 focus:border-indigo-500 focus:outline-none transition-colors px-1"
-                            placeholder="Deck Title"
-                        />
-                    </div>
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-semibold flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-200"
-                    >
-                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                        Save
-                    </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                    {deckCards.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-center space-y-4 px-8">
-                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-                                <Plus className="w-8 h-8 text-gray-400" />
-                            </div>
-                            <p className="text-gray-500">Your deck is empty. Search and add cards from the right pane!</p>
-                        </div>
-                    ) : (
-                        deckCards.map((dc) => (
-                            <div key={dc.card_id} className="group flex items-center gap-3 p-3 bg-white border rounded-2xl hover:border-indigo-200 hover:shadow-md transition-all">
-                                <div className="w-12 h-16 bg-gray-100 rounded-lg overflow-hidden shrink-0 shadow-sm">
-                                    {dc.card?.image_uris?.small && (
-                                        <img src={dc.card.image_uris.small} alt={dc.card.name} className="w-full h-full object-cover" />
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-gray-900 truncate">{dc.card?.name}</h4>
-                                    <p className="text-xs text-gray-500 uppercase tracking-wider font-bold">{dc.board}</p>
-                                </div>
-                                <div className="flex items-center bg-gray-50 rounded-xl p-1 border">
-                                    <button onClick={() => updateQuantity(dc.card_id, -1)} className="p-1 hover:text-indigo-600 transition">
-                                        <Minus className="w-4 h-4" />
-                                    </button>
-                                    <span className="w-8 text-center font-bold text-gray-700">{dc.quantity}</span>
-                                    <button onClick={() => updateQuantity(dc.card_id, 1)} className="p-1 hover:text-indigo-600 transition">
-                                        <Plus className="w-4 h-4" />
-                                    </button>
-                                </div>
-                                <button onClick={() => removeCard(dc.card_id)} className="p-2 text-gray-400 hover:text-red-500 transition opacity-0 group-hover:opacity-100">
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </div>
-                        ))
-                    )}
-                </div>
-
-                <div className="p-6 border-t bg-gray-50/50">
-                    <div className="flex justify-between items-center">
-                        <span className="text-gray-500 font-medium">Total Cards</span>
-                        <span className="text-2xl font-black text-gray-900">
-                            {deckCards.reduce((acc, curr) => acc + curr.quantity, 0)}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Right Column: Search & Discovery */}
-            <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="p-8 bg-white/40 backdrop-blur-xl border-b z-10 sticky top-0">
-                    <div className="max-w-3xl mx-auto flex flex-col space-y-6">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
-                                Card Discovery <Sparkles className="w-6 h-6 text-amber-400 fill-amber-400" />
-                            </h2>
-                        </div>
-
-                        <form onSubmit={handleSearch} className="relative group">
-                            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                                <Search className="w-6 h-6 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
-                            </div>
-                            <input
-                                type="text"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Find your next card (name, type, or color)..."
-                                className="w-full bg-white border-2 border-gray-100 hover:border-indigo-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none rounded-2xl py-5 pl-14 pr-32 text-lg font-medium transition-all shadow-sm"
+            <Paper
+                square
+                elevation={0}
+                sx={{
+                    width: '45%',
+                    borderRight: 1,
+                    borderColor: 'divider',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    bgcolor: 'background.paper',
+                    zIndex: 10
+                }}
+            >
+                {/* Header */}
+                <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider', bgcolor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(12px)', position: 'sticky', top: 0, zIndex: 20 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                        <IconButton component={RouterLink} to="/decks" size="small" sx={{ border: 1, borderColor: 'divider', borderRadius: 2 }}>
+                            <ArrowBackIcon fontSize="small" />
+                        </IconButton>
+                        <Box sx={{ flex: 1 }}>
+                            <TextField
+                                fullWidth
+                                variant="standard"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                placeholder="Deck Title"
+                                InputProps={{
+                                    disableUnderline: true,
+                                    sx: { fontSize: '1.5rem', fontWeight: 900 }
+                                }}
                             />
-                            <button
-                                type="submit"
-                                disabled={searching}
-                                className="absolute right-3 top-2.5 bottom-2.5 bg-gray-900 text-white px-6 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-600 transition-all disabled:opacity-50"
-                            >
-                                {searching ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Search'}
-                            </button>
-                        </form>
-                    </div>
-                </div>
+                            <Typography variant="caption" fontWeight="700" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                                {deckCards.reduce((acc, curr) => acc + curr.quantity, 0)} Cards
+                            </Typography>
+                        </Box>
+                        <Button
+                            variant="contained"
+                            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+                            onClick={handleSave}
+                            disabled={saving}
+                            sx={{ borderRadius: 3, fontWeight: 700 }}
+                        >
+                            Save
+                        </Button>
+                    </Box>
+                </Box>
 
-                <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                    {searching ? (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8 animate-pulse text-transparent select-none">
-                            {[...Array(10)].map((_, i) => (
-                                <div key={i} className="aspect-[2.5/3.5] bg-gray-200 rounded-3xl" />
-                            ))}
-                        </div>
+                {/* Deck Content */}
+                <Box sx={{ flex: 1, overflowY: 'auto', p: 3, pb: 10 }}>
+                    {deckCards.length === 0 ? (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', opacity: 0.5, textAlign: 'center', gap: 2 }}>
+                            <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: 'action.hover', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <GridViewIcon sx={{ fontSize: 40, color: 'text.secondary' }} />
+                            </Box>
+                            <Box>
+                                <Typography variant="h5" fontWeight="800" color="text.primary">Start Building</Typography>
+                                <Typography variant="body2" color="text.secondary">Search for cards on the right to add them to your masterpiece.</Typography>
+                            </Box>
+                        </Box>
                     ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-8 gap-y-12">
-                            {searchResults.map((card) => (
-                                <div
-                                    key={card.id}
-                                    className="group relative flex flex-col space-y-4 cursor-pointer"
-                                    onClick={() => addCard(card)}
-                                >
-                                    <div className="relative aspect-[2.5/3.5] rounded-[1.5rem] overflow-hidden shadow-xl group-hover:shadow-2xl group-hover:-translate-y-2 transition-all duration-300">
-                                        {card.image_uris?.normal ? (
-                                            <img src={card.image_uris.normal} alt={card.name} className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex flex-col items-center justify-center p-6 text-center">
-                                                <div className="text-gray-400 font-black mb-2 uppercase tracking-tighter">No Preview</div>
-                                                <div className="text-gray-600 font-bold text-sm tracking-tight">{card.name}</div>
-                                            </div>
-                                        )}
-                                        <div className="absolute inset-0 bg-indigo-600/0 group-hover:bg-indigo-600/10 transition-colors" />
-                                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100">
-                                            <div className="bg-white text-indigo-600 p-3 rounded-2xl shadow-xl">
-                                                <Plus className="w-6 h-6 stroke-[3]" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="px-1">
-                                        <h4 className="font-black text-gray-900 leading-tight group-hover:text-indigo-600 transition-colors truncate">{card.name}</h4>
-                                        <p className="text-sm font-bold text-gray-500 tracking-wide uppercase mt-1">
-                                            {card.type_line?.split(' — ')[0].split(' ').pop()}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-
-                            {searchResults.length === 0 && !searching && (
-                                <div className="col-span-full py-32 flex flex-col items-center justify-center text-center opacity-40">
-                                    <Search className="w-24 h-24 mb-6 stroke-[0.5]" />
-                                    <p className="text-2xl font-medium tracking-tight">Try searching for your favorite cards!</p>
-                                </div>
-                            )}
-                        </div>
+                            <Stack spacing={4}>
+                                {sortedGroups.map(type => (
+                                    <Box key={type}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                            <Typography variant="subtitle2" fontWeight="900" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                                                {type}
+                                            </Typography>
+                                            <Box sx={{ px: 1, py: 0.5, bgcolor: 'action.selected', borderRadius: 1, fontSize: '0.7rem', fontWeight: 700, color: 'text.primary' }}>
+                                                {groupedCards[type].reduce((a, c) => a + c.quantity, 0)}
+                                            </Box>
+                                            <Divider sx={{ flex: 1 }} />
+                                        </Box>
+                                        <Grid container spacing={2}>
+                                            {groupedCards[type].map(dc => (
+                                            <Grid size={{ xs: 3, lg: 2 }} key={dc.card_id}>
+                                                <DeckCardComponent
+                                                    deckCard={dc}
+                                                    onUpdateQuantity={updateQuantity}
+                                                    onRemove={removeCard}
+                                                />
+                                            </Grid>
+                                            ))}
+                                        </Grid>
+                                    </Box>
+                                ))}
+                            </Stack>
                     )}
-                </div>
-            </div>
-        </div>
+                </Box>
+            </Paper>
+
+            {/* Right Column: Search */}
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
+                <Box sx={{ p: 4, zIndex: 10, bgcolor: 'background.default', borderBottom: 1, borderColor: 'divider' }}>
+                    <Typography variant="h4" fontWeight="900" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        Card Database <AutoAwesomeIcon sx={{ color: 'warning.main', fontSize: 28 }} />
+                    </Typography>
+
+                    <Box component="form" onSubmit={handleSearch} sx={{ position: 'relative', mt: 3 }}>
+                        <TextField
+                            fullWidth
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Search by name, type, or color..."
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon color="action" />
+                                    </InputAdornment>
+                                ),
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <Button
+                                            type="submit" 
+                                            variant="contained" 
+                                            disabled={searching} 
+                                            sx={{ minWidth: 80, borderRadius: 2 }}
+                                        >
+                                            {searching ? <CircularProgress size={20} color="inherit" /> : 'Find'}
+                                        </Button>
+                                    </InputAdornment>
+                                ),
+                                sx: {
+                                    borderRadius: 4,
+                                    bgcolor: 'background.paper',
+                                    boxShadow: 2,
+                                    pl: 2,
+                                    pr: 1,
+                                    py: 1,
+                                    '& fieldset': { border: 'none' }
+                                }
+                            }}
+                        />
+                    </Box>
+                </Box>
+
+                <Box sx={{ flex: 1, overflowY: 'auto', p: 4 }}>
+                    {searching ? (
+                        <Grid container spacing={2}>
+                            {[...Array(10)].map((_, i) => (
+                                <Grid size={{ xs: 4, sm: 3, md: 2 }} key={i}>
+                                    <Box sx={{ aspectRatio: '2.5/3.5', bgcolor: 'action.hover', borderRadius: 3, animation: 'pulse 1.5s infinite opacity' }} />
+                                </Grid>
+                            ))}
+                        </Grid>
+                    ) : (
+                            <Grid container spacing={3}>
+                            {searchResults.map((card) => (
+                                <Grid size={{ xs: 4, sm: 3, md: 2 }} key={card.id}>
+                                    <SearchCard card={card} onAdd={addCard} />
+                                </Grid>
+                            ))}
+                                {searchResults.length === 0 && !searching && (
+                                    <Box sx={{ gridColumn: '1 / -1', py: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.3, gap: 2 }}>
+                                        <AutoAwesomeIcon sx={{ fontSize: 60 }} />
+                                        <Typography variant="h5" fontWeight="700">Search the multiverse</Typography>
+                                    </Box>
+                            )}
+                            </Grid>
+                    )}
+                </Box>
+            </Box>
+        </Box>
     );
 };

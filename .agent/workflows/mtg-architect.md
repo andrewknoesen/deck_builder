@@ -23,7 +23,7 @@ Tech constraints
 - Containerization: Must run via Docker, with docker-compose orchestrating:
   - frontend service (React)
   - backend service (FastAPI)
-- Backend should be ready to plug into a real DB (e.g., Postgres), but can start with an in-memory or simple SQLite model.
+- Backend should be ready to plug into postgres
 
 Deliverables
 - High-level architecture description (frontend, backend, shared models, auth, data flow).

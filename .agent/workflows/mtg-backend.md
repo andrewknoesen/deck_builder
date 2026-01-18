@@ -12,7 +12,7 @@ Tech stack
 - PEP 8 style guide
 - FastAPI + Uvicorn
 - Pydantic models
-- Simple persistence (start with SQLite using SQLModel or SQLAlchemy; can be swapped later).
+- Simple persistence (Postgres).
 
 Core responsibilities
 
