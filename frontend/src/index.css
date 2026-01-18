@@ -1,3 +1,31 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Global Styles */
+html,
+body {
+    margin: 0;
+    padding: 0;
+    /* Font family and background are handled by MUI Theme and CssBaseline */
+    background-color: #020617;
+    /* Fallback to Slate-950 matches theme */
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0f172a;
+    /* Slate 900 */
+}
+
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    /* Slate 700 */
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+    /* Slate 600 */
+}

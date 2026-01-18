@@ -1,58 +1,114 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link as RouterLink, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DeckList } from './pages/DeckList';
 import { DeckBuilder } from './pages/DeckBuilder';
+import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Button, Box, Avatar, Container } from '@mui/material';
+import { theme } from './theme';
+import DashboardIcon from '@mui/icons-material/Dashboard'; // Placeholder for custom logo
+import LayersIcon from '@mui/icons-material/Layers';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, login } = useAuth();
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] font-sans text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
-      <nav className="bg-white/80 backdrop-blur-xl border-b border-gray-100 px-8 py-5 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-        <Link to="/" className="text-2xl font-black text-gray-900 tracking-tighter flex items-center gap-2 group">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center transform group-hover:rotate-12 transition-transform shadow-lg shadow-indigo-200">
-            <div className="w-5 h-5 border-2 border-white rounded-sm transform rotate-45" />
-          </div>
-          MTG <span className="text-indigo-600">Builder</span>
-        </Link>
-        <div className="flex items-center gap-6">
-          <Link to="/decks" className="font-bold text-gray-500 hover:text-indigo-600 transition-colors">My Decks</Link>
-          <button
-            onClick={() => login('mock-jwt-token')}
-            className="bg-gray-900 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-600 transition-all shadow-lg shadow-gray-200 flex items-center gap-2"
-          >
-            {user ? (
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-indigo-500 rounded-full" />
-                {user.name}
-              </div>
-            ) : 'Sign In'}
-          </button>
-        </div>
-      </nav>
-      <main className="">
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
+      <AppBar position="sticky" elevation={0} sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider' }}>
+        <Container maxWidth="xl">
+          <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
+            {/* Logo area */}
+            <Box
+              component={RouterLink}
+              to="/"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                textDecoration: 'none',
+                color: 'text.primary',
+                '&:hover': { color: 'primary.main' }, // Hover effect on text
+              }}
+            >
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  bgcolor: 'primary.main',
+                  borderRadius: 3,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: 4,
+                }}
+              >
+                <DashboardIcon sx={{ color: 'white' }} />
+              </Box>
+              <Typography variant="h5" component="div" sx={{ fontWeight: 900, letterSpacing: '-0.02em' }}>
+                MTG <Box component="span" sx={{ color: 'primary.main' }}>Builder</Box>
+              </Typography>
+            </Box>
+
+            {/* Navigation & Auth */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Button
+                component={RouterLink}
+                to="/decks"
+                startIcon={<LayersIcon />}
+                sx={{ color: 'text.secondary', fontWeight: 700, '&:hover': { color: 'text.primary' } }}
+              >
+                My Decks
+              </Button>
+
+              <Button
+                variant="outlined"
+                onClick={() => login('mock-jwt-token')}
+                sx={{
+                  borderRadius: 3,
+                  fontWeight: 700,
+                  borderColor: 'divider',
+                  color: 'white',
+                  '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.main' }
+                }}
+              >
+                {user ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main', fontSize: '0.75rem' }}>
+                      {user.name.charAt(0)}
+                    </Avatar>
+                    {user.name}
+                  </Box>
+                ) : 'Sign In'}
+              </Button>
+            </Box>
+          </Toolbar>
+        </Container>
+      </AppBar>
+
+      <Box component="main" sx={{ flexGrow: 1 }}>
         {children}
-      </main>
-    </div>
+      </Box>
+    </Box>
   );
 };
 
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Navigate to="/decks" replace />} />
-            <Route path="/decks" element={<DeckList />} />
-            <Route path="/decks/:deckId" element={<DeckBuilder />} />
-            <Route path="/decks/new" element={<DeckBuilder />} />
-          </Routes>
-        </Layout>
-      </Router>
-    </AuthProvider>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AuthProvider>
+        <Router>
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Navigate to="/decks" replace />} />
+              <Route path="/decks" element={<DeckList />} />
+              <Route path="/decks/:deckId" element={<DeckBuilder />} />
+              <Route path="/decks/new" element={<DeckBuilder />} />
+            </Routes>
+          </Layout>
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
