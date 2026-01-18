@@ -7,26 +7,27 @@ WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1
 
 # Copy dependency files
-COPY pyproject.toml .
-COPY uv.lock .
-
-# Install dependencies using UV
-# --frozen ensures we stick to the lockfile
-# --no-install-project avoids installing the current package itself if it's not needed as a library (we are running it as scripts)
-# --system installs into the system python environment, or we can rely on .venv (default for uv sync).
-# For simple docker images, installing into system or VIRTUAL_ENV is good.
-# Using standard virtualenv approach:
-ENV VIRTUAL_ENV=/app/.venv
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
-# Sync dependencies
-RUN uv sync --frozen --no-install-project
+# Using monorepo context (build from root)
+COPY pyproject.toml uv.lock ./
+# Copy backend specific config if needed, or just rely on root
+# We need to install the project dependencies. 
+# Since 'backend' is a member, we might need the backend directory structure present if we wanted to install it editable,
+# but 'uv sync' might just need pyproject.toml if we don't install root? 
+# Actually, let's copy the backend directory to /app/backend to match structure expected by imports if running from root?
+# No, usually we run from /app/backend.
+# Let's assume we copy everything.
 
 COPY . .
+
+# Now sync. Since we have full source, 'uv sync' works.
+RUN uv sync --frozen --no-install-project
 
 # Expose port
 EXPOSE 8000
 
 # Command to run the application
-# We use 'uv run' or just 'uvicorn' via the activated venv path
+# We need to point to existing app.
+# If we are in /app, and we copied . ., then backend code is at /app/backend/app.
+# So we should change WORKDIR to /app/backend or run uvicorn with full path.
 CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+

@@ -1,3 +1,4 @@
+from fastapi import APIRouter
 from app.api.routes import auth, users, cards, decks, ai
 
 api_router = APIRouter()

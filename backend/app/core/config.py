@@ -1,13 +1,17 @@
-from pydantic_settings import BaseSettings
 from typing import Optional
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "MTG Deck Builder"
     API_V1_STR: str = "/api/v1"
     
     # Database
-    DATABASE_URL: str = "sqlite:///./sql_app.db" # Default to local sqlite
-    
+    DATABASE_URL: str = (
+        "sqlite+aiosqlite:///./sql_app.db"  # Default to local sqlite async
+    )
+
     # Security
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
@@ -16,7 +20,6 @@ class Settings(BaseSettings):
     # External APIs
     SCRYFALL_BASE_URL: str = "https://api.scryfall.com"
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()
