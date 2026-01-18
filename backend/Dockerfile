@@ -3,8 +3,9 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 WORKDIR /app
 
-# Ensure byte compilation (optional)
+# Ensure byte compilation and use copy instead of hardlink for UV (essential for Docker/Volumes)
 ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
 
 # Copy dependency files
 # Using monorepo context (build from root)

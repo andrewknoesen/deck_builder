@@ -1,36 +1,44 @@
-from fastapi import APIRouter
+import httpx
+from app.services.scryfall import ScryfallService, get_scryfall_service
+from fastapi import APIRouter, Depends, HTTPException
 
 router = APIRouter()
 
 @router.get("/search")
-def search_cards(q: str):
+async def search_cards(
+    q: str, scryfall: ScryfallService = Depends(get_scryfall_service)
+):
     """
     Search for cards using Scryfall.
     """
-    # Mock data for testing UI
-    return {
-        "data": [
-            {
-                "id": "mock-1",
-                "name": "Black Lotus",
-                "image_uris": {
-                    "normal": "https://cards.scryfall.io/normal/front/b/d/bd8fa327-dd41-4737-8f19-2cf5eb1f7cdd.jpg?1614638838"
-                }
-            },
-            {
-                "id": "mock-2",
-                "name": "Mox Pearl",
-                "image_uris": {
-                    "normal": "https://cards.scryfall.io/normal/front/e/d/ed0216a0-c5c9-4a99-b869-53e4d0256326.jpg?1614638847"
-                }
-            }
-        ]
-    }
+    try:
+        data = await scryfall.search_cards(q)
+        return data
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"Scryfall error: {e.response.text}",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{card_id}")
-def get_card(card_id: str):
+async def get_card(
+    card_id: str, scryfall: ScryfallService = Depends(get_scryfall_service)
+):
     """
     Get card by ID.
     """
-    return {"message": f"Get card placeholder for: {card_id}"}
+    try:
+        data = await scryfall.get_card_by_id(card_id)
+        return data
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Card not found")
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"Scryfall error: {e.response.text}",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
