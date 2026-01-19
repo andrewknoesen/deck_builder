@@ -1,12 +1,19 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link as RouterLink, Navigate } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Link as RouterLink,
+} from "react-router-dom";
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DeckList } from './pages/DeckList';
 import { DeckBuilder } from './pages/DeckBuilder';
+import { LandingPage } from "./pages/LandingPage";
 import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Button, Box, Avatar, Container } from '@mui/material';
 import { theme } from './theme';
 import DashboardIcon from '@mui/icons-material/Dashboard'; // Placeholder for custom logo
 import LayersIcon from '@mui/icons-material/Layers';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, login } = useAuth();
@@ -91,9 +98,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
-
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -112,7 +116,7 @@ function App() {
           <Router>
             <Layout>
               <Routes>
-                <Route path="/" element={<Navigate to="/decks" replace />} />
+                <Route path="/" element={<LandingPage />} />
                 <Route path="/decks" element={<DeckList />} />
                 <Route path="/decks/:deckId" element={<DeckBuilder />} />
                 <Route path="/decks/new" element={<DeckBuilder />} />
