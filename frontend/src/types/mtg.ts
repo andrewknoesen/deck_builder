@@ -29,3 +29,10 @@ export interface Deck {
     user_id: number;
     cards?: DeckCard[];
 }
+
+export interface CollectionCard {
+    id: number;
+    card_id: string;
+    quantity: number;
+    card?: ScryfallCard;
+}
