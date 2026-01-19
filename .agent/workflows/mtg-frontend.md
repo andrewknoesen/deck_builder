@@ -10,6 +10,8 @@ Tech stack
 - React + TypeScript + Vite or Create React App.
 - State management: React Query or simple Context + hooks.
 - UI: MUI.
+- Python with UV
+- Postgres
 
 Core screens
 

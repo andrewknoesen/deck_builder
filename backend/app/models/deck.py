@@ -57,6 +57,7 @@ class ScryfallCardPublic(SQLModel):
     type_line: Optional[str] = None
     oracle_text: Optional[str] = None
     colors: Optional[List[str]] = None
+    produced_mana: Optional[List[str]] = None
     image_uris: Optional[Dict[str, str]] = None
 
 

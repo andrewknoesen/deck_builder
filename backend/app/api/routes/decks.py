@@ -25,31 +25,58 @@ async def sync_cards(db: AsyncSession, card_ids: List[str], scryfall: ScryfallSe
     if not card_ids:
         return
 
-    # Check which cards exist
-    result = await db.execute(select(Card.id).where(col(Card.id).in_(card_ids)))
-    existing_ids = set(result.scalars().all())
+    # Check which cards exist and have been synced with produced_mana
+    # We treat NULL produced_mana as "needs sync"
+    result = await db.execute(
+        select(Card.id)
+        .where(col(Card.id).in_(card_ids))
+        .where(col(Card.produced_mana).is_not(None))
+    )
+    existing_synced_ids = set(result.scalars().all())
     
-    missing_ids = list(set(card_ids) - existing_ids)
-    if not missing_ids:
+    ids_to_fetch = list(set(card_ids) - existing_synced_ids)
+    if not ids_to_fetch:
         return
 
     # Fetch missing cards from Scryfall
-    scryfall_cards = await scryfall.get_cards_by_ids(missing_ids)
+    scryfall_cards = await scryfall.get_cards_by_ids(ids_to_fetch)
     
-    # Insert new cards
+    # Process fetched cards
     for card_data in scryfall_cards:
-        # Map Scryfall JSON to Card model
-        # Note: Scryfall JSON keys roughly match Card fields
-        card = Card(
-            id=card_data["id"],
-            name=card_data["name"],
-            mana_cost=card_data.get("mana_cost"),
-            type_line=card_data.get("type_line"),
-            oracle_text=card_data.get("oracle_text"),
-            colors=card_data.get("colors"),
-            image_uris=card_data.get("image_uris"),
-        )
-        db.add(card)
+        # Check if card already exists (but was incomplete) to avoid PK violation
+        # We can use upsert or just checking existence. 
+        # Since we filtered by "is_not(None)", the card MIGHT exist but have NULL.
+        # So we should try to get it first or use merge.
+        
+        # Simpler approach: check if it exists in DB (even with NULL)
+        existing_check = await db.execute(select(Card).where(Card.id == card_data["id"]))
+        existing_card = existing_check.scalar_one_or_none()
+        
+        produced_mana = card_data.get("produced_mana", [])
+        
+        if existing_card:
+            # Update existing
+            existing_card.name = card_data["name"]
+            existing_card.mana_cost = card_data.get("mana_cost")
+            existing_card.type_line = card_data.get("type_line")
+            existing_card.oracle_text = card_data.get("oracle_text")
+            existing_card.colors = card_data.get("colors")
+            existing_card.produced_mana = produced_mana
+            existing_card.image_uris = card_data.get("image_uris")
+            db.add(existing_card)
+        else:
+            # Create new
+            card = Card(
+                id=card_data["id"],
+                name=card_data["name"],
+                mana_cost=card_data.get("mana_cost"),
+                type_line=card_data.get("type_line"),
+                oracle_text=card_data.get("oracle_text"),
+                colors=card_data.get("colors"),
+                produced_mana=produced_mana,
+                image_uris=card_data.get("image_uris"),
+            )
+            db.add(card)
     
     await db.commit()
 
@@ -203,9 +230,24 @@ async def delete_deck(deck_id: int, db: AsyncSession = Depends(get_db)):
     return {"status": "ok"}
 
 
+from app.services.stats import DeckStatsService
+
 @router.get("/{deck_id}/stats")
-def get_deck_stats(deck_id: int):
+async def get_deck_stats(
+    deck_id: int,
+    db: AsyncSession = Depends(get_db),
+):
     """
     Get deck statistics.
     """
-    return {"message": f"Deck stats placeholder for: {deck_id}"}
+    result = await db.execute(
+        select(Deck)
+        .where(Deck.id == deck_id)
+        .options(selectinload(Deck.cards).selectinload(DeckCard.card))
+    )
+    deck = result.scalar_one_or_none()
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+        
+    stats = DeckStatsService.calculate_stats(deck)
+    return stats

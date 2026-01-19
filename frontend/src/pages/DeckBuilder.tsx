@@ -13,7 +13,10 @@ import {
   Divider,
   Stack,
   CircularProgress,
+  Tabs,
+  Tab,
 } from "@mui/material";
+import BarChartIcon from "@mui/icons-material/BarChart";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SearchIcon from "@mui/icons-material/Search";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
@@ -23,6 +26,7 @@ import type { ScryfallCard, Deck, DeckCard } from "../types/mtg";
 import { useAuth } from "../context/AuthContext";
 import { SearchCard } from "../components/SearchCard";
 import { DeckCard as DeckCardComponent } from "../components/DeckCard";
+import { DeckStats } from "../components/DeckStats";
 import { useDebounce } from "../hooks/useDebounce";
 
 // Helper to determine primary type for grouping
@@ -162,6 +166,7 @@ export const DeckBuilder: React.FC = () => {
   }, [debouncedTitle, debouncedFormat, debouncedCards]);
 
   // Search State
+  const [rightTab, setRightTab] = useState(0);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ScryfallCard[]>([]);
   const [searching, setSearching] = useState(false);
@@ -425,7 +430,7 @@ export const DeckBuilder: React.FC = () => {
         </Box>
       </Paper>
 
-      {/* Right Column: Search (Reduced width) */}
+      {/* Right Column: Search + Stats */}
       <Box
         sx={{
           flex: 1,
@@ -437,111 +442,125 @@ export const DeckBuilder: React.FC = () => {
       >
         <Box
           sx={{
-            p: 4,
+            px: 2,
+            pt: 2,
             zIndex: 10,
             bgcolor: "background.default",
             borderBottom: 1,
             borderColor: "divider",
           }}
         >
-          <Typography
-            variant="h4"
-            fontWeight="900"
-            gutterBottom
-            sx={{ display: "flex", alignItems: "center", gap: 2 }}
-          >
-            Card Database{" "}
-            <AutoAwesomeIcon sx={{ color: "warning.main", fontSize: 28 }} />
-          </Typography>
-
-          <Box
-            component="form"
-            onSubmit={handleSearch}
-            sx={{ position: "relative", mt: 3 }}
-          >
-            <TextField
-              fullWidth
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, type, or color..."
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon color="action" />
-                  </InputAdornment>
-                ),
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      disabled={searching}
-                      sx={{ minWidth: 80, borderRadius: 2 }}
-                    >
-                      {searching ? (
-                        <CircularProgress size={20} color="inherit" />
-                      ) : (
-                        "Find"
-                      )}
-                    </Button>
-                  </InputAdornment>
-                ),
-                sx: {
-                  borderRadius: 4,
-                  bgcolor: "background.paper",
-                  boxShadow: 2,
-                  pl: 2,
-                  pr: 1,
-                  py: 1,
-                  "& fieldset": { border: "none" },
-                },
-              }}
+          <Tabs value={rightTab} onChange={(_, v) => setRightTab(v)}>
+            <Tab
+              icon={<SearchIcon />}
+              label="Search Cards"
+              iconPosition="start"
+              sx={{ minHeight: 64 }}
             />
-          </Box>
+            <Tab
+              icon={<BarChartIcon />}
+              label="Deck Stats"
+              iconPosition="start"
+              sx={{ minHeight: 64 }}
+            />
+          </Tabs>
+
+          {rightTab === 0 && (
+            <Box
+              component="form"
+              onSubmit={handleSearch}
+              sx={{ position: "relative", my: 2 }}
+            >
+              <TextField
+                fullWidth
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by name, type, or color..."
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon color="action" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        disabled={searching}
+                        sx={{ minWidth: 80, borderRadius: 2 }}
+                      >
+                        {searching ? (
+                          <CircularProgress size={20} color="inherit" />
+                        ) : (
+                          "Find"
+                        )}
+                      </Button>
+                    </InputAdornment>
+                  ),
+                  sx: {
+                    borderRadius: 4,
+                    bgcolor: "background.paper",
+                    boxShadow: 2,
+                    pl: 2,
+                    pr: 1,
+                    py: 1,
+                    "& fieldset": { border: "none" },
+                  },
+                }}
+              />
+            </Box>
+          )}
         </Box>
 
-        <Box sx={{ flex: 1, overflowY: "auto", p: 4 }}>
-          {searching ? (
-            <Grid container spacing={2}>
-              {[...Array(10)].map((_, i) => (
-                <Grid size={{ xs: 6, sm: 4, md: 3 }} key={i}>
-                  <Box
-                    sx={{
-                      aspectRatio: "2.5/3.5",
-                      bgcolor: "action.hover",
-                      borderRadius: 3,
-                      animation: "pulse 1.5s infinite opacity",
-                    }}
-                  />
+        <Box sx={{ flex: 1, overflowY: "auto", p: rightTab === 0 ? 4 : 0 }}>
+          {rightTab === 0 ? (
+            <>
+              {searching ? (
+                <Grid container spacing={2}>
+                  {[...Array(10)].map((_, i) => (
+                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={i}>
+                      <Box
+                        sx={{
+                          aspectRatio: "2.5/3.5",
+                          bgcolor: "action.hover",
+                          borderRadius: 3,
+                          animation: "pulse 1.5s infinite opacity",
+                        }}
+                      />
+                    </Grid>
+                  ))}
                 </Grid>
-              ))}
-            </Grid>
-          ) : (
-            <Grid container spacing={3}>
-              {searchResults.map((card) => (
-                <Grid size={{ xs: 6, sm: 4, md: 3 }} key={card.id}>
-                  <SearchCard card={card} onAdd={addCard} />
+              ) : (
+                <Grid container spacing={3}>
+                  {searchResults.map((card) => (
+                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={card.id}>
+                      <SearchCard card={card} onAdd={addCard} />
+                    </Grid>
+                  ))}
+                  {searchResults.length === 0 && !searching && (
+                    <Box
+                      sx={{
+                        gridColumn: "1 / -1",
+                        py: 10,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        opacity: 0.3,
+                        gap: 2,
+                      }}
+                    >
+                      <AutoAwesomeIcon sx={{ fontSize: 60 }} />
+                      <Typography variant="h5" fontWeight="700">
+                        Search the multiverse
+                      </Typography>
+                    </Box>
+                  )}
                 </Grid>
-              ))}
-              {searchResults.length === 0 && !searching && (
-                <Box
-                  sx={{
-                    gridColumn: "1 / -1",
-                    py: 10,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    opacity: 0.3,
-                    gap: 2,
-                  }}
-                >
-                  <AutoAwesomeIcon sx={{ fontSize: 60 }} />
-                  <Typography variant="h5" fontWeight="700">
-                    Search the multiverse
-                  </Typography>
-                </Box>
               )}
-            </Grid>
+            </>
+          ) : (
+            <DeckStats cards={deckCards} deckId={deck ? deck.id : undefined} />
           )}
         </Box>
       </Box>
