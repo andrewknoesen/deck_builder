@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate, Link as RouterLink } from "react-router-dom";
 import {
@@ -15,15 +9,12 @@ import {
   IconButton,
   Grid,
   Paper,
-  CircularProgress,
   InputAdornment,
   Divider,
   Stack,
-  Chip,
+  CircularProgress,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import SearchIcon from "@mui/icons-material/Search";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import GridViewIcon from "@mui/icons-material/GridView";
@@ -60,6 +51,19 @@ const TYPE_ORDER = [
   "Unknown",
 ];
 
+const FORMATS = [
+  "Commander",
+  "Standard",
+  "Modern",
+  "Pioneer",
+  "Legacy",
+  "Vintage",
+  "Pauper",
+  "Oathbreaker",
+  "Brawl",
+  "Limited",
+];
+
 export const DeckBuilder: React.FC = () => {
   const { deckId } = useParams();
   const navigate = useNavigate();
@@ -70,6 +74,7 @@ export const DeckBuilder: React.FC = () => {
 
   // State
   const [title, setTitle] = useState("New Deck");
+  const [format, setFormat] = useState("Commander");
   const [deckCards, setDeckCards] = useState<DeckCard[]>([]);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">(
     "saved",
@@ -78,6 +83,7 @@ export const DeckBuilder: React.FC = () => {
 
   // Debounce critical state for auto-save
   const debouncedTitle = useDebounce(title, 1000);
+  const debouncedFormat = useDebounce(format, 1000);
   const debouncedCards = useDebounce(deckCards, 1000);
 
   // Fetch deck data
@@ -92,27 +98,26 @@ export const DeckBuilder: React.FC = () => {
   });
 
   // Sync remote data to local state when loaded
+  // Sync remote data to local state ONLY on initial load
   useEffect(() => {
-    if (deck) {
+    if (deck && isInitialLoad) {
       setTitle(deck.title);
+      setFormat(deck.format || "Commander");
       setDeckCards(deck.cards || []);
       setIsInitialLoad(false);
     } else if (isNew) {
       setIsInitialLoad(false);
     }
-  }, [deck, isNew]);
+  }, [deck, isNew, isInitialLoad]);
 
   // Track if we have unsaved changes locally
   useEffect(() => {
     if (!isInitialLoad) {
       // Check if current state differs from debounced (roughly implies typing)
       // Or simpler: just set to unsaved on any change, and let debounce effect handle save
-      // But we can't easily compare "debounced" vs "current" in the same render easily without ref or separate effect.
-      // Let's simplistically set 'unsaved' when title or cards change,
-      // BUT we need to avoid setting it on initial load. `isInitialLoad` handles the initial hydration.
       setSaveStatus("unsaved");
     }
-  }, [title, deckCards, isInitialLoad]);
+  }, [title, format, deckCards, isInitialLoad]);
 
   // Auto-save Effect
   useEffect(() => {
@@ -124,6 +129,7 @@ export const DeckBuilder: React.FC = () => {
       try {
         const deckData = {
           title: debouncedTitle,
+          format: debouncedFormat,
           user_id: user?.id || 1,
           cards: debouncedCards.map(({ card_id, quantity, board }) => ({
             card_id,
@@ -153,7 +159,7 @@ export const DeckBuilder: React.FC = () => {
     if (saveStatus === "unsaved") {
       saveDeck();
     }
-  }, [debouncedTitle, debouncedCards]);
+  }, [debouncedTitle, debouncedFormat, debouncedCards]);
 
   // Search State
   const [query, setQuery] = useState("");
@@ -283,18 +289,37 @@ export const DeckBuilder: React.FC = () => {
             >
               <ArrowBackIcon fontSize="small" />
             </IconButton>
-            <Box sx={{ flex: 1 }}>
-              <TextField
-                fullWidth
-                variant="standard"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Deck Title"
-                InputProps={{
-                  disableUnderline: true,
-                  sx: { fontSize: "1.5rem", fontWeight: 900 },
-                }}
-              />
+            <Box
+              sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}
+            >
+              <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+                <TextField
+                  fullWidth
+                  variant="standard"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Deck Title"
+                  InputProps={{
+                    disableUnderline: true,
+                    sx: { fontSize: "1.5rem", fontWeight: 900 },
+                  }}
+                />
+                <TextField
+                  select
+                  value={format}
+                  onChange={(e) => setFormat(e.target.value)}
+                  variant="outlined"
+                  size="small"
+                  SelectProps={{ native: true }}
+                  sx={{ width: 220 }}
+                >
+                  {FORMATS.map((fmt) => (
+                    <option key={fmt} value={fmt}>
+                      {fmt}
+                    </option>
+                  ))}
+                </TextField>
+              </Box>
               <Typography
                 variant="caption"
                 fontWeight="700"
@@ -306,35 +331,7 @@ export const DeckBuilder: React.FC = () => {
             </Box>
 
             {/* Status Indicator */}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              {saveStatus === "saving" && (
-                <Chip
-                  icon={<CircularProgress size={14} color="inherit" />}
-                  label="Saving..."
-                  size="small"
-                  variant="outlined"
-                  color="default"
-                />
-              )}
-              {saveStatus === "saved" && (
-                <Chip
-                  icon={<CheckCircleIcon />}
-                  label="Saved"
-                  size="small"
-                  variant="outlined"
-                  color="success"
-                />
-              )}
-              {saveStatus === "unsaved" && (
-                <Chip
-                  icon={<CloudUploadIcon />}
-                  label="Unsaved"
-                  size="small"
-                  variant="outlined"
-                  color="warning"
-                />
-              )}
-            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}></Box>
           </Box>
         </Box>
 

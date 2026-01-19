@@ -154,15 +154,25 @@ async def update_deck(
     update_data = deck_in.model_dump(exclude_unset=True)
 
     if "cards" in update_data:
-        # Replace strategy
-        if deck_in.cards:
-            db_deck.cards = [
-                DeckCard.model_validate(card, update={"deck_id": db_deck.id})
-                for card in deck_in.cards
-            ]
-        else:
-            db_deck.cards = []
-
+        # Replace strategy with manual merge to ensure updates persist
+        if deck_in.cards is not None:
+            existing_cards_map = {dc.card_id: dc for dc in db_deck.cards}
+            new_cards_list = []
+            
+            for card_in in deck_in.cards:
+                if card_in.card_id in existing_cards_map:
+                    # Update existing item in place
+                    existing_card = existing_cards_map[card_in.card_id]
+                    existing_card.quantity = card_in.quantity
+                    existing_card.board = card_in.board
+                    new_cards_list.append(existing_card)
+                else:
+                    # Create new item
+                    new_card = DeckCard.model_validate(card_in, update={"deck_id": db_deck.id})
+                    new_cards_list.append(new_card)
+            
+            db_deck.cards = new_cards_list
+        
         del update_data["cards"]
 
     db_deck.sqlmodel_update(update_data)
