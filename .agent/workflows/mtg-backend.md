@@ -12,7 +12,7 @@ Tech stack
 - PEP 8 style guide
 - FastAPI + Uvicorn
 - Pydantic models
-- Simple persistence (Postgres).
+- Use postgres for data persistance.
 
 Core responsibilities
 

@@ -8,7 +8,7 @@ interface SearchCardProps {
     onAdd: (card: ScryfallCard) => void;
 }
 
-export const SearchCard: React.FC<SearchCardProps> = ({ card, onAdd }) => {
+export const SearchCard = React.memo<SearchCardProps>(({ card, onAdd }) => {
     return (
         <Card sx={{ 
             height: '100%', 
@@ -26,7 +26,7 @@ export const SearchCard: React.FC<SearchCardProps> = ({ card, onAdd }) => {
                 className="image-wrapper"
                 sx={{ 
                     position: 'relative', 
-                    borderRadius: 3, 
+                    borderRadius: 0, 
                     overflow: 'hidden', 
                     aspectRatio: '2.5/3.5', 
                     boxShadow: 4, 
@@ -42,6 +42,7 @@ export const SearchCard: React.FC<SearchCardProps> = ({ card, onAdd }) => {
                         component="img"
                         image={card.image_uris.normal}
                         alt={card.name}
+                        loading="lazy"
                         sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                 ) : (
@@ -91,4 +92,4 @@ export const SearchCard: React.FC<SearchCardProps> = ({ card, onAdd }) => {
             </Box>
         </Card>
     );
-};
+});

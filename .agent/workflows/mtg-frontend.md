@@ -9,7 +9,9 @@ Goal: Implement the frontend application as designed by the Architect agent.
 Tech stack
 - React + TypeScript + Vite or Create React App.
 - State management: React Query or simple Context + hooks.
-- UI: any simple component library (MUI, Chakra, or custom minimal components).
+- UI: MUI.
+- Python with UV
+- Postgres
 
 Core screens
 

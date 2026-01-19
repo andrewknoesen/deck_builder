@@ -2,18 +2,18 @@ import React from 'react';
 import { Card, CardMedia, Box, Typography, IconButton, Button } from '@mui/material';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
-import type { DeckCard as DeckCardType } from '../types/mtg';
+import type { CollectionCard } from '../types/mtg';
 
-interface DeckCardProps {
-    deckCard: DeckCardType;
-    onUpdateQuantity: (cardId: string, delta: number) => void;
-    onRemove: (cardId: string) => void;
+interface CollectionCardProps {
+    collectionCard: CollectionCard;
+    onUpdateQuantity: (id: number, delta: number) => void; // Using numerical ID for collection items
+    onRemove: (id: number) => void;
 }
 
-export const DeckCard = React.memo<DeckCardProps>(({ deckCard, onUpdateQuantity, onRemove }) => {
+export const CollectionCardComponent = React.memo<CollectionCardProps>(({ collectionCard, onUpdateQuantity, onRemove }) => {
     return (
         <Box sx={{ position: 'relative', width: '100%', aspectRatio: '2.5/3.5' }}>
-             {/* Quantity Badge (Always Visible initially, hidden on hover via CSS) */}
+             {/* Quantity Badge */}
              <Box sx={{ 
                 position: 'absolute', 
                 top: -8, 
@@ -33,9 +33,9 @@ export const DeckCard = React.memo<DeckCardProps>(({ deckCard, onUpdateQuantity,
                 fontSize: '0.75rem',
                 transition: 'opacity 0.2s',
                 opacity: 1,
-                '.parent-card:hover &': { opacity: 0 } // Hide when hovering the card controller
+                '.parent-card:hover &': { opacity: 0 }
             }}>
-                x{deckCard.quantity}
+                x{collectionCard.quantity}
             </Box>
 
             <Card className="parent-card" sx={{ 
@@ -45,7 +45,7 @@ export const DeckCard = React.memo<DeckCardProps>(({ deckCard, onUpdateQuantity,
                 borderRadius: 0, 
                 border: 1, 
                 borderColor: 'divider',
-                overflow: 'visible', // For scale effect
+                overflow: 'visible',
                 '&:hover': { zIndex: 10 },
             }}>
                 <Box sx={{ 
@@ -57,18 +57,18 @@ export const DeckCard = React.memo<DeckCardProps>(({ deckCard, onUpdateQuantity,
                     transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     '&:hover': { transform: 'scale(1.05)', boxShadow: 12 }
                 }}>
-                    {deckCard.card?.image_uris?.normal ? (
+                    {collectionCard.card?.image_uris?.normal ? (
                         <CardMedia
                             component="img"
-                            image={deckCard.card.image_uris.normal}
-                            alt={deckCard.card.name}
+                            image={collectionCard.card.image_uris.normal}
+                            alt={collectionCard.card.name}
                             loading="lazy"
                             sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                     ) : (
                         <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.paper', p: 2, textAlign: 'center' }}>
                             <Typography variant="body2" color="text.secondary" fontWeight="700">
-                                {deckCard.card?.name}
+                                {collectionCard.card?.name}
                             </Typography>
                         </Box>
                     )}
@@ -90,18 +90,18 @@ export const DeckCard = React.memo<DeckCardProps>(({ deckCard, onUpdateQuantity,
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <IconButton 
                                 size="small" 
-                                onClick={(e) => { e.stopPropagation(); onUpdateQuantity(deckCard.card_id, -1); }}
+                                onClick={(e) => { e.stopPropagation(); onUpdateQuantity(collectionCard.id, -1); }}
                                 sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: 'secondary.main', color: 'white' } }}
                             >
                                 <RemoveIcon fontSize="small" />
                             </IconButton>
                             <Typography variant="h6" fontWeight="900" sx={{ minWidth: 24, textAlign: 'center' }}>
-                                {deckCard.quantity}
+                                {collectionCard.quantity}
                             </Typography>
                             <IconButton 
                                 size="small" 
-                                onClick={(e) => { e.stopPropagation(); onUpdateQuantity(deckCard.card_id, 1); }}
-                                sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: '#10b981', color: 'white' } }} // Emerald-500 equivalent
+                                onClick={(e) => { e.stopPropagation(); onUpdateQuantity(collectionCard.id, 1); }}
+                                sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: '#10b981', color: 'white' } }}
                             >
                                 <AddIcon fontSize="small" />
                             </IconButton>
@@ -110,7 +110,7 @@ export const DeckCard = React.memo<DeckCardProps>(({ deckCard, onUpdateQuantity,
                             size="small"
                             variant="text"
                             color="secondary"
-                            onClick={(e) => { e.stopPropagation(); onRemove(deckCard.card_id); }}
+                            onClick={(e) => { e.stopPropagation(); onRemove(collectionCard.id); }}
                             sx={{ fontWeight: 800, letterSpacing: 1, fontSize: '0.65rem' }}
                         >
                             REMOVE

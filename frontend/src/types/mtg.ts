@@ -5,6 +5,7 @@ export interface ScryfallCard {
     type_line?: string;
     oracle_text?: string;
     colors?: string[];
+    produced_mana?: string[];
     image_uris?: {
         small: string;
         normal: string;
@@ -28,4 +29,26 @@ export interface Deck {
     format?: string;
     user_id: number;
     cards?: DeckCard[];
+}
+
+export interface CollectionCard {
+    id: number;
+    card_id: string;
+    quantity: number;
+    card?: ScryfallCard;
+}
+
+export interface DeckStatsRecommendation {
+    land_count: number;
+    ramp_count: number;
+    cantrip_count: number;
+    reasoning: string;
+}
+
+export interface DeckStatsResponse {
+    total_cards: number;
+    mana_curve: Record<string, number>;
+    average_cmc: number;
+    recommendations: DeckStatsRecommendation;
+    color_stats?: Record<string, { pips: number; sources: number; recommended_sources: number }>;
 }
