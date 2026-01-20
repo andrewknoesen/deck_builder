@@ -93,7 +93,11 @@ export const DeckListItem: React.FC<DeckListItemProps> = ({
             <Stack direction="row" spacing={0.5} alignItems="center">
               <LayersIcon sx={{ fontSize: 16 }} />
               <Typography variant="caption" fontWeight="700">
-                {deck.cards?.length || 0} Cards
+                {(deck.cards || []).reduce(
+                  (acc, card) => acc + card.quantity,
+                  0,
+                )}{" "}
+                Cards
               </Typography>
             </Stack>
             <Stack direction="row" spacing={0.5} alignItems="center">

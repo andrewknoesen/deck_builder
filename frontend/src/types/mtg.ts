@@ -45,10 +45,23 @@ export interface DeckStatsRecommendation {
     reasoning: string;
 }
 
+export interface DeckStatsDrawOdds {
+    opening_hand: {
+        lands_at_least_2: number;
+        lands_at_least_3: number;
+        lands_at_least_4: number;
+    };
+    on_curve: {
+        turn_3_land_drop: number;
+        turn_4_land_drop: number;
+    };
+}
+
 export interface DeckStatsResponse {
     total_cards: number;
     mana_curve: Record<string, number>;
     average_cmc: number;
     recommendations: DeckStatsRecommendation;
     color_stats?: Record<string, { pips: number; sources: number; recommended_sources: number }>;
+    draw_odds?: DeckStatsDrawOdds;
 }
