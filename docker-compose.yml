@@ -20,7 +20,7 @@ services:
     command: sh -c "uv run python prestart.py && uv run alembic upgrade head && uv run python -m app.initial_data && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   db:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
@@ -31,7 +31,7 @@ services:
       - "5432:5432"
 
   frontend:
-    image: node:22-alpine
+    image: node:24-alpine
     working_dir: /app
     volumes:
       - ./frontend:/app
