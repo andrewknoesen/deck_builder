@@ -119,7 +119,7 @@ This document defines the mathematical formulas, algorithms, and data structures
 
 ### Algorithm
 1.  Calculate `AverageCMC` of non-land cards.
-2.  Count `Ramp` cards (heuristic: `type_line` contains "Creature" or "Artifact" AND `oracle_text` contains "add {" AND `cmc` <= 2).
+2.  Count `Ramp` cards (heuristic: `type_line` contains "Creature" or "Artifact" AND `oracle_text` contains "add" AND `cmc` <= 2).
 3.  Count `Cantrip` cards (heuristic: `oracle_text` contains "draw a card" AND `cmc` <= 2).
 4.  Determine format (passed as argument or inferred from deck size).
     *   **If Commander (>80 cards)**:

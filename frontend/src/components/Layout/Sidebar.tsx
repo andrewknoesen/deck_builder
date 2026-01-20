@@ -19,39 +19,39 @@ const drawerWidth = 240;
 
 interface SidebarProps {
   open: boolean;
+  onClose: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ open }) => {
-// ...
+export const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
+  // ...
 
   const location = useLocation();
 
   const menuItems = [
-    { text: 'Home', icon: <DashboardIcon />, path: '/' },
-    { text: 'My Decks', icon: <LayersIcon />, path: '/decks' },
-    { text: 'New Deck', icon: <AddCircleOutlineIcon />, path: '/decks/new' },
-    { text: 'Collection', icon: <CollectionsIcon />, path: '/collection' },
+    { text: "Home", icon: <DashboardIcon />, path: "/" },
+    { text: "My Decks", icon: <LayersIcon />, path: "/decks" },
+    { text: "New Deck", icon: <AddCircleOutlineIcon />, path: "/decks/new" },
+    { text: "Collection", icon: <CollectionsIcon />, path: "/collection" },
   ];
 
   return (
     <Drawer
-      variant="persistent"
+      variant="temporary"
       anchor="left"
       open={open}
+      onClose={onClose}
       sx={{
-        width: open ? drawerWidth : 0,
-        flexShrink: 0,
-        '& .MuiDrawer-paper': {
+        "& .MuiDrawer-paper": {
           width: drawerWidth,
-          boxSizing: 'border-box',
-          top: 64, // Height of AppBar, push it down
-          height: 'calc(100% - 64px)',
+          boxSizing: "border-box",
+          // top: 64, // Removed to allow full height overlay
+          // height: 'calc(100% - 64px)', // Removed for full height
           borderRight: 1,
-          borderColor: 'divider',
+          borderColor: "divider",
         },
       }}
     >
-      <Box sx={{ overflow: 'auto' }}>
+      <Box sx={{ overflow: "auto" }}>
         <List>
           {menuItems.map((item) => (
             <ListItem key={item.text} disablePadding>
@@ -60,22 +60,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ open }) => {
                 to={item.path}
                 selected={location.pathname === item.path}
                 sx={{
-                    '&.Mui-selected': {
-                        bgcolor: 'primary.main',
-                        color: 'white',
-                        '&:hover': {
-                            bgcolor: 'primary.dark',
-                        },
-                        '& .MuiListItemIcon-root': {
-                            color: 'white',
-                        }
+                  "&.Mui-selected": {
+                    bgcolor: "primary.main",
+                    color: "white",
+                    "&:hover": {
+                      bgcolor: "primary.dark",
                     },
-                    borderRadius: 2,
-                    mx: 1,
-                    my: 0.5,
+                    "& .MuiListItemIcon-root": {
+                      color: "white",
+                    },
+                  },
+                  borderRadius: 2,
+                  mx: 1,
+                  my: 0.5,
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
+                <ListItemIcon sx={{ minWidth: 40, color: "inherit" }}>
                   {item.icon}
                 </ListItemIcon>
                 <ListItemText primary={item.text} />

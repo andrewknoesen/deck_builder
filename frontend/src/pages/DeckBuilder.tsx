@@ -217,20 +217,41 @@ export const DeckBuilder: React.FC = () => {
     setDeckCards((prev) => prev.filter((dc) => dc.card_id !== cardId));
   }, []);
 
+  const handleMoveToBoard = useCallback((cardId: string, newBoard: string) => {
+    setDeckCards((prev) =>
+      prev.map((dc) => {
+        if (dc.card_id === cardId) {
+          // If moving to commander, quantity max 1
+          const quantity = newBoard === "commander" ? 1 : dc.quantity;
+          return { ...dc, board: newBoard, quantity };
+        }
+        return dc;
+      }),
+    );
+  }, []);
+
   // Group cards
   const groupedCards = useMemo(() => {
     const groups: Record<string, DeckCard[]> = {};
     deckCards.forEach((dc) => {
-      const type = getCardType(dc.card?.type_line);
-      if (!groups[type]) groups[type] = [];
-      groups[type].push(dc);
+      // Logic for grouping:
+      // 1. If board is commander, group is "Commander"
+      // 2. Else group by type
+      let groupKey = getCardType(dc.card?.type_line);
+      if (dc.board === "commander") {
+        groupKey = "Commander";
+      }
+
+      if (!groups[groupKey]) groups[groupKey] = [];
+      groups[groupKey].push(dc);
     });
     return groups;
   }, [deckCards]);
 
   const sortedGroups = useMemo(() => {
+    const customOrder = ["Commander", ...TYPE_ORDER];
     return Object.keys(groupedCards).sort((a, b) => {
-      return TYPE_ORDER.indexOf(a) - TYPE_ORDER.indexOf(b);
+      return customOrder.indexOf(a) - customOrder.indexOf(b);
     });
   }, [groupedCards]);
 
@@ -419,6 +440,10 @@ export const DeckBuilder: React.FC = () => {
                           deckCard={dc}
                           onUpdateQuantity={updateQuantity}
                           onRemove={removeCard}
+                          onMoveToBoard={handleMoveToBoard}
+                          isCommanderFormat={
+                            format === "Commander" || format === "Brawl"
+                          }
                         />
                       </Grid>
                     ))}

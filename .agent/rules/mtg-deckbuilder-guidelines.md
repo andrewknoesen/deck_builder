@@ -12,3 +12,6 @@ trigger: always_on
 * When adding new features, update or add tests (pytest on backend, React Testing Library on frontend) whenever reasonable.
 * Default to ENV‑driven configuration (`.env` files) rather than hard‑coding secrets or URLs.
 * Write concise but clear comments when behavior is non‑obvious, and keep naming consistent (snake_case in Python, camelCase in TS).
+* Use postgres for the database.
+* Always manually test the code.
+* When testing the frontend always open the browser to test.

@@ -75,6 +75,10 @@ class DeckStatsService:
         # 3. Color Stats
         color_stats = DeckStatsService._calculate_color_needs(non_lands, lands, is_commander)
         
+        # 4. Draw Odds
+        total_lands = sum(dc.quantity for dc in lands)
+        draw_odds = DeckStatsService._calculate_draw_odds(total_cards, total_lands)
+
         return {
             "total_cards": total_cards,
             "mana_curve": mana_curve,
@@ -85,7 +89,8 @@ class DeckStatsService:
                 "cantrip_count": cantrip_count,
                 "reasoning": f"Based on avg CMC {round(avg_cmc, 2)} and {ramp_count} ramp sources."
             },
-            "color_stats": color_stats
+            "color_stats": color_stats,
+            "draw_odds": draw_odds
         }
 
     @staticmethod
@@ -184,3 +189,55 @@ class DeckStatsService:
                 pass
 
         return stats
+
+    @staticmethod
+    def _calculate_draw_odds(total_cards: int, total_lands: int) -> Dict[str, Any]:
+        """
+        Calculate hypergeometric probabilities for drawing lands.
+        P(X=k) = C(K, k) * C(N-K, n-k) / C(N, n)
+        """
+        import math
+
+        def hypergeom(N, K, n, k):
+            """
+            N: Population size (Deck size)
+            K: Successes in population (Total lands)
+            n: Sample size (Cards drawn)
+            k: Successes in sample (Lands desired)
+            """
+            if k > n or k > K or n - k > N - K:
+                return 0.0
+            combin = math.comb
+            return (combin(K, k) * combin(N - K, n - k)) / combin(N, n)
+
+        def prob_at_least(N, K, n, k):
+            """Sum of probabilities for X >= k"""
+            total_prob = 0.0
+            # iterate from k up to min(n, K)
+            for i in range(k, min(n, K) + 1):
+                total_prob += hypergeom(N, K, n, i)
+            return round(total_prob, 2)
+
+        # Opening Hand (7 cards)
+        # Prob of at least 2, 3, 4 lands
+        opening_hand = {
+            "lands_at_least_2": prob_at_least(total_cards, total_lands, 7, 2),
+            "lands_at_least_3": prob_at_least(total_cards, total_lands, 7, 3),
+            "lands_at_least_4": prob_at_least(total_cards, total_lands, 7, 4),
+        }
+
+        # On Curve (drawing naturally)
+        # Turn 3: 7 + 2 draws = 9 cards seen (Play/Draw varies, assume Play for simple heuristic or avg)
+        # Actually simplified: On the Play, T3 you have seen 7+2=9 cards (Draw step T2, T3).
+        # We want >= 3 lands by Turn 3.
+        # Turn 4: 7 + 3 draws = 10 cards. want >= 4 lands.
+        
+        on_curve = {
+            "turn_3_land_drop": prob_at_least(total_cards, total_lands, 9, 3),
+            "turn_4_land_drop": prob_at_least(total_cards, total_lands, 10, 4),
+        }
+
+        return {
+            "opening_hand": opening_hand,
+            "on_curve": on_curve
+        }
