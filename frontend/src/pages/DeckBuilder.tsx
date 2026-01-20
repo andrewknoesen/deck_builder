@@ -15,7 +15,10 @@ import {
   CircularProgress,
   Tabs,
   Tab,
+  Alert,
+  Collapse,
 } from "@mui/material";
+import { validateDeckSize } from "../utils/deckValidation";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SearchIcon from "@mui/icons-material/Search";
@@ -255,6 +258,16 @@ export const DeckBuilder: React.FC = () => {
     });
   }, [groupedCards]);
 
+  const totalCards = useMemo(
+    () => deckCards.reduce((acc, curr) => acc + curr.quantity, 0),
+    [deckCards],
+  );
+
+  const validation = useMemo(
+    () => validateDeckSize(format, totalCards),
+    [format, totalCards],
+  );
+
   if (loadingDecks) {
     return (
       <Box
@@ -352,13 +365,30 @@ export const DeckBuilder: React.FC = () => {
                 color="text.secondary"
                 sx={{ textTransform: "uppercase", letterSpacing: 1 }}
               >
-                {deckCards.reduce((acc, curr) => acc + curr.quantity, 0)} Cards
+                {totalCards} Cards
               </Typography>
             </Box>
 
             {/* Status Indicator */}
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}></Box>
           </Box>
+
+          <Collapse in={!validation.valid}>
+            {validation.message && (
+              <Alert
+                severity={validation.severity === "error" ? "error" : "warning"}
+                sx={{
+                  mx: 3,
+                  mb: 2,
+                  borderRadius: 2,
+                  fontWeight: 500,
+                  "& .MuiAlert-icon": { alignItems: "center" },
+                }}
+              >
+                {validation.message}
+              </Alert>
+            )}
+          </Collapse>
         </Box>
 
         {/* Deck Content */}
@@ -585,7 +615,11 @@ export const DeckBuilder: React.FC = () => {
               )}
             </>
           ) : (
-            <DeckStats cards={deckCards} deckId={deck ? deck.id : undefined} />
+            <DeckStats
+              cards={deckCards}
+              deckId={deck ? deck.id : undefined}
+              format={format}
+            />
           )}
         </Box>
       </Box>
