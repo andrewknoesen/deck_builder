@@ -1,0 +1,17 @@
+{
+  "extends": ["config:base"],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "matchPackagePatterns": ["*"],
+      "groupName": "all dependencies",
+      "schedule": ["every weekend"]
+    }
+  ],
+  "prHourlyLimit": 2,
+  "timezone": "Africa/Johannesburg",
+  "ignorePaths": ["docs/**", "examples/**"]
+}

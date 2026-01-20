@@ -1,0 +1,24 @@
+About
+Name Dredge
+
+Deck
+4 Blanchwood Prowler
+4 Cache Grab
+2 Conduit Pylons
+6 Forest
+3 Generous Ent
+1 Geothermal Bog
+2 Gnaw to the Bone
+1 Haunted Mire
+4 Lotleth Giant
+4 Rubblebelt Maverick
+4 Satyr Wayfinder
+4 Scrapwork Mutt
+3 Swamp
+4 Troll of Khazad-dûm
+1 Wooded Ridgeline
+
+Sideboard
+4 Ancient Grudge
+2 Gnaw to the Bone
+4 Ray of Revelation
