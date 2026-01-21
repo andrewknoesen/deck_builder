@@ -22,6 +22,7 @@ import {
   validateDeckSize,
   getCardLimit,
   isCardLegal,
+  isValidCommander,
 } from "../utils/deckValidation";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -236,6 +237,9 @@ export const DeckBuilder: React.FC = () => {
     setDeckCards((prev) =>
       prev.map((dc) => {
         if (dc.card_id === cardId) {
+          if (newBoard === "commander" && !isValidCommander(dc.card)) {
+            return dc; // Prevent illegal commander
+          }
           // If moving to commander, quantity max 1
           const quantity = newBoard === "commander" ? 1 : dc.quantity;
           return { ...dc, board: newBoard, quantity };
@@ -478,17 +482,29 @@ export const DeckBuilder: React.FC = () => {
                   <Grid container spacing={2}>
                     {groupedCards[type].map((dc) => (
                       <Grid size={{ xs: 3, lg: 2 }} key={dc.card_id}>
-                        <DeckCardComponent
-                          deckCard={dc}
-                          onUpdateQuantity={updateQuantity}
-                          onRemove={removeCard}
-                          onMoveToBoard={handleMoveToBoard}
-                          limit={getCardLimit(format, dc.card)}
-                          isCommanderFormat={
-                            format === "Commander" || format === "Brawl"
-                          }
-                          isIllegal={!isCardLegal(format, dc.card)}
-                        />
+                        {(() => {
+                          const isCommanderLike =
+                            format === "Commander" ||
+                            format === "Brawl" ||
+                            format === "Oathbreaker";
+                          const isIllegalPlacement =
+                            dc.board === "commander" && !isCommanderLike;
+                          return (
+                            <DeckCardComponent
+                              deckCard={dc}
+                              onUpdateQuantity={updateQuantity}
+                              onRemove={removeCard}
+                              onMoveToBoard={handleMoveToBoard}
+                              limit={getCardLimit(format, dc.card)}
+                              isCommanderFormat={isCommanderLike}
+                              isIllegal={
+                                !isCardLegal(format, dc.card) ||
+                                isIllegalPlacement
+                              }
+                              canBeCommander={isValidCommander(dc.card)}
+                            />
+                          );
+                        })()}
                       </Grid>
                     ))}
                   </Grid>

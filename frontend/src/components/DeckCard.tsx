@@ -11,7 +11,6 @@ import {
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents"; // Crown icon alternative
-import StarIcon from "@mui/icons-material/Star";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import type { DeckCard as DeckCardType } from '../types/mtg';
 
@@ -23,6 +22,7 @@ interface DeckCardProps {
   isCommanderFormat?: boolean;
   limit?: number;
   isIllegal?: boolean;
+  canBeCommander?: boolean;
 }
 
 export const DeckCard = React.memo<DeckCardProps>(
@@ -34,6 +34,7 @@ export const DeckCard = React.memo<DeckCardProps>(
     isCommanderFormat,
     limit = 4,
     isIllegal = false,
+    canBeCommander = true,
   }) => {
     const isOverLimit = deckCard.quantity > limit;
 
@@ -230,7 +231,7 @@ export const DeckCard = React.memo<DeckCardProps>(
                         <ArrowDownwardIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                  ) : (
+                  ) : canBeCommander ? (
                     <Tooltip title="Set as Commander">
                       <IconButton
                         size="small"
@@ -250,7 +251,7 @@ export const DeckCard = React.memo<DeckCardProps>(
                         <EmojiEventsIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                  )}
+                  ) : null}
                 </Box>
               )}
 
