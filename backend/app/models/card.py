@@ -10,6 +10,7 @@ class CardBase(SQLModel):
     colors: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     produced_mana: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     image_uris: Optional[Dict[str, str]] = Field(default=None, sa_column=Column(JSON))
+    legalities: Optional[Dict[str, str]] = Field(default=None, sa_column=Column(JSON))
 
 class Card(CardBase, table=True):
     pass

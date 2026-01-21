@@ -62,3 +62,60 @@ export const validateDeckSize = (
     message: `${format} decks usually require at least 60 cards.`,
   };
 };
+
+export const getCardLimit = (
+  format: string = "Commander",
+  card?: { type_line?: string; oracle_text?: string }
+): number => {
+  if (!card) return 4;
+
+  const f = format.toLowerCase();
+  
+  // Basic Lands are unlimited (technically 99/60 etc, but effectively unlimited)
+  if (card.type_line?.includes("Basic Land")) {
+    return 99;
+  }
+
+  // Cards that say "A deck can have any number of cards named..."
+  if (card.oracle_text?.includes("A deck can have any number of cards named")) {
+    return 99;
+  }
+
+  // Singleton formats
+  if (f === "commander" || f === "edh" || f === "brawl" || f === "oathbreaker") {
+    return 1;
+  }
+
+  // Limited formats - essentially unlimited pool
+  if (f === "limited" || f === "draft" || f === "sealed") {
+    return 99;
+  }
+
+  // Standard, Modern, Pioneer, etc.
+  return 4;
+};
+
+export const isCardLegal = (
+  format: string,
+  card?: { legalities?: Record<string, string> }
+): boolean => {
+  if (!card || !card.legalities) return true; // Default to legal if unknown
+
+  const f = format.toLowerCase();
+  
+  // Skip check for Limited formats
+  if (f === "limited" || f === "draft" || f === "sealed") {
+    return true;
+  }
+
+  // Map UI format names to Scryfall legality keys
+  const legalityKey = f === "edh" ? "commander" : f;
+
+  const status = card.legalities[legalityKey];
+  
+  // If status is undefined, assume legal or not applicable (safe default)
+  // 'legal' and 'restricted' are considered legal for inclusion
+  if (!status) return true;
+  
+  return status === "legal" || status === "restricted";
+};

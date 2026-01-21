@@ -8,11 +8,12 @@ from sqlmodel import SQLModel
 from app.core.db import get_db
 from app.main import app
 
-# Use a dedicated Postgres database for testing
-TEST_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/deck_builder_test"
+# Use a dedicated SQLite database for testing to avoid external dependencies
+TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
 
 engine = create_async_engine(
     TEST_DATABASE_URL,
+    connect_args={"check_same_thread": False},
     future=True,
 )
 TestingSessionLocal = async_sessionmaker(
