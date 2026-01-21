@@ -21,7 +21,8 @@ interface DeckCardProps {
   onRemove: (cardId: string) => void;
   onMoveToBoard?: (cardId: string, board: string) => void;
   isCommanderFormat?: boolean;
-  limit?: number; // New prop for limit checking
+  limit?: number;
+  isIllegal?: boolean;
 }
 
 export const DeckCard = React.memo<DeckCardProps>(
@@ -32,11 +33,34 @@ export const DeckCard = React.memo<DeckCardProps>(
     onMoveToBoard,
     isCommanderFormat,
     limit = 4,
+    isIllegal = false,
   }) => {
     const isOverLimit = deckCard.quantity > limit;
 
     return (
       <Box sx={{ position: "relative", width: "100%", aspectRatio: "2.5/3.5" }}>
+        {/* Illegality Badge */}
+        {isIllegal && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: 8,
+              left: 8,
+              zIndex: 20,
+              bgcolor: "error.main",
+              color: "white",
+              px: 1,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: "0.6rem",
+              fontWeight: 900,
+              boxShadow: 4,
+              pointerEvents: "none",
+            }}
+          >
+            ILLEGAL
+          </Box>
+        )}
         {/* Quantity Badge (Always Visible initially, hidden on hover via CSS) */}
         <Box
           sx={{
@@ -45,10 +69,11 @@ export const DeckCard = React.memo<DeckCardProps>(
             right: -8,
             width: 28,
             height: 28,
-            bgcolor: isOverLimit ? "error.main" : "background.paper", // Red if over limit
-            color: isOverLimit ? "white" : "text.primary",
+            bgcolor:
+              isOverLimit || isIllegal ? "error.main" : "background.paper",
+            color: isOverLimit || isIllegal ? "white" : "text.primary",
             border: 1,
-            borderColor: isOverLimit ? "error.main" : "divider",
+            borderColor: isOverLimit || isIllegal ? "error.main" : "divider",
             borderRadius: "50%",
             display: "flex",
             alignItems: "center",
@@ -73,12 +98,16 @@ export const DeckCard = React.memo<DeckCardProps>(
             position: "relative",
             borderRadius: 0,
             border: 1,
-            borderColor: isOverLimit
-              ? "error.main" // Red border if over limit
-              : deckCard.board === "commander"
-                ? "warning.main"
-                : "divider",
-            borderWidth: isOverLimit || deckCard.board === "commander" ? 2 : 1,
+            borderColor:
+              isOverLimit || isIllegal
+                ? "error.main"
+                : deckCard.board === "commander"
+                  ? "warning.main"
+                  : "divider",
+            borderWidth:
+              isOverLimit || isIllegal || deckCard.board === "commander"
+                ? 2
+                : 1,
             overflow: "visible", // For scale effect
             "&:hover": { zIndex: 10 },
           }}
@@ -92,6 +121,7 @@ export const DeckCard = React.memo<DeckCardProps>(
               overflow: "hidden",
               transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               "&:hover": { transform: "scale(1.05)", boxShadow: 12 },
+              filter: isIllegal ? "grayscale(100%)" : "none",
             }}
           >
             {deckCard.card?.image_uris?.normal ? (

@@ -94,3 +94,28 @@ export const getCardLimit = (
   // Standard, Modern, Pioneer, etc.
   return 4;
 };
+
+export const isCardLegal = (
+  format: string,
+  card?: { legalities?: Record<string, string> }
+): boolean => {
+  if (!card || !card.legalities) return true; // Default to legal if unknown
+
+  const f = format.toLowerCase();
+  
+  // Skip check for Limited formats
+  if (f === "limited" || f === "draft" || f === "sealed") {
+    return true;
+  }
+
+  // Map UI format names to Scryfall legality keys
+  const legalityKey = f === "edh" ? "commander" : f;
+
+  const status = card.legalities[legalityKey];
+  
+  // If status is undefined, assume legal or not applicable (safe default)
+  // 'legal' and 'restricted' are considered legal for inclusion
+  if (!status) return true;
+  
+  return status === "legal" || status === "restricted";
+};

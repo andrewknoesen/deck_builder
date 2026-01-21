@@ -14,6 +14,7 @@ export interface ScryfallCard {
         art_crop: string;
         border_crop: string;
     };
+    legalities?: Record<string, string>;
 }
 
 export interface DeckCard {

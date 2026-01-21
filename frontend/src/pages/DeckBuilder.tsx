@@ -18,7 +18,11 @@ import {
   Alert,
   Collapse,
 } from "@mui/material";
-import { validateDeckSize, getCardLimit } from "../utils/deckValidation";
+import {
+  validateDeckSize,
+  getCardLimit,
+  isCardLegal,
+} from "../utils/deckValidation";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SearchIcon from "@mui/icons-material/Search";
@@ -483,6 +487,7 @@ export const DeckBuilder: React.FC = () => {
                           isCommanderFormat={
                             format === "Commander" || format === "Brawl"
                           }
+                          isIllegal={!isCardLegal(format, dc.card)}
                         />
                       </Grid>
                     ))}

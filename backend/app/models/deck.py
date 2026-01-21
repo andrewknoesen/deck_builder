@@ -59,6 +59,7 @@ class ScryfallCardPublic(SQLModel):
     colors: Optional[List[str]] = None
     produced_mana: Optional[List[str]] = None
     image_uris: Optional[Dict[str, str]] = None
+    legalities: Optional[Dict[str, str]] = None
 
 
 class DeckCardPublic(DeckCardBase):
