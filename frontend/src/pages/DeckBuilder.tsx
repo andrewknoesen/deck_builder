@@ -18,7 +18,7 @@ import {
   Alert,
   Collapse,
 } from "@mui/material";
-import { validateDeckSize } from "../utils/deckValidation";
+import { validateDeckSize, getCardLimit } from "../utils/deckValidation";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SearchIcon from "@mui/icons-material/Search";
@@ -190,17 +190,25 @@ export const DeckBuilder: React.FC = () => {
     }
   };
 
-  const addCard = useCallback((card: ScryfallCard) => {
-    setDeckCards((prev) => {
-      const existing = prev.find((dc) => dc.card_id === card.id);
-      if (existing) {
-        return prev.map((dc) =>
-          dc.card_id === card.id ? { ...dc, quantity: dc.quantity + 1 } : dc,
-        );
-      }
-      return [...prev, { card_id: card.id, quantity: 1, board: "main", card }];
-    });
-  }, []);
+  const addCard = useCallback(
+    (card: ScryfallCard) => {
+      setDeckCards((prev) => {
+        const existing = prev.find((dc) => dc.card_id === card.id);
+
+        if (existing) {
+          // Allow exceeding limit (visual warning handled in DeckCard)
+          return prev.map((dc) =>
+            dc.card_id === card.id ? { ...dc, quantity: dc.quantity + 1 } : dc,
+          );
+        }
+        return [
+          ...prev,
+          { card_id: card.id, quantity: 1, board: "main", card },
+        ];
+      });
+    },
+    [format],
+  );
 
   const updateQuantity = useCallback((cardId: string, delta: number) => {
     setDeckCards((prev) =>
@@ -471,6 +479,7 @@ export const DeckBuilder: React.FC = () => {
                           onUpdateQuantity={updateQuantity}
                           onRemove={removeCard}
                           onMoveToBoard={handleMoveToBoard}
+                          limit={getCardLimit(format, dc.card)}
                           isCommanderFormat={
                             format === "Commander" || format === "Brawl"
                           }

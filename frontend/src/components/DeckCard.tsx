@@ -21,6 +21,7 @@ interface DeckCardProps {
   onRemove: (cardId: string) => void;
   onMoveToBoard?: (cardId: string, board: string) => void;
   isCommanderFormat?: boolean;
+  limit?: number; // New prop for limit checking
 }
 
 export const DeckCard = React.memo<DeckCardProps>(
@@ -30,7 +31,10 @@ export const DeckCard = React.memo<DeckCardProps>(
     onRemove,
     onMoveToBoard,
     isCommanderFormat,
+    limit = 4,
   }) => {
+    const isOverLimit = deckCard.quantity > limit;
+
     return (
       <Box sx={{ position: "relative", width: "100%", aspectRatio: "2.5/3.5" }}>
         {/* Quantity Badge (Always Visible initially, hidden on hover via CSS) */}
@@ -41,9 +45,10 @@ export const DeckCard = React.memo<DeckCardProps>(
             right: -8,
             width: 28,
             height: 28,
-            bgcolor: "background.paper",
+            bgcolor: isOverLimit ? "error.main" : "background.paper", // Red if over limit
+            color: isOverLimit ? "white" : "text.primary",
             border: 1,
-            borderColor: "divider",
+            borderColor: isOverLimit ? "error.main" : "divider",
             borderRadius: "50%",
             display: "flex",
             alignItems: "center",
@@ -68,9 +73,12 @@ export const DeckCard = React.memo<DeckCardProps>(
             position: "relative",
             borderRadius: 0,
             border: 1,
-            borderColor:
-              deckCard.board === "commander" ? "warning.main" : "divider",
-            borderWidth: deckCard.board === "commander" ? 2 : 1,
+            borderColor: isOverLimit
+              ? "error.main" // Red border if over limit
+              : deckCard.board === "commander"
+                ? "warning.main"
+                : "divider",
+            borderWidth: isOverLimit || deckCard.board === "commander" ? 2 : 1,
             overflow: "visible", // For scale effect
             "&:hover": { zIndex: 10 },
           }}
