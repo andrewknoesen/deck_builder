@@ -1,4 +1,4 @@
-from typing import List, cast, Sequence
+from typing import List
 
 from app.core.db import get_db
 from app.models.card import Card
@@ -12,8 +12,8 @@ from app.models.deck import (
 from app.services.scryfall import ScryfallService, get_scryfall_service
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import QueryableAttribute, selectinload
-from sqlmodel import select, col
+from sqlalchemy.orm import selectinload
+from sqlmodel import col, select
 
 router = APIRouter()
 
@@ -33,27 +33,29 @@ async def sync_cards(db: AsyncSession, card_ids: List[str], scryfall: ScryfallSe
         .where(col(Card.produced_mana).is_not(None))
     )
     existing_synced_ids = set(result.scalars().all())
-    
+
     ids_to_fetch = list(set(card_ids) - existing_synced_ids)
     if not ids_to_fetch:
         return
 
     # Fetch missing cards from Scryfall
     scryfall_cards = await scryfall.get_cards_by_ids(ids_to_fetch)
-    
+
     # Process fetched cards
     for card_data in scryfall_cards:
         # Check if card already exists (but was incomplete) to avoid PK violation
-        # We can use upsert or just checking existence. 
+        # We can use upsert or just checking existence.
         # Since we filtered by "is_not(None)", the card MIGHT exist but have NULL.
         # So we should try to get it first or use merge.
-        
+
         # Simpler approach: check if it exists in DB (even with NULL)
-        existing_check = await db.execute(select(Card).where(Card.id == card_data["id"]))
+        existing_check = await db.execute(
+            select(Card).where(Card.id == card_data["id"])
+        )
         existing_card = existing_check.scalar_one_or_none()
-        
+
         produced_mana = card_data.get("produced_mana", [])
-        
+
         if existing_card:
             # Update existing
             existing_card.name = card_data["name"]
@@ -79,7 +81,7 @@ async def sync_cards(db: AsyncSession, card_ids: List[str], scryfall: ScryfallSe
                 legalities=card_data.get("legalities"),
             )
             db.add(card)
-    
+
     await db.commit()
 
 
@@ -93,7 +95,7 @@ async def read_decks(
     # Eager load cards AND the nested card definition
     result = await db.execute(
         select(Deck).options(
-            selectinload(Deck.cards).selectinload(DeckCard.card)
+            selectinload(Deck.cards).selectinload(DeckCard.card)  # type: ignore[arg-type]
         )
     )
     decks = result.scalars().all()
@@ -102,9 +104,9 @@ async def read_decks(
 
 @router.post("/", response_model=DeckPublic)
 async def create_deck(
-    deck_in: DeckCreate, 
+    deck_in: DeckCreate,
     db: AsyncSession = Depends(get_db),
-    scryfall: ScryfallService = Depends(get_scryfall_service)
+    scryfall: ScryfallService = Depends(get_scryfall_service),
 ):
     """
     Create new deck. Safely syncs cards to local DB first.
@@ -132,7 +134,7 @@ async def create_deck(
     result = await db.execute(
         select(Deck)
         .where(Deck.id == db_deck.id)
-        .options(selectinload(Deck.cards).selectinload(DeckCard.card))
+        .options(selectinload(Deck.cards).selectinload(DeckCard.card))  # type: ignore[arg-type]
     )
     return result.scalar_one()
 
@@ -148,7 +150,7 @@ async def read_deck(
     result = await db.execute(
         select(Deck)
         .where(Deck.id == deck_id)
-        .options(selectinload(Deck.cards).selectinload(DeckCard.card))
+        .options(selectinload(Deck.cards).selectinload(DeckCard.card))  # type: ignore[arg-type]
     )
     deck = result.scalar_one_or_none()
     if not deck:
@@ -158,18 +160,16 @@ async def read_deck(
 
 @router.put("/{deck_id}", response_model=DeckPublic)
 async def update_deck(
-    deck_id: int, 
-    deck_in: DeckUpdate, 
+    deck_id: int,
+    deck_in: DeckUpdate,
     db: AsyncSession = Depends(get_db),
-    scryfall: ScryfallService = Depends(get_scryfall_service)
+    scryfall: ScryfallService = Depends(get_scryfall_service),
 ):
     """
     Update deck. Syncs new cards if added.
     """
     result = await db.execute(
-        select(Deck)
-        .where(Deck.id == deck_id)
-        .options(selectinload(Deck.cards))
+        select(Deck).where(Deck.id == deck_id).options(selectinload(Deck.cards))  # type: ignore[arg-type]
     )
     db_deck = result.scalar_one_or_none()
     if not db_deck:
@@ -187,7 +187,7 @@ async def update_deck(
         if deck_in.cards is not None:
             existing_cards_map = {dc.card_id: dc for dc in db_deck.cards}
             new_cards_list = []
-            
+
             for card_in in deck_in.cards:
                 if card_in.card_id in existing_cards_map:
                     # Update existing item in place
@@ -197,11 +197,13 @@ async def update_deck(
                     new_cards_list.append(existing_card)
                 else:
                     # Create new item
-                    new_card = DeckCard.model_validate(card_in, update={"deck_id": db_deck.id})
+                    new_card = DeckCard.model_validate(
+                        card_in, update={"deck_id": db_deck.id}
+                    )
                     new_cards_list.append(new_card)
-            
+
             db_deck.cards = new_cards_list
-        
+
         del update_data["cards"]
 
     db_deck.sqlmodel_update(update_data)
@@ -213,7 +215,7 @@ async def update_deck(
     result = await db.execute(
         select(Deck)
         .where(Deck.id == deck_id)
-        .options(selectinload(Deck.cards).selectinload(DeckCard.card))
+        .options(selectinload(Deck.cards).selectinload(DeckCard.card))  # type: ignore[arg-type]
     )
     return result.scalar_one()
 
@@ -234,6 +236,7 @@ async def delete_deck(deck_id: int, db: AsyncSession = Depends(get_db)):
 
 from app.services.stats import DeckStatsService
 
+
 @router.get("/{deck_id}/stats")
 async def get_deck_stats(
     deck_id: int,
@@ -245,7 +248,7 @@ async def get_deck_stats(
     result = await db.execute(
         select(Deck)
         .where(Deck.id == deck_id)
-        .options(selectinload(Deck.cards).selectinload(DeckCard.card))
+        .options(selectinload(Deck.cards).selectinload(DeckCard.card))  # type: ignore[arg-type]
     )
     deck = result.scalar_one_or_none()
     if not deck:

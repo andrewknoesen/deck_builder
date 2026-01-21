@@ -119,3 +119,24 @@ export const isCardLegal = (
   
   return status === "legal" || status === "restricted";
 };
+
+export const isValidCommander = (
+  card?: { type_line?: string; oracle_text?: string }
+): boolean => {
+  if (!card) return false;
+
+  const type = card.type_line?.toLowerCase() || "";
+  const text = card.oracle_text?.toLowerCase() || "";
+
+  // 1. Must be Legendary Creature
+  if (type.includes("legendary creature")) {
+    return true;
+  }
+
+  // 2. Or specified Planeswalkers/Cards that say "can be your commander"
+  if (text.includes("can be your commander")) {
+    return true;
+  }
+
+  return false;
+};
