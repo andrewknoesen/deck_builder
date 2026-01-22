@@ -5,16 +5,12 @@ import {
   Box,
   TextField,
   Typography,
-  Button,
   IconButton,
   Grid,
   Paper,
-  InputAdornment,
   Divider,
   Stack,
   CircularProgress,
-  Tabs,
-  Tab,
   Alert,
   Collapse,
 } from "@mui/material";
@@ -26,16 +22,16 @@ import {
 } from "../utils/deckValidation";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import SearchIcon from "@mui/icons-material/Search";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import GridViewIcon from "@mui/icons-material/GridView";
 import { apiClient } from "../api/client";
 import type { ScryfallCard, Deck, DeckCard } from "../types/mtg";
 import { useAuth } from "../context/AuthContext";
-import { SearchCard } from "../components/SearchCard";
 import { DeckCard as DeckCardComponent } from "../components/DeckCard";
 import { DeckStats } from "../components/DeckStats";
+import { DeckBuilderSearch } from "../components/DeckBuilderSearch";
 import { useDebounce } from "../hooks/useDebounce";
+import { useCardHover } from "../context/CardHoverContext";
+import { Card, CardMedia } from "@mui/material";
 
 // Helper to determine primary type for grouping
 const getCardType = (typeLine?: string): string => {
@@ -81,6 +77,7 @@ export const DeckBuilder: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { hoveredCard } = useCardHover();
 
   const isNew = !deckId || deckId === "new";
 
@@ -173,27 +170,7 @@ export const DeckBuilder: React.FC = () => {
     }
   }, [debouncedTitle, debouncedFormat, debouncedCards]);
 
-  // Search State
-  const [rightTab, setRightTab] = useState(0);
-  const [query, setQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<ScryfallCard[]>([]);
-  const [searching, setSearching] = useState(false);
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query) return;
-    setSearching(true);
-    try {
-      const res = await apiClient.get(`/cards/search`, {
-        params: { q: query },
-      });
-      setSearchResults(res.data.data || []);
-    } catch (err) {
-      console.error("Search failed", err);
-    } finally {
-      setSearching(false);
-    }
-  };
+  // Search State removed (now handled by DeckBuilderSearch)
 
   const addCard = useCallback(
     (card: ScryfallCard) => {
@@ -323,9 +300,11 @@ export const DeckBuilder: React.FC = () => {
         }}
       >
         {/* Header */}
+        {/* Header */}
         <Box
           sx={{
-            p: 3,
+            py: 1.5,
+            px: 2,
             borderBottom: 1,
             borderColor: "divider",
             bgcolor: "rgba(15, 23, 42, 0.8)",
@@ -335,7 +314,7 @@ export const DeckBuilder: React.FC = () => {
             zIndex: 20,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <IconButton
               component={RouterLink}
               to="/decks"
@@ -344,49 +323,67 @@ export const DeckBuilder: React.FC = () => {
             >
               <ArrowBackIcon fontSize="small" />
             </IconButton>
-            <Box
-              sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}
-            >
-              <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
-                <TextField
-                  fullWidth
-                  variant="standard"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Deck Title"
-                  InputProps={{
-                    disableUnderline: true,
-                    sx: { fontSize: "1.5rem", fontWeight: 900 },
-                  }}
-                />
-                <TextField
-                  select
-                  value={format}
-                  onChange={(e) => setFormat(e.target.value)}
-                  variant="outlined"
-                  size="small"
-                  SelectProps={{ native: true }}
-                  sx={{ width: 220 }}
-                >
-                  {FORMATS.map((fmt) => (
-                    <option key={fmt} value={fmt}>
-                      {fmt}
-                    </option>
-                  ))}
-                </TextField>
-              </Box>
-              <Typography
-                variant="caption"
-                fontWeight="700"
-                color="text.secondary"
-                sx={{ textTransform: "uppercase", letterSpacing: 1 }}
-              >
-                {totalCards} Cards
-              </Typography>
-            </Box>
 
-            {/* Status Indicator */}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}></Box>
+            {/* Title & Format Row */}
+            <Box
+              sx={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                gap: 2,
+                minWidth: 0,
+              }}
+            >
+              <TextField
+                fullWidth
+                variant="standard"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Deck Title"
+                InputProps={{
+                  disableUnderline: true,
+                  sx: { fontSize: "1.25rem", fontWeight: 800 },
+                }}
+              />
+              <TextField
+                select
+                value={format}
+                onChange={(e) => setFormat(e.target.value)}
+                variant="outlined"
+                size="small"
+                SelectProps={{ native: true }}
+                sx={{ width: 140, "& .MuiInputBase-input": { py: 0.5 } }}
+              >
+                {FORMATS.map((fmt) => (
+                  <option key={fmt} value={fmt}>
+                    {fmt}
+                  </option>
+                ))}
+              </TextField>
+            </Box>
+          </Box>
+
+          {/* Search Row */}
+          <Box
+            sx={{
+              mt: 1.5,
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              justifyContent: "space-between",
+            }}
+          >
+            <Box sx={{ flex: 1, maxWidth: 600 }}>
+              <DeckBuilderSearch onAddCard={addCard} />
+            </Box>
+            <Typography
+              variant="caption"
+              fontWeight="700"
+              color="text.secondary"
+              sx={{ textTransform: "uppercase", letterSpacing: 1 }}
+            >
+              {totalCards} Cards
+            </Typography>
           </Box>
 
           <Collapse in={!validation.valid}>
@@ -394,11 +391,12 @@ export const DeckBuilder: React.FC = () => {
               <Alert
                 severity={validation.severity === "error" ? "error" : "warning"}
                 sx={{
-                  mx: 3,
-                  mb: 2,
+                  mt: 1,
+                  py: 0,
                   borderRadius: 2,
                   fontWeight: 500,
-                  "& .MuiAlert-icon": { alignItems: "center" },
+                  "& .MuiAlert-icon": { alignItems: "center", py: 0 },
+                  "& .MuiAlert-message": { py: 0.5 },
                 }}
               >
                 {validation.message}
@@ -515,7 +513,7 @@ export const DeckBuilder: React.FC = () => {
         </Box>
       </Paper>
 
-      {/* Right Column: Search + Stats */}
+      {/* Right Column: Stats (Blurred) or Card Preview */}
       <Box
         sx={{
           flex: 1,
@@ -523,136 +521,173 @@ export const DeckBuilder: React.FC = () => {
           flexDirection: "column",
           bgcolor: "background.default",
           minWidth: 0,
+          borderLeft: 1,
+          borderColor: "divider",
+          position: "relative", // For overlay
         }}
       >
+        {/* Main Content (Stats) - active when NO hover */}
         <Box
           sx={{
-            px: 2,
-            pt: 2,
-            zIndex: 10,
-            bgcolor: "background.default",
-            borderBottom: 1,
-            borderColor: "divider",
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden", // Fixes scrolling issue
+            transition: "filter 0.2s, opacity 0.2s",
+            filter: hoveredCard ? "blur(8px)" : "none",
+            opacity: hoveredCard ? 0.3 : 1,
+            pointerEvents: hoveredCard ? "none" : "auto",
           }}
         >
-          <Tabs value={rightTab} onChange={(_, v) => setRightTab(v)}>
-            <Tab
-              icon={<SearchIcon />}
-              label="Search Cards"
-              iconPosition="start"
-              sx={{ minHeight: 64 }}
-            />
-            <Tab
-              icon={<BarChartIcon />}
-              label="Deck Stats"
-              iconPosition="start"
-              sx={{ minHeight: 64 }}
-            />
-          </Tabs>
+          <Box
+            sx={{
+              p: 2,
+              borderBottom: 1,
+              borderColor: "divider",
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+            }}
+          >
+            <BarChartIcon color="primary" />
+            <Typography variant="h6" fontWeight="700">
+              Deck Statistics
+            </Typography>
+          </Box>
 
-          {rightTab === 0 && (
-            <Box
-              component="form"
-              onSubmit={handleSearch}
-              sx={{ position: "relative", my: 2 }}
-            >
-              <TextField
-                fullWidth
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by name, type, or color..."
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon color="action" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={searching}
-                        sx={{ minWidth: 80, borderRadius: 2 }}
-                      >
-                        {searching ? (
-                          <CircularProgress size={20} color="inherit" />
-                        ) : (
-                          "Find"
-                        )}
-                      </Button>
-                    </InputAdornment>
-                  ),
-                  sx: {
-                    borderRadius: 4,
-                    bgcolor: "background.paper",
-                    boxShadow: 2,
-                    pl: 2,
-                    pr: 1,
-                    py: 1,
-                    "& fieldset": { border: "none" },
-                  },
-                }}
-              />
-            </Box>
-          )}
-        </Box>
-
-        <Box sx={{ flex: 1, overflowY: "auto", p: rightTab === 0 ? 4 : 0 }}>
-          {rightTab === 0 ? (
-            <>
-              {searching ? (
-                <Grid container spacing={2}>
-                  {[...Array(10)].map((_, i) => (
-                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={i}>
-                      <Box
-                        sx={{
-                          aspectRatio: "2.5/3.5",
-                          bgcolor: "action.hover",
-                          borderRadius: 3,
-                          animation: "pulse 1.5s infinite opacity",
-                        }}
-                      />
-                    </Grid>
-                  ))}
-                </Grid>
-              ) : (
-                <Grid container spacing={3}>
-                  {searchResults.map((card) => (
-                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={card.id}>
-                      <SearchCard card={card} onAdd={addCard} />
-                    </Grid>
-                  ))}
-                  {searchResults.length === 0 && !searching && (
-                    <Box
-                      sx={{
-                        gridColumn: "1 / -1",
-                        py: 10,
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        opacity: 0.3,
-                        gap: 2,
-                      }}
-                    >
-                      <AutoAwesomeIcon sx={{ fontSize: 60 }} />
-                      <Typography variant="h5" fontWeight="700">
-                        Search the multiverse
-                      </Typography>
-                    </Box>
-                  )}
-                </Grid>
-              )}
-            </>
-          ) : (
+          <Box sx={{ flex: 1, overflowY: "auto" }}>
             <DeckStats
               cards={deckCards}
               deckId={deck ? deck.id : undefined}
               format={format}
             />
-          )}
+          </Box>
         </Box>
+
+        {/* Hover Overlay */}
+        {hoveredCard && (
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 20,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center", // Center vertically
+              p: 2,
+              gap: 2,
+              overflow: "hidden", // Prevent overlay itself from scrolling
+            }}
+          >
+            <Card
+              sx={{
+                width: "auto",
+                height: "auto",
+                maxHeight: "55%", // Limit height to avoid cutoff
+                aspectRatio: "2.5/3.5",
+                bgcolor: "transparent",
+                borderRadius: "4.5% / 3.5%",
+                boxShadow: 24,
+                overflow: "hidden",
+                transform: "perspective(1000px) rotateY(5deg)",
+                flexShrink: 1, // Allow shrinking if needed
+              }}
+            >
+              {hoveredCard.image_uris?.normal ? (
+                <CardMedia
+                  component="img"
+                  image={hoveredCard.image_uris.normal}
+                  alt={hoveredCard.name}
+                  sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <Box
+                  sx={{
+                    width: "100%",
+                    height: "100%",
+                    bgcolor: "background.paper",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    p: 4,
+                    textAlign: "center",
+                  }}
+                >
+                  <Typography variant="h5" fontWeight="700">
+                    {hoveredCard.name}
+                  </Typography>
+                </Box>
+              )}
+            </Card>
+
+            {/* Info Panel */}
+            <Paper
+              sx={{
+                width: "100%",
+                maxWidth: 400,
+                p: 2,
+                borderRadius: 1, // Reduced radius
+                bgcolor: "background.paper",
+                backdropFilter: "blur(20px)",
+                border: 1,
+                borderColor: "divider",
+                display: "flex",
+                flexDirection: "column",
+                maxHeight: "40%", // Leave room for card
+                overflowY: "auto", // Scroll if text is long
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  mb: 1,
+                  flexShrink: 0,
+                }}
+              >
+                <Typography variant="h6" fontWeight="900" lineHeight={1.1}>
+                  {hoveredCard.name}
+                </Typography>
+                <Typography
+                  variant="subtitle2"
+                  sx={{
+                    bgcolor: "action.hover",
+                    px: 1,
+                    py: 0.5,
+                    borderRadius: 1,
+                    fontFamily: "monospace",
+                    flexShrink: 0,
+                  }}
+                >
+                  {hoveredCard.mana_cost}
+                </Typography>
+              </Box>
+              <Typography
+                variant="subtitle2"
+                color="primary.main"
+                fontWeight="700"
+                gutterBottom
+                sx={{ flexShrink: 0 }}
+              >
+                {hoveredCard.type_line}
+              </Typography>
+              <Divider sx={{ my: 1.5, flexShrink: 0 }} />
+              <Typography
+                variant="body2"
+                sx={{
+                  whiteSpace: "pre-wrap",
+                  lineHeight: 1.6,
+                  color: "text.primary",
+                }}
+              >
+                {hoveredCard.oracle_text}
+              </Typography>
+            </Paper>
+          </Box>
+        )}
       </Box>
     </Box>
   );
-};
+};;

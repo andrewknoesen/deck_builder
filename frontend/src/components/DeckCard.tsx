@@ -14,6 +14,8 @@ import EmojiEventsIcon from "@mui/icons-material/EmojiEvents"; // Crown icon alt
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import type { DeckCard as DeckCardType } from '../types/mtg';
 
+import { useCardHover } from "../context/CardHoverContext";
+
 interface DeckCardProps {
   deckCard: DeckCardType;
   onUpdateQuantity: (cardId: string, delta: number) => void;
@@ -37,9 +39,14 @@ export const DeckCard = React.memo<DeckCardProps>(
     canBeCommander = true,
   }) => {
     const isOverLimit = deckCard.quantity > limit;
+    const { setHoveredCard } = useCardHover();
 
     return (
-      <Box sx={{ position: "relative", width: "100%", aspectRatio: "2.5/3.5" }}>
+      <Box
+        sx={{ position: "relative", width: "100%", aspectRatio: "2.5/3.5" }}
+        onMouseEnter={() => deckCard.card && setHoveredCard(deckCard.card)}
+        onMouseLeave={() => setHoveredCard(null)}
+      >
         {/* Illegality Badge */}
         {isIllegal && (
           <Box

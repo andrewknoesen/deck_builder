@@ -11,7 +11,7 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useLocation } from "react-router-dom";
 import { useAuth } from '../../context/AuthContext';
 import { Sidebar } from './Sidebar';
 
@@ -19,6 +19,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const { user, login } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false); // Default to closed for overlay
+  const location = useLocation();
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -129,8 +130,22 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
+          p:
+            location.pathname.startsWith("/decks/") &&
+            location.pathname !== "/decks"
+              ? 0
+              : 3,
           mt: 8, // Toolbar height
+          height:
+            location.pathname.startsWith("/decks/") &&
+            location.pathname !== "/decks"
+              ? "calc(100vh - 64px)"
+              : "auto",
+          overflow:
+            location.pathname.startsWith("/decks/") &&
+            location.pathname !== "/decks"
+              ? "hidden"
+              : "auto",
         }}
       >
         {children}
