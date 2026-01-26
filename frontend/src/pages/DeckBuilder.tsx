@@ -13,9 +13,11 @@ import {
   CircularProgress,
   Alert,
   Collapse,
+  Snackbar,
 } from "@mui/material";
 import {
   validateDeckSize,
+  validateSideboardSize,
   getCardLimit,
   isCardLegal,
   isValidCommander,
@@ -89,6 +91,19 @@ export const DeckBuilder: React.FC = () => {
     "saved",
   );
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: "error" | "warning" | "info" | "success";
+  }>({
+    open: false,
+    message: "",
+    severity: "info",
+  });
+
+  const handleCloseSnackbar = () => {
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
 
   // Debounce critical state for auto-save
   const debouncedTitle = useDebounce(title, 1000);
@@ -172,15 +187,20 @@ export const DeckBuilder: React.FC = () => {
 
   // Search State removed (now handled by DeckBuilderSearch)
 
+  /* 
+   * Card Management Logic (Board-Aware)
+   * We now support the same card existing in multiple boards (e.g. 3 Main, 1 Side).
+   */
+
   const addCard = useCallback(
     (card: ScryfallCard) => {
       setDeckCards((prev) => {
-        const existing = prev.find((dc) => dc.card_id === card.id);
+        // Default to adding to Mainboard
+        const existingMain = prev.find((dc) => dc.card_id === card.id && dc.board === "main");
 
-        if (existing) {
-          // Allow exceeding limit (visual warning handled in DeckCard)
-          return prev.map((dc) =>
-            dc.card_id === card.id ? { ...dc, quantity: dc.quantity + 1 } : dc,
+        if (existingMain) {
+           return prev.map((dc) =>
+            dc === existingMain ? { ...dc, quantity: dc.quantity + 1 } : dc
           );
         }
         return [
@@ -192,74 +212,193 @@ export const DeckBuilder: React.FC = () => {
     [format],
   );
 
-  const updateQuantity = useCallback((cardId: string, delta: number) => {
-    setDeckCards((prev) =>
-      prev
+  const updateQuantity = useCallback((cardId: string, board: string, delta: number) => {
+    setDeckCards((prev) => {
+      // Logic for Sideboard Limit Check
+      if (board === "side" && delta > 0) {
+          const currentSideboardCount = prev
+              .filter(c => c.board === "side")
+              .reduce((acc, curr) => acc + curr.quantity, 0);
+          
+          const splitRes = validateSideboardSize(format, currentSideboardCount + delta);
+          // Block if it's an error (e.g. > 15 in constructed). Warnings (e.g. >0 in Commander) allow through.
+          if (!splitRes.valid && splitRes.severity === "error") {
+              setSnackbar({
+                  open: true,
+                  message: splitRes.message || "Sideboard limit reached.",
+                  severity: "error",
+              });
+              return prev; // Do not apply change
+          }
+      }
+
+      return prev
         .map((dc) => {
-          if (dc.card_id === cardId) {
+          if (dc.card_id === cardId && dc.board === board) {
             const newQty = Math.max(0, dc.quantity + delta);
             return { ...dc, quantity: newQty };
           }
           return dc;
         })
-        .filter((dc) => dc.quantity > 0),
-    );
+        .filter((dc) => dc.quantity > 0);
+    });
+  }, [format]);
+
+  const removeCard = useCallback((cardId: string, board: string) => {
+    setDeckCards((prev) => prev.filter((dc) => !(dc.card_id === cardId && dc.board === board)));
   }, []);
 
-  const removeCard = useCallback((cardId: string) => {
-    setDeckCards((prev) => prev.filter((dc) => dc.card_id !== cardId));
-  }, []);
-
-  const handleMoveToBoard = useCallback((cardId: string, newBoard: string) => {
-    setDeckCards((prev) =>
-      prev.map((dc) => {
-        if (dc.card_id === cardId) {
-          if (newBoard === "commander" && !isValidCommander(dc.card)) {
-            return dc; // Prevent illegal commander
-          }
-          // If moving to commander, quantity max 1
-          const quantity = newBoard === "commander" ? 1 : dc.quantity;
-          return { ...dc, board: newBoard, quantity };
+  const handleMoveCard = useCallback((cardId: string, fromBoard: string, toBoard: string, quantity: number = 1) => {
+    setDeckCards((prev) => {
+        const sourceIndex = prev.findIndex(dc => dc.card_id === cardId && dc.board === fromBoard);
+        if (sourceIndex === -1) return prev;
+        
+        const source = prev[sourceIndex];
+        
+        // Validation: Commander
+        if (toBoard === "commander" && !isValidCommander(source.card)) {
+             setSnackbar({
+               open: true,
+               message: "This card cannot be your commander.",
+               severity: "error",
+             });
+             return prev;
         }
-        return dc;
-      }),
-    );
-  }, []);
+
+        // Validation: Sideboard Limit
+        if (toBoard === "side") {
+            const currentSideboardCount = prev
+                .filter(c => c.board === "side")
+                .reduce((acc, curr) => acc + curr.quantity, 0);
+            
+            // moving FROM side TO side shouldn't happen, but if it did, net change is 0. 
+            // Here we assume moving from Main/Maybe TO Side.
+            if (fromBoard !== "side") {
+                const splitRes = validateSideboardSize(format, currentSideboardCount + quantity);
+                if (!splitRes.valid && splitRes.severity === "error") {
+                    setSnackbar({
+                        open: true,
+                        message: splitRes.message || "Sideboard limit reached.",
+                        severity: "error",
+                    });
+                    return prev; 
+                }
+            }
+        }
+
+        const newCards = [...prev];
+        
+        // 1. Decrement Source
+        if (source.quantity <= quantity) {
+             // Moved entire stack
+             newCards.splice(sourceIndex, 1);
+        } else {
+             newCards[sourceIndex] = { ...source, quantity: source.quantity - quantity };
+        }
+        
+        // 2. Increment/Create Destination
+        // Commander can only have 1
+        const actualQuantityToAdd = toBoard === "commander" ? 1 : quantity;
+
+        const destIndex = newCards.findIndex(dc => dc.card_id === cardId && dc.board === toBoard);
+        
+        if (destIndex !== -1) {
+             // Add to existing stack
+             const dest = newCards[destIndex];
+             // If commander, ensure quantity is 1 (idempotent)
+             const newDestQty = toBoard === "commander" ? 1 : dest.quantity + actualQuantityToAdd;
+             newCards[destIndex] = { ...dest, quantity: newDestQty };
+        } else {
+             // Create new stack
+             newCards.push({
+                 card_id: cardId,
+                 quantity: actualQuantityToAdd,
+                 board: toBoard,
+                 card: source.card
+             });
+        }
+        
+        return newCards;
+    });
+  }, [format]);
 
   // Group cards
   const groupedCards = useMemo(() => {
     const groups: Record<string, DeckCard[]> = {};
-    deckCards.forEach((dc) => {
-      // Logic for grouping:
-      // 1. If board is commander, group is "Commander"
-      // 2. Else group by type
-      let groupKey = getCardType(dc.card?.type_line);
-      if (dc.board === "commander") {
-        groupKey = "Commander";
-      }
 
-      if (!groups[groupKey]) groups[groupKey] = [];
-      groups[groupKey].push(dc);
+    // Initialize standard mainboard groups
+    TYPE_ORDER.forEach((t) => (groups[t] = []));
+    groups["Commander"] = [];
+    groups["Sideboard"] = [];
+    groups["Maybeboard"] = [];
+
+    deckCards.forEach((dc) => {
+      if (dc.board === "commander") {
+        groups["Commander"].push(dc);
+      } else if (dc.board === "side") {
+        groups["Sideboard"].push(dc);
+      } else if (dc.board === "maybe") {
+        groups["Maybeboard"].push(dc);
+      } else {
+        // Mainboard - group by type
+        const typeKey = getCardType(dc.card?.type_line);
+        if (!groups[typeKey]) groups[typeKey] = [];
+        groups[typeKey].push(dc);
+      }
     });
+
+    // Remove empty groups
+    Object.keys(groups).forEach((key) => {
+      if (groups[key].length === 0) delete groups[key];
+    });
+
     return groups;
   }, [deckCards]);
 
   const sortedGroups = useMemo(() => {
-    const customOrder = ["Commander", ...TYPE_ORDER];
+    // Order: Commander, then Mainboard types, then Sideboard, then Maybeboard
+    const sectionOrder = [
+      "Commander",
+      ...TYPE_ORDER,
+      "Sideboard",
+      "Maybeboard",
+    ];
     return Object.keys(groupedCards).sort((a, b) => {
-      return customOrder.indexOf(a) - customOrder.indexOf(b);
+      return sectionOrder.indexOf(a) - sectionOrder.indexOf(b);
     });
   }, [groupedCards]);
 
   const totalCards = useMemo(
-    () => deckCards.reduce((acc, curr) => acc + curr.quantity, 0),
+    () => deckCards.filter(c => c.board === "main" || c.board === "commander").reduce((acc, curr) => acc + curr.quantity, 0),
     [deckCards],
   );
 
-  const validation = useMemo(
-    () => validateDeckSize(format, totalCards),
-    [format, totalCards],
+  const sideboardCount = useMemo(
+    () => deckCards.filter(c => c.board === "side").reduce((acc, curr) => acc + curr.quantity, 0),
+    [deckCards],
   );
+
+  // Global card counts (Main + Side + Commander) for limit validation
+  const globalCardCounts = useMemo(() => {
+     const counts: Record<string, number> = {};
+     deckCards.forEach(dc => {
+         // Maybeboard usually doesn't count towards limit, but let's assume limit applies to Deck (Main+Side)
+         if (dc.board !== "maybe") {
+             counts[dc.card_id] = (counts[dc.card_id] || 0) + dc.quantity;
+         }
+     });
+     return counts;
+  }, [deckCards]);
+
+  const validation = useMemo(() => {
+    const deckVal = validateDeckSize(format, totalCards);
+    const sideVal = validateSideboardSize(format, sideboardCount);
+    
+    if (!deckVal.valid) return deckVal;
+    if (!sideVal.valid) return sideVal;
+    
+    return { valid: true, severity: "success", message: "" };
+  }, [format, totalCards, sideboardCount]);
 
   if (loadingDecks) {
     return (
@@ -490,9 +629,9 @@ export const DeckBuilder: React.FC = () => {
                           return (
                             <DeckCardComponent
                               deckCard={dc}
-                              onUpdateQuantity={updateQuantity}
-                              onRemove={removeCard}
-                              onMoveToBoard={handleMoveToBoard}
+                              onUpdateQuantity={(cid, delta) => updateQuantity(cid, dc.board, delta)}
+                              onRemove={(cid) => removeCard(cid, dc.board)}
+                              onMoveCard={handleMoveCard}
                               limit={getCardLimit(format, dc.card)}
                               isCommanderFormat={isCommanderLike}
                               isIllegal={
@@ -500,6 +639,7 @@ export const DeckBuilder: React.FC = () => {
                                 isIllegalPlacement
                               }
                               canBeCommander={isValidCommander(dc.card)}
+                              currentTotalQuantity={globalCardCounts[dc.card_id]}
                             />
                           );
                         })()}
@@ -557,7 +697,9 @@ export const DeckBuilder: React.FC = () => {
 
           <Box sx={{ flex: 1, overflowY: "auto" }}>
             <DeckStats
-              cards={deckCards}
+              cards={deckCards.filter(
+                (c) => c.board === "main" || c.board === "commander",
+              )}
               deckId={deck ? deck.id : undefined}
               format={format}
             />
@@ -688,6 +830,21 @@ export const DeckBuilder: React.FC = () => {
           </Box>
         )}
       </Box>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };;

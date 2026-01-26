@@ -6,7 +6,7 @@ from app.models.card import Card
 class DeckCardBase(SQLModel):
     card_id: str = Field(primary_key=True)  # Scryfall ID
     quantity: int = 1
-    board: str = "main"  # main, side, commander
+    board: str = Field(default="main", primary_key=True)  # main, side, maybe, commander
 
 class DeckCard(DeckCardBase, table=True):
     deck_id: Optional[int] = Field(

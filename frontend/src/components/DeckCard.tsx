@@ -5,14 +5,14 @@ import {
   Box,
   Typography,
   IconButton,
-  Button,
-  Tooltip,
+  Menu,
+  MenuItem,
 } from "@mui/material";
-import RemoveIcon from '@mui/icons-material/Remove';
-import AddIcon from '@mui/icons-material/Add';
-import EmojiEventsIcon from "@mui/icons-material/EmojiEvents"; // Crown icon alternative
-import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
-import type { DeckCard as DeckCardType } from '../types/mtg';
+import RemoveIcon from "@mui/icons-material/Remove";
+import AddIcon from "@mui/icons-material/Add";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import DeleteIcon from "@mui/icons-material/Delete";
+import type { DeckCard as DeckCardType } from "../types/mtg";
 
 import { useCardHover } from "../context/CardHoverContext";
 
@@ -20,11 +20,12 @@ interface DeckCardProps {
   deckCard: DeckCardType;
   onUpdateQuantity: (cardId: string, delta: number) => void;
   onRemove: (cardId: string) => void;
-  onMoveToBoard?: (cardId: string, board: string) => void;
+  onMoveCard?: (cardId: string, fromBoard: string, toBoard: string, quantity?: number) => void;
   isCommanderFormat?: boolean;
   limit?: number;
   isIllegal?: boolean;
   canBeCommander?: boolean;
+  currentTotalQuantity?: number;
 }
 
 export const DeckCard = React.memo<DeckCardProps>(
@@ -32,14 +33,40 @@ export const DeckCard = React.memo<DeckCardProps>(
     deckCard,
     onUpdateQuantity,
     onRemove,
-    onMoveToBoard,
+    onMoveCard,
     isCommanderFormat,
     limit = 4,
     isIllegal = false,
     canBeCommander = true,
+    currentTotalQuantity,
   }) => {
-    const isOverLimit = deckCard.quantity > limit;
+    const isOverLimit = (currentTotalQuantity ?? deckCard.quantity) > limit;
     const { setHoveredCard } = useCardHover();
+
+    // Menu State
+    const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+    const openMenu = Boolean(anchorEl);
+
+    const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+      event.stopPropagation();
+      setAnchorEl(event.currentTarget);
+    };
+
+    const handleMenuClose = (e?: React.MouseEvent) => {
+      if (e) e.stopPropagation();
+      setAnchorEl(null);
+    };
+
+    const handleMove = (targetBoard: string, quantity: number = 1) => {
+      if (onMoveCard) {
+        onMoveCard(deckCard.card_id, deckCard.board, targetBoard, quantity);
+      }
+      handleMenuClose();
+    };
+
+    const handleMoveAll = (targetBoard: string) => {
+        handleMove(targetBoard, deckCard.quantity);
+    };
 
     return (
       <Box
@@ -215,69 +242,108 @@ export const DeckCard = React.memo<DeckCardProps>(
                 </IconButton>
               </Box>
 
-              {/* Commander Actions */}
-              {isCommanderFormat && onMoveToBoard && (
-                <Box sx={{ display: "flex", gap: 1 }}>
-                  {deckCard.board === "commander" ? (
-                    <Tooltip title="Move to Main Deck">
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onMoveToBoard(deckCard.card_id, "main");
-                        }}
-                        sx={{
-                          bgcolor: "background.paper",
-                          color: "warning.main",
-                          "&:hover": {
-                            bgcolor: "background.paper",
-                            color: "text.primary",
-                          },
-                        }}
-                      >
-                        <ArrowDownwardIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  ) : canBeCommander ? (
-                    <Tooltip title="Set as Commander">
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onMoveToBoard(deckCard.card_id, "commander");
-                        }}
-                        sx={{
-                          bgcolor: "background.paper",
-                          color: "text.secondary",
-                          "&:hover": {
-                            bgcolor: "warning.main",
-                            color: "white",
-                          },
-                        }}
-                      >
-                        <EmojiEventsIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  ) : null}
-                </Box>
-              )}
+              {/* Actions Row */}
+              <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+                {/* Board Menu */}
+                {onMoveCard && (
+                  <>
+                    <IconButton
+                      size="small"
+                      onClick={handleMenuClick}
+                      sx={{
+                        bgcolor: "background.paper",
+                        color: "text.secondary",
+                        "&:hover": { bgcolor: "primary.main", color: "white" },
+                      }}
+                    >
+                      <MoreVertIcon fontSize="small" />
+                    </IconButton>
+                    <Menu
+                      anchorEl={anchorEl}
+                      open={openMenu}
+                      onClose={() => handleMenuClose()}
+                      anchorOrigin={{
+                        vertical: "bottom",
+                        horizontal: "center",
+                      }}
+                      transformOrigin={{
+                        vertical: "top",
+                        horizontal: "center",
+                      }}
+                      PaperProps={{ sx: { minWidth: 160 } }}
+                    >
+                      {deckCard.board !== "main" && (
+                        deckCard.quantity > 1 ? [
+                            <MenuItem key="move-one-main" onClick={() => handleMove("main", 1)}>
+                                Move One to Main
+                            </MenuItem>,
+                            <MenuItem key="move-all-main" onClick={() => handleMoveAll("main")}>
+                                Move All to Main
+                            </MenuItem>
+                        ] : (
+                            <MenuItem onClick={() => handleMove("main")}>
+                                Move to Mainboard
+                            </MenuItem>
+                        )
+                      )}
+                      {deckCard.board !== "side" && (
+                        deckCard.quantity > 1 ? [
+                            <MenuItem key="move-one-side" onClick={() => handleMove("side", 1)}>
+                                Move One to Side
+                            </MenuItem>,
+                            <MenuItem key="move-all-side" onClick={() => handleMoveAll("side")}>
+                                Move All to Side
+                            </MenuItem>
+                        ] : (
+                            <MenuItem onClick={() => handleMove("side")}>
+                                Move to Sideboard
+                            </MenuItem>
+                        )
+                      )}
+                      {deckCard.board !== "maybe" && (
+                         deckCard.quantity > 1 ? [
+                            <MenuItem key="move-one-maybe" onClick={() => handleMove("maybe", 1)}>
+                                Move One to Maybe
+                            </MenuItem>,
+                            <MenuItem key="move-all-maybe" onClick={() => handleMoveAll("maybe")}>
+                                Move All to Maybe
+                            </MenuItem>
+                         ] : (
+                            <MenuItem onClick={() => handleMove("maybe")}>
+                                Move to Maybeboard
+                            </MenuItem>
+                         )
+                      )}
+                      {isCommanderFormat &&
+                        canBeCommander &&
+                        deckCard.board !== "commander" && (
+                          <MenuItem onClick={() => handleMove("commander", 1)}>
+                            Set as Commander
+                          </MenuItem>
+                        )}
+                    </Menu>
+                  </>
+                )}
 
-              <Button
-                size="small"
-                variant="text"
-                color="secondary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemove(deckCard.card_id);
-                }}
-                sx={{ fontWeight: 800, letterSpacing: 1, fontSize: "0.65rem" }}
-              >
-                REMOVE
-              </Button>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove(deckCard.card_id);
+                  }}
+                  sx={{
+                    bgcolor: "background.paper",
+                    color: "error.main",
+                    "&:hover": { bgcolor: "error.main", color: "white" },
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
             </Box>
           </Box>
         </Card>
       </Box>
     );
-  },
+  }
 );

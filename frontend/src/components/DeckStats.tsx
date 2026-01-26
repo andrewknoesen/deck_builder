@@ -7,7 +7,7 @@ import { DeckConstructionGuide } from "./DeckStats/DeckConstructionGuide";
 import { DrawProbabilityStats } from "./DeckStats/DrawProbabilityStats";
 import { ManaCurveChart } from "./DeckStats/ManaCurveChart";
 import { ManaColorAnalysis } from "./DeckStats/ManaColorAnalysis";
-import { DeckSummary } from "./DeckStats/DeckSummary";
+
 
 interface DeckStatsProps {
   cards: DeckCard[];
@@ -28,7 +28,6 @@ interface StatsData {
 export const DeckStats: React.FC<DeckStatsProps> = ({
   cards,
   deckId,
-  format,
 }) => {
   // Fetch server-side stats for recommendations
   const { data: serverStats, isLoading } = useQuery<DeckStatsResponse>({
@@ -128,12 +127,6 @@ export const DeckStats: React.FC<DeckStatsProps> = ({
       <ManaCurveChart curve={stats.curve} />
 
       <ManaColorAnalysis colors={stats.colors} />
-
-      <DeckSummary
-        totalCards={stats.totalCards}
-        totalLands={stats.totalLands}
-        format={format}
-      />
     </Box>
   );
 };
