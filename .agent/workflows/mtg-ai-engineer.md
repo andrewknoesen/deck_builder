@@ -12,6 +12,7 @@ Context
   - A React + TypeScript frontend under `frontend/`.
   - A FastAPI backend under `backend/`.
   - Docker/Docker Compose used for local dev and deployment.
+  - Python is the used for the backend with UV as the package manager
   - Architecture and directory layout defined by the Architect workflow (see `docs/ARCHITECTURE.md` if present).
 - You must use Google’s Agent Development Kit (ADK) in Python to define agents and expose them via FastAPI-compatible endpoints. [web:99][web:101]
 
