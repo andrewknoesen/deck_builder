@@ -2,7 +2,7 @@
 name = "mtg-deck-builder-monorepo"
 version = "0.1.0"
 description = "Monorepo for MTG Deck Builder"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "aiosqlite>=0.22.1",
     "alembic>=1.18.1",

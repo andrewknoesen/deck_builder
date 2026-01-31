@@ -21,7 +21,8 @@ To minimize costs and latency, we will use a **Retrieval Augmented Generation (R
 ### 2.1. Knowledge Base
 1.  **Comprehensive Rules (CR)**:
     - **Chunking Strategy**: Split by Rule ID (e.g., `702.1`, `100.1a`). Each rule is a distinct chunk.
-    - **Embeddings**: Generate embeddings for all ~2000+ rule chunks using a lightweight model (e.g., `text-embedding-004`).
+    - **Embeddings**: Generate embeddings for all ~2000+ rule chunks using **nomic-ai/nomic-embed-text-v1** (HuggingFace).
+    - **Rationale**: Local execution (zero cost), High performance, Long context (8192) suitable for complex rules.
     - **Storage**: In-memory vector index (e.g., FAISS or simple cosine similarity with numpy) loaded at startup. The dataset is small enough (<10MB total with embeddings) to fit in RAM.
 
 2.  **Card Oracle & Rulings**:

@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     # External APIs
     SCRYFALL_BASE_URL: str = "https://api.scryfall.com"
 
+    # AI Configuration
+    HF_TOKEN: Optional[str] = None
+    GOOGLE_API_KEY: Optional[str] = None
+    GOOGLE_PROJECT_ID: Optional[str] = None
+    GOOGLE_LOCATION: str = "us-central1"
+    AI_MODEL_NAME: str = "gemini-2.5-flash"
+
     model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()
