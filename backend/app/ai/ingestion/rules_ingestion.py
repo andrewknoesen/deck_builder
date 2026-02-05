@@ -1,5 +1,4 @@
 import asyncio
-import re
 from typing import Dict, List, Optional
 
 import aiohttp
@@ -20,52 +19,96 @@ async def download_rules() -> str:
                 return ""
             return await response.text(encoding='utf-8', errors='ignore')
 
-def load_mtg_rules(file_path: Optional[str] = None) -> dict:
-    """Load and parse MTG Comprehensive Rules"""
-    if file_path:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-    else:
-        content = asyncio.run(download_rules())
-    
-    # Parse rules by section number (e.g., "100.1", "704.5k")
-    # Rules are numbered hierarchically
-    pattern = r'(\d+\.\d+[a-z]*)\.\s+(.*?)(?=\n\d+\.\d+[a-z]*\.|$)'
-    matches = re.findall(pattern, content, re.DOTALL)
-    
-    rules = {}
-    for rule_num, rule_text in matches:
-        rules[rule_num] = {
-            'number': rule_num,
-            'text': rule_text.strip(),
-            'section': rule_num.split('.')[0]  # e.g., "704" from "704.5k"
-        }
-    print(rules)
-    return rules
 
-def chunk_rules_for_embedding(rules: dict, context_window: int = 512) -> list:
+def split_into_paragraph_segments(
+    text: str,
+    min_len: int = 200,
+    max_len: int = 1000,
+) -> List[Dict]:
     """
-    Chunk rules intelligently for embedding
-    Best practice: 500-1000 tokens per chunk for semantic coherence
+    Very generic paragraph-based splitter for RAG.
+    - No assumption about rule numbers.
+    - Works on arbitrary text (headers, glossary, examples, etc.).
+    Returns a list of {id, text, metadata}.
     """
-    chunks = []
-    
-    for rule_num, rule_data in rules.items():
-        # For each rule, create a chunk with context
-        section = rule_data['section']
-        chunk_text = f"Rule {rule_num}: {rule_data['text']}"
-        
-        chunks.append({
-            'id': rule_num,
-            'text': chunk_text,
-            'metadata': {
-                'rule_number': rule_num,
-                'section': section,
-                'type': 'comprehensive_rule'
-            }
+    # First, group lines into paragraphs separated by blank lines
+    paragraphs = []
+    buf: List[str] = []
+
+    for line in text.splitlines():
+        if line.strip() == "":
+            if buf:
+                paragraphs.append(" ".join(buf).strip())
+                buf = []
+        else:
+            buf.append(line.strip())
+
+    if buf:
+        paragraphs.append(" ".join(buf).strip())
+
+    # Then, merge / split paragraphs to get roughly min_len–max_len chars
+    segments: List[Dict] = []
+    current: List[str] = []
+    current_len = 0
+    seg_index = 0
+
+    def flush_segment():
+        nonlocal current, current_len, seg_index
+        if not current:
+            return
+        seg_text = " ".join(current).strip()
+        if not seg_text:
+            return
+        segments.append({
+            "id": f"mtg-2026-seg-{seg_index}",
+            "text": seg_text,
+            "metadata": {
+                "source": "mtg_comprehensive_rules_2026",
+                "segment_index": seg_index,
+            },
         })
-    
-    return chunks
+        seg_index += 1
+        current = []
+        current_len = 0
+
+    for p in paragraphs:
+        if not p:
+            continue
+
+        # If paragraph is huge, chunk it by max_len
+        if len(p) > max_len:
+            start = 0
+            while start < len(p):
+                piece = p[start:start + max_len]
+                segments.append({
+                    "id": f"mtg-2026-seg-{seg_index}",
+                    "text": piece.strip(),
+                    "metadata": {
+                        "source": "mtg_comprehensive_rules_2026",
+                        "segment_index": seg_index,
+                    },
+                })
+                seg_index += 1
+                start += max_len
+            continue
+
+        # Normal paragraph: try to pack into the current segment
+        if current_len + len(p) <= max_len:
+            current.append(p)
+            current_len += len(p)
+        else:
+            # Current segment is full enough; flush and start new
+            flush_segment()
+            current.append(p)
+            current_len = len(p)
+
+        # If segment is already “good enough”, flush eagerly
+        if current_len >= min_len:
+            flush_segment()
+
+    flush_segment()
+    return segments
+
 
 def generate_embeddings_local(
     chunks: List[Dict], 
@@ -149,38 +192,55 @@ def generate_embeddings_local(
     return embedded_chunks
 
 def main():
-    # Configuration
     CHROMADB_HOST = "localhost"
     CHROMADB_PORT = 8001
-    MTG_RULES_FILE = None
     MODEL_NAME = "BAAI/bge-base-en-v1.5"
-    
-    print("Loading MTG rules...")
-    rules = load_mtg_rules(MTG_RULES_FILE)
-    chunks = chunk_rules_for_embedding(rules)
-    print(f"Loaded {len(chunks)} rules")
-    
-    # Use your generate_embeddings_local function (it's better!)
+    MTG_RULES_FILE = None  # optional local override
+
+    # 1) Load raw document text
+    if MTG_RULES_FILE:
+        print(f"Loading MTG rules from file: {MTG_RULES_FILE}")
+        with open(MTG_RULES_FILE, "r", encoding="utf-8") as f:
+            content = f.read()
+    else:
+        print("Downloading MTG rules text...")
+        content = asyncio.run(download_rules())
+
+    if not content:
+        print("No content; aborting.")
+        return
+
+    # 2) Split document into generic segments (no dict, no rule regex)
+    print("Splitting document into segments...")
+    segments = split_into_paragraph_segments(
+        content,
+        min_len=400,   # tune for your RAG
+        max_len=1200,  # token-ish proxy
+    )
+    print(f"Prepared {len(segments)} segments")
+
+    # 3) Embed segments
     print("\nGenerating embeddings...")
-    embedded_chunks = generate_embeddings_local(
-        chunks,
+    embedded_segments = generate_embeddings_local(
+        segments,
         model_name=MODEL_NAME,
         batch_size=16,
-        device=None,  # Auto-detect
-        use_mps=True
+        device=None,
+        use_mps=True,
     )
-    
+
+    # 4) Ingest into ChromaDB
     print("\nIngesting to ChromaDB...")
     db = MTGRulesVectorDB(
         host=CHROMADB_HOST,
         port=CHROMADB_PORT,
-        embedding_model=MODEL_NAME
+        embedding_model=MODEL_NAME,
     )
-    
-    db.add_rules(embedded_chunks)
-    
+    db.add_segments(embedded_segments)
+
     stats = db.get_collection_stats()
-    print(f"\n✅ Complete! Collection has {stats['total_rules']} rules")
+    print(f"\n✅ Complete! Collection has {stats['total_segments']} segments")
+
 
 
 if __name__ == "__main__":
