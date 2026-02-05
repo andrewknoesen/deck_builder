@@ -21,6 +21,11 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
   const [sidebarOpen, setSidebarOpen] = useState(false); // Default to closed for overlay
   const location = useLocation();
 
+  const isAppMode =
+    (location.pathname.startsWith("/decks/") &&
+    location.pathname !== "/decks") ||
+    location.pathname === "/collection";
+
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
@@ -130,22 +135,10 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         component="main"
         sx={{
           flexGrow: 1,
-          p:
-            location.pathname.startsWith("/decks/") &&
-            location.pathname !== "/decks"
-              ? 0
-              : 3,
+          p: isAppMode ? 0 : 3,
           mt: 8, // Toolbar height
-          height:
-            location.pathname.startsWith("/decks/") &&
-            location.pathname !== "/decks"
-              ? "calc(100vh - 64px)"
-              : "auto",
-          overflow:
-            location.pathname.startsWith("/decks/") &&
-            location.pathname !== "/decks"
-              ? "hidden"
-              : "auto",
+          height: isAppMode ? "calc(100vh - 64px)" : "auto",
+          overflow: isAppMode ? "hidden" : "auto",
         }}
       >
         {children}

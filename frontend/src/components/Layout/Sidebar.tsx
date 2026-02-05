@@ -13,6 +13,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import LayersIcon from '@mui/icons-material/Layers';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import CollectionsIcon from '@mui/icons-material/Collections';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { Link, useLocation } from 'react-router-dom';
 
 const drawerWidth = 240;
@@ -32,6 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
     { text: "My Decks", icon: <LayersIcon />, path: "/decks" },
     { text: "New Deck", icon: <AddCircleOutlineIcon />, path: "/decks/new" },
     { text: "Collection", icon: <CollectionsIcon />, path: "/collection" },
+    { text: "Agents", icon: <SmartToyIcon />, path: "/agents" },
   ];
 
   return (

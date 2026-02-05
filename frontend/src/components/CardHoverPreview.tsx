@@ -7,8 +7,8 @@ export const CardHoverPreview: React.FC = () => {
   const { hoveredCard } = useCardHover();
   const location = useLocation();
 
-  // Hide global preview on DeckBuilder page
-  if (location.pathname.startsWith("/decks/") && location.pathname !== "/decks") {
+  // Hide global preview on DeckBuilder page and Collection page
+  if ((location.pathname.startsWith("/decks/") && location.pathname !== "/decks") || location.pathname === "/collection") {
       return null;
   }
 

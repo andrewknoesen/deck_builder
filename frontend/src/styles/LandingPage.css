@@ -1,0 +1,103 @@
+/* Landing Page Container */
+.landing-container {
+  background-color: #020617; /* background.default */
+  min-height: 100%;
+  padding-bottom: 64px;
+}
+
+/* Hero Section */
+.landing-hero {
+  background-color: #0f172a; /* background.paper */
+  padding-top: 32px;
+  padding-bottom: 32px;
+  background: linear-gradient(180deg, rgba(15,23,42,1) 0%, rgba(2,6,23,1) 100%);
+  border-bottom: 1px solid #1e293b; /* divider */
+  text-align: center;
+}
+
+.landing-hero-icon-box {
+  width: 48px;
+  height: 48px;
+  background-color: #6366f1; /* primary.main */
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0px 3px 5px -1px rgba(0,0,0,0.2),0px 6px 10px 0px rgba(0,0,0,0.14),0px 1px 18px 0px rgba(0,0,0,0.12); /* elevation 8 approximation */
+  margin-bottom: 16px;
+}
+
+.landing-hero-title {
+  letter-spacing: -0.02em;
+}
+
+.landing-hero-highlight {
+  color: #6366f1; /* primary.main */
+}
+
+.landing-hero-subtitle {
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.6;
+}
+
+.landing-cta-stack {
+  padding-top: 16px;
+}
+
+.landing-btn-primary {
+  border-radius: 12px;
+  padding: 8px 24px;
+  font-size: 1rem;
+  box-shadow: 0px 3px 5px -1px rgba(0,0,0,0.2),0px 6px 10px 0px rgba(0,0,0,0.14),0px 1px 18px 0px rgba(0,0,0,0.12);
+}
+
+.landing-btn-outlined {
+  border-radius: 12px;
+  padding: 8px 24px;
+  font-size: 1rem;
+}
+
+/* Features Section */
+.landing-features-container {
+  margin-top: 64px;
+}
+
+.landing-feature-card {
+  height: 100%;
+  border-radius: 0;
+  border: 1px solid #1e293b; /* divider */
+  background-color: transparent !important;
+}
+
+.landing-feature-action {
+  height: 100%;
+  padding: 16px;
+}
+
+.landing-feature-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+
+.landing-feature-icon-box {
+  padding: 16px;
+  border-radius: 50%;
+}
+
+.feature-icon-primary {
+  background-color: rgba(99, 102, 241, 0.1);
+}
+
+.feature-icon-secondary {
+  background-color: rgba(244, 63, 94, 0.1);
+}
+
+.feature-icon-success {
+  background-color: rgba(16, 185, 129, 0.1);
+}

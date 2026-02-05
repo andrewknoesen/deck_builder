@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
+import "../styles/DeckList.css";
 import {
   Container,
   Grid,
@@ -64,16 +65,7 @@ export const DeckList: React.FC = () => {
 
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "60vh",
-          gap: 2,
-        }}
-      >
+      <Box className="deck-list-loading">
         <CircularProgress color="primary" />
         <Typography variant="body1" color="text.secondary">
           Fetching your collection...
@@ -83,24 +75,15 @@ export const DeckList: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 6 }}>
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: { xs: "column", md: "row" },
-          justifyContent: "space-between",
-          alignItems: { xs: "flex-start", md: "center" },
-          gap: 4,
-          mb: 6,
-        }}
-      >
+    <Container maxWidth="xl" className="deck-list-container">
+      <Box className="deck-list-header">
         <Box>
           <Typography
             variant="h3"
             component="h1"
             fontWeight="900"
             gutterBottom
-            sx={{ display: "flex", alignItems: "center", gap: 2 }}
+            className="deck-list-title"
           >
             <AutoStoriesIcon sx={{ fontSize: 40, color: "primary.main" }} /> My
             Grimoire
@@ -119,44 +102,15 @@ export const DeckList: React.FC = () => {
           variant="contained"
           size="large"
           startIcon={<AddIcon />}
-          sx={{
-            borderRadius: 4,
-            px: 4,
-            py: 1.5,
-            fontSize: "1rem",
-            fontWeight: 800,
-          }}
+          className="deck-list-new-btn"
         >
           New Deck
         </Button>
       </Box>
 
       {decks.length === 0 ? (
-        <Box
-          sx={{
-            border: "2px dashed",
-            borderColor: "divider",
-            borderRadius: 8,
-            py: 12,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            textAlign: "center",
-            bgcolor: "background.paper",
-          }}
-        >
-          <Box
-            sx={{
-              width: 80,
-              height: 80,
-              bgcolor: "background.default",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              mb: 3,
-            }}
-          >
+        <Box className="deck-list-empty">
+          <Box className="deck-list-empty-icon">
             <LayersIcon sx={{ fontSize: 40, color: "text.secondary" }} />
           </Box>
           <Typography variant="h4" fontWeight="800" gutterBottom>
@@ -165,7 +119,7 @@ export const DeckList: React.FC = () => {
           <Typography
             variant="body1"
             color="text.secondary"
-            sx={{ maxWidth: 300, mb: 4 }}
+            className="deck-list-empty-text"
           >
             Your collection is waiting to be built. Start your first journey
             today.

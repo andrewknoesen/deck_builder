@@ -9,3 +9,5 @@ backend/__pycache__
 frontend/node_modules
 frontend/dist
 sql_app.db
+.env
+**/.env

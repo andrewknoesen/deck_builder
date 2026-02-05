@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import "../styles/DeckBuilder.css";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate, Link as RouterLink } from "react-router-dom";
 import {
@@ -400,18 +401,15 @@ export const DeckBuilder: React.FC = () => {
     return { valid: true, severity: "success", message: "" };
   }, [format, totalCards, sideboardCount]);
 
+
+
+// ... existing imports ...
+
+// ... within Code ...
+
   if (loadingDecks) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "calc(100vh - 64px)",
-          gap: 2,
-        }}
-      >
+      <Box className="deck-builder-loading">
         <CircularProgress size={48} color="primary" />
         <Typography variant="body1" color="text.secondary">
           Conjuring your deck...
@@ -421,67 +419,37 @@ export const DeckBuilder: React.FC = () => {
   }
 
   return (
-    <Box
-      sx={{ display: "flex", height: "calc(100vh - 64px)", overflow: "hidden" }}
-    >
+    <Box className="deck-builder-container">
       {/* Left Column: Deck Inventory (Expanded to 65%) */}
       <Paper
         square
         elevation={0}
-        sx={{
-          width: "65%", // Expanded from 45%
-          borderRight: 1,
-          borderColor: "divider",
-          display: "flex",
-          flexDirection: "column",
-          bgcolor: "background.paper",
-          zIndex: 10,
-        }}
+        className="deck-builder-pane-left"
       >
         {/* Header */}
-        {/* Header */}
-        <Box
-          sx={{
-            py: 1.5,
-            px: 2,
-            borderBottom: 1,
-            borderColor: "divider",
-            bgcolor: "rgba(15, 23, 42, 0.8)",
-            backdropFilter: "blur(12px)",
-            position: "sticky",
-            top: 0,
-            zIndex: 20,
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Box className="deck-builder-header">
+          <Box className="deck-builder-header-top">
             <IconButton
               component={RouterLink}
               to="/decks"
               size="small"
-              sx={{ border: 1, borderColor: "divider", borderRadius: 2 }}
+              className="deck-builder-back-btn"
             >
               <ArrowBackIcon fontSize="small" />
             </IconButton>
 
             {/* Title & Format Row */}
-            <Box
-              sx={{
-                flex: 1,
-                display: "flex",
-                alignItems: "center",
-                gap: 2,
-                minWidth: 0,
-              }}
-            >
+            <Box className="deck-builder-controls">
               <TextField
                 fullWidth
                 variant="standard"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Deck Title"
+                className="deck-builder-title-input"
                 InputProps={{
                   disableUnderline: true,
-                  sx: { fontSize: "1.25rem", fontWeight: 800 },
+                  // CSS class deck-builder-title-input handles font size/weight on input
                 }}
               />
               <TextField
@@ -491,7 +459,7 @@ export const DeckBuilder: React.FC = () => {
                 variant="outlined"
                 size="small"
                 SelectProps={{ native: true }}
-                sx={{ width: 140, "& .MuiInputBase-input": { py: 0.5 } }}
+                sx={{ width: 140, "& .MuiInputBase-input": { py: 0.5 } }} // Keep minimal sizing SX if tricky in CSS or move to class
               >
                 {FORMATS.map((fmt) => (
                   <option key={fmt} value={fmt}>
@@ -503,23 +471,15 @@ export const DeckBuilder: React.FC = () => {
           </Box>
 
           {/* Search Row */}
-          <Box
-            sx={{
-              mt: 1.5,
-              display: "flex",
-              alignItems: "center",
-              gap: 2,
-              justifyContent: "space-between",
-            }}
-          >
-            <Box sx={{ flex: 1, maxWidth: 600 }}>
+          <Box className="deck-builder-search-row">
+            <Box className="deck-builder-search-box">
               <DeckBuilderSearch onAddCard={addCard} />
             </Box>
             <Typography
               variant="caption"
               fontWeight="700"
               color="text.secondary"
-              sx={{ textTransform: "uppercase", letterSpacing: 1 }}
+              className="deck-builder-count"
             >
               {totalCards} Cards
             </Typography>
@@ -529,14 +489,7 @@ export const DeckBuilder: React.FC = () => {
             {validation.message && (
               <Alert
                 severity={validation.severity === "error" ? "error" : "warning"}
-                sx={{
-                  mt: 1,
-                  py: 0,
-                  borderRadius: 2,
-                  fontWeight: 500,
-                  "& .MuiAlert-icon": { alignItems: "center", py: 0 },
-                  "& .MuiAlert-message": { py: 0.5 },
-                }}
+                className="deck-builder-alert"
               >
                 {validation.message}
               </Alert>
@@ -545,31 +498,10 @@ export const DeckBuilder: React.FC = () => {
         </Box>
 
         {/* Deck Content */}
-        <Box sx={{ flex: 1, overflowY: "auto", p: 3, pb: 10 }}>
+        <Box className="deck-builder-content">
           {deckCards.length === 0 ? (
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "100%",
-                opacity: 0.5,
-                textAlign: "center",
-                gap: 2,
-              }}
-            >
-              <Box
-                sx={{
-                  width: 80,
-                  height: 80,
-                  borderRadius: "50%",
-                  bgcolor: "action.hover",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
+            <Box className="deck-builder-empty">
+              <Box className="deck-builder-empty-icon">
                 <GridViewIcon sx={{ fontSize: 40, color: "text.secondary" }} />
               </Box>
               <Box>
@@ -585,14 +517,7 @@ export const DeckBuilder: React.FC = () => {
             <Stack spacing={4}>
               {sortedGroups.map((type) => (
                 <Box key={type}>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      mb: 2,
-                    }}
-                  >
+                  <Box className="deck-builder-group-header">
                     <Typography
                       variant="subtitle2"
                       fontWeight="900"
@@ -601,17 +526,7 @@ export const DeckBuilder: React.FC = () => {
                     >
                       {type}
                     </Typography>
-                    <Box
-                      sx={{
-                        px: 1,
-                        py: 0.5,
-                        bgcolor: "action.selected",
-                        borderRadius: 1,
-                        fontSize: "0.7rem",
-                        fontWeight: 700,
-                        color: "text.primary",
-                      }}
-                    >
+                    <Box className="deck-builder-group-count">
                       {groupedCards[type].reduce((a, c) => a + c.quantity, 0)}
                     </Box>
                     <Divider sx={{ flex: 1 }} />
@@ -654,48 +569,17 @@ export const DeckBuilder: React.FC = () => {
       </Paper>
 
       {/* Right Column: Stats (Blurred) or Card Preview */}
-      <Box
-        sx={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          bgcolor: "background.default",
-          minWidth: 0,
-          borderLeft: 1,
-          borderColor: "divider",
-          position: "relative", // For overlay
-        }}
-      >
+      <Box className="deck-builder-pane-right">
         {/* Main Content (Stats) - active when NO hover */}
-        <Box
-          sx={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden", // Fixes scrolling issue
-            transition: "filter 0.2s, opacity 0.2s",
-            filter: hoveredCard ? "blur(8px)" : "none",
-            opacity: hoveredCard ? 0.3 : 1,
-            pointerEvents: hoveredCard ? "none" : "auto",
-          }}
-        >
-          <Box
-            sx={{
-              p: 2,
-              borderBottom: 1,
-              borderColor: "divider",
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-            }}
-          >
+        <Box className={`deck-builder-stats ${hoveredCard ? "blurred" : ""}`}>
+          <Box className="deck-builder-stats-header">
             <BarChartIcon color="primary" />
             <Typography variant="h6" fontWeight="700">
               Deck Statistics
             </Typography>
           </Box>
 
-          <Box sx={{ flex: 1, overflowY: "auto" }}>
+          <Box className="deck-builder-stats-content">
             <DeckStats
               cards={deckCards.filter(
                 (c) => c.board === "main" || c.board === "commander",
@@ -708,34 +592,8 @@ export const DeckBuilder: React.FC = () => {
 
         {/* Hover Overlay */}
         {hoveredCard && (
-          <Box
-            sx={{
-              position: "absolute",
-              inset: 0,
-              zIndex: 20,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center", // Center vertically
-              p: 2,
-              gap: 2,
-              overflow: "hidden", // Prevent overlay itself from scrolling
-            }}
-          >
-            <Card
-              sx={{
-                width: "auto",
-                height: "auto",
-                maxHeight: "55%", // Limit height to avoid cutoff
-                aspectRatio: "2.5/3.5",
-                bgcolor: "transparent",
-                borderRadius: "4.5% / 3.5%",
-                boxShadow: 24,
-                overflow: "hidden",
-                transform: "perspective(1000px) rotateY(5deg)",
-                flexShrink: 1, // Allow shrinking if needed
-              }}
-            >
+          <Box className="deck-builder-overlay">
+            <Card className="deck-builder-overlay-card">
               {hoveredCard.image_uris?.normal ? (
                 <CardMedia
                   component="img"
@@ -764,22 +622,7 @@ export const DeckBuilder: React.FC = () => {
             </Card>
 
             {/* Info Panel */}
-            <Paper
-              sx={{
-                width: "100%",
-                maxWidth: 400,
-                p: 2,
-                borderRadius: 1, // Reduced radius
-                bgcolor: "background.paper",
-                backdropFilter: "blur(20px)",
-                border: 1,
-                borderColor: "divider",
-                display: "flex",
-                flexDirection: "column",
-                maxHeight: "40%", // Leave room for card
-                overflowY: "auto", // Scroll if text is long
-              }}
-            >
+            <Paper className="deck-builder-overlay-info">
               <Box
                 sx={{
                   display: "flex",
@@ -798,6 +641,7 @@ export const DeckBuilder: React.FC = () => {
                     bgcolor: "action.hover",
                     px: 1,
                     py: 0.5,
+
                     borderRadius: 1,
                     fontFamily: "monospace",
                     flexShrink: 0,
