@@ -23,6 +23,8 @@ dependencies = [
     "sentence-transformers>=2.3.0",
     "einops>=0.7.0",
     "aiohttp>=3.9.0",
+    "google-generativeai>=0.8.6",
+    "google-cloud-aiplatform>=1.134.0",
 ]
 
 [dependency-groups]
