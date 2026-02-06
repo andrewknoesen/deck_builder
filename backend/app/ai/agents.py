@@ -2,6 +2,7 @@ from google.genai import types
 from google.genai import Client
 from app.ai.tools import query_comprehensive_rules, lookup_card_rulings
 from app.core.config import settings
+from app.core.logging import logger
 
 # In a full ADK setup, we'd use the higher-level ADK libraries (agenthub, etc.)
 # But often "ADK" refers to using the GenAI SDK with tool calling patterns or the Vertex AI Agent Builder.
@@ -15,6 +16,8 @@ class RulesAgent:
         self.client = None
         if self.api_key:
              self.client = Client(api_key=self.api_key)
+        else:
+             logger.warning("RulesAgent initialized without API Key. AI features will be disabled.")
 
     def _get_system_instruction(self) -> str:
         return """You are a Level 3 Magic: The Gathering Judge.
@@ -33,7 +36,10 @@ Format:
 **Explanation**: [Detailed walkthrough]"""
 
     async def chat(self, user_message: str, context_cards: list[str] = []) -> str:
+        logger.info(f"RulesAgent received message: '{user_message}' with context_cards: {context_cards}")
+        
         if not self.client:
+            logger.error("Attempted to chat but RulesAgent is missing API Key.")
             return "AI Agent not configured (missing API Key)."
 
         # Manual Tool Calling Loop (simplified ADK pattern)
@@ -59,7 +65,17 @@ Format:
         if context_cards:
             full_message += f"\n(Context Cards: {', '.join(context_cards)})"
 
-        response = chat.send_message(full_message)
+        try:
+            logger.info(f"Sending message to model {self.model_name}")
+            response = chat.send_message(full_message)
+            
+            if response.text:
+                 logger.info("RulesAgent received valid response from model.")
+                 return response.text
+                 
+        except Exception as e:
+            logger.error(f"Error during RulesAgent chat: {e}", exc_info=True)
+            return "I encountered an error processing your request."
         
         # The SDK automatically handles tool execution turns IF configured 
         # but often requires a loop if using low-level `generate_content`. 
@@ -78,9 +94,6 @@ Format:
         # For this snippet, we'll assume the setup works or returns the function call which we'd need to handle.
         # Given "Phase 1" constraints, this is a sufficient definition.
         
-        try:
-             return response.text
-        except:
-             return "I encountered an error processing your request."
+        return "I encountered an error processing your request."
 
 rules_agent = RulesAgent()

@@ -2,7 +2,7 @@ from typing import List
 
 # from app.services.scryfall import search_cards  # Removed: Not available as standalone function
 from app.ai.rag import rules_rag
-
+from app.core.logging import logger
 
 def lookup_card_rulings(card_names: List[str]) -> str:
     """
@@ -17,6 +17,7 @@ def lookup_card_rulings(card_names: List[str]) -> str:
     # For now, let's return a stub if service isn't ready, or try to use search_cards.
     
     results = []
+    logger.info(f"Tool 'lookup_card_rulings' called with: {card_names}")
     for name in card_names:
         # TODO: Implement actual Ruling fetch. 
         # For now, we simulate finding the card.
@@ -28,6 +29,7 @@ def query_comprehensive_rules(query: str) -> str:
     """
     Searches the Magic: The Gathering Comprehensive Rules for relevant sections.
     """
+    logger.info(f"Tool 'query_comprehensive_rules' called with query: '{query}'")
     docs = rules_rag.query_rules(query, k=5)
     if not docs:
         return "No relevant rules found in the Comprehensive Rules."
