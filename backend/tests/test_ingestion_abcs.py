@@ -3,14 +3,12 @@ from typing import Any, Dict, List, Optional
 import pytest
 from app.ai.ingestion.base import (
     ContentSplitter,
-    EmbeddingModel,
     IngestionDocument,
     IngestionSource,
-    PipelineContext,
-    ProcessedChunk,
     SectionParser,
-    VectorStore,
 )
+from app.ai.types import PipelineContext, ProcessedChunk
+from app.ai.vector_store.base import EmbeddingModel, VectorStore
 
 # --- Mock Implementations for ABCs ---
 

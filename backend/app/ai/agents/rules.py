@@ -1,13 +1,10 @@
-from google.genai import Client, types
+from functools import lru_cache
 
-from app.ai.tools import lookup_card_rulings, query_comprehensive_rules
+from app.ai.tools.rules import query_comprehensive_rules
+from app.ai.tools.scryfall import lookup_card_rulings
 from app.core.config import settings
 from app.core.logging import logger
-
-# In a full ADK setup, we'd use the higher-level ADK libraries (agenthub, etc.)
-# But often "ADK" refers to using the GenAI SDK with tool calling patterns or the Vertex AI Agent Builder.
-# Given the "python ADK libraries" instruction, we will stick to the idiomatic GenAI SDK tool use
-# or a simple Agent class wrapper as requested in the workflow.
+from google.genai import Client, types
 
 
 class RulesAgent:
@@ -47,15 +44,7 @@ Format:
             logger.error("Attempted to chat but RulesAgent is missing API Key.")
             return "AI Agent not configured (missing API Key)."
 
-        # Manual Tool Calling Loop (simplified ADK pattern)
-        # 1. Send message with tools
-        # 2. If model calls tool, execute and reply
-        # 3. Final answer
-
         tools = [query_comprehensive_rules, lookup_card_rulings]
-
-        # We can construct a specialized prompt or use the SDK's chat features.
-        # For simplicity in Phase 1, we'll assume a stateless single-turn or simple chat.
 
         chat = self.client.chats.create(
             model=self.model_name,
@@ -65,7 +54,6 @@ Format:
             ),
         )
 
-        # If context cards are provided, we might want to pre-inject info or append to prompt
         full_message = user_message
         if context_cards:
             full_message += f"\n(Context Cards: {', '.join(context_cards)})"
@@ -82,24 +70,9 @@ Format:
             logger.error(f"Error during RulesAgent chat: {e}", exc_info=True)
             return "I encountered an error processing your request."
 
-        # The SDK automatically handles tool execution turns IF configured
-        # but often requires a loop if using low-level `generate_content`.
-        # The `chats.create` high level abstraction in recent SDKs handles it if `automatic_function_calling` is enabled?
-        # Let's verify ADK/SDK explicit behavior. The new `google-genai` library (v0.3.0+)
-        # has `automatic_function_calling` enabled by default in some contexts or requires configuration.
-        # To be safe, we rely on the SDK's default handling or check parts.
-
-        # Validating response
-        if response.text:
-            return response.text
-
-        # If the model produced function calls but the SDK didn't auto-execute,
-        # we'd see parts with function calls.
-        # Assuming the new SDK `chats` handles this or we need to look into `response.candidates[0].content.parts`.
-        # For this snippet, we'll assume the setup works or returns the function call which we'd need to handle.
-        # Given "Phase 1" constraints, this is a sufficient definition.
-
         return "I encountered an error processing your request."
 
 
-rules_agent = RulesAgent()
+@lru_cache()
+def get_rules_agent() -> RulesAgent:
+    return RulesAgent()
