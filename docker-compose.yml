@@ -6,6 +6,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     working_dir: /app/backend
+    restart: always
     volumes:
       - .:/app
     ports:
@@ -16,6 +17,7 @@ services:
       - UV_LINK_MODE=copy
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
+      - CHROMA_SERVER_LOG_LEVEL=DEBUG
     # Keep the reload flag in command
     # Wait for DB to be ready ideally, or rely on restart_policy. 
     # For simplicity in dev, we just run. Optional: add a wait-for script.

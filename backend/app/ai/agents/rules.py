@@ -45,13 +45,19 @@ Format:
             logger.error("Attempted to chat but RulesAgent is missing API Key.")
             return "AI Agent not configured (missing API Key)."
 
-        tools = [query_comprehensive_rules, lookup_card_rulings]
-
+        # Map function names to callables
+        tool_map = {
+            "query_comprehensive_rules": query_comprehensive_rules,
+            "lookup_card_rulings": lookup_card_rulings,
+        }
+        
+        # Configure the chat session with tools
         chat = self.client.chats.create(
             model=self.model_name,
             config=types.GenerateContentConfig(
                 system_instruction=self._get_system_instruction(),
-                tools=tools,  # type: ignore
+                tools=list(tool_map.values()), 
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True), # We handle it manually for control/logging or if SDK auto-handling is tricky
             ),
         )
 
@@ -63,15 +69,62 @@ Format:
             logger.info(f"Sending message to model {self.model_name}")
             response = chat.send_message(full_message)
 
-            if response.text:
-                logger.info("RulesAgent received valid response from model.")
-                return response.text
+            # Tool execution loop
+            max_turns = 10
+            for _ in range(max_turns):
+                # If there are no function calls, return the text
+                if not response.function_calls:
+                    if response.text:
+                        return response.text
+                    else:
+                        return "I'm not sure how to answer that."
+
+                # Verify if we have parts to process
+                if not response.candidates or not response.candidates[0].content.parts:
+                     break
+
+                # Execute all function calls in the response
+                function_responses = []
+                for part in response.candidates[0].content.parts:
+                    if part.function_call:
+                        fc = part.function_call
+                        func_name = fc.name
+                        func_args = fc.args
+                        
+                        logger.info(f"Agent requesting tool execution: {func_name}({func_args})")
+                        
+                        if func_name in tool_map:
+                            try:
+                                # Call the tool
+                                result = tool_map[func_name](**func_args)
+                                logger.info(f"Tool {func_name} output: {str(result)[:100]}...")
+                            except Exception as e:
+                                logger.error(f"Tool {func_name} failed: {e}")
+                                result = f"Error executing tool: {e}"
+                        else:
+                            result = f"Error: Tool '{func_name}' not found."
+
+                        # Create the function response part
+                        function_responses.append(
+                            types.Part.from_function_response(
+                                name=func_name,
+                                response={"result": result}
+                            )
+                        )
+
+                # Send the tool outputs back to the model
+                if function_responses:
+                    logger.info(f"Sending {len(function_responses)} tool outputs back to model.")
+                    response = chat.send_message(function_responses)
+                else:
+                    # Should not happen if response.function_calls was true, but safety break
+                    break
+            
+            return "I reached the maximum number of reasoning steps without a final answer."
 
         except Exception as e:
             logger.error(f"Error during RulesAgent chat: {e}", exc_info=True)
             return "I encountered an error processing your request."
-
-        return "I encountered an error processing your request."
 
 
 # @lru_cache()

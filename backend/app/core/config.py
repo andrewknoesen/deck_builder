@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # AI Configuration
     CHROMA_HOST: str = "localhost"
-    CHROMA_PORT: int = 8000
+    CHROMA_PORT: int = 8001
     HF_TOKEN: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
     GOOGLE_PROJECT_ID: Optional[str] = None
