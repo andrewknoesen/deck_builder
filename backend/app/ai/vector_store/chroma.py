@@ -80,13 +80,17 @@ class ChromaVectorStore(VectorStore):
         )
 
         chunks = []
-        if results["ids"]:
-            for i in range(len(results["ids"][0])):
+        if results["ids"] and results["documents"] and results["metadatas"]:
+            ids = results["ids"][0]
+            docs = results["documents"][0]
+            metadatas = results["metadatas"][0]
+
+            for i in range(len(ids)):
                 chunks.append(
                     ProcessedChunk(
-                        id=results["ids"][0][i],
-                        text=results["documents"][0][i],
-                        metadata=results["metadatas"][0][i],
+                        id=ids[i],
+                        text=docs[i],
+                        metadata=cast(Dict[str, Any], metadatas[i] or {}),
                     )
                 )
         return chunks
