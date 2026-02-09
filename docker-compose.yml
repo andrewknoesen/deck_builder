@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     working_dir: /app/backend
-    restart: always
+    restart: unless-stopped
     volumes:
       - .:/app
     ports:

@@ -14,3 +14,15 @@ def query_comprehensive_rules(query: str) -> str:
         return "No relevant rules found in the Comprehensive Rules."
 
     return "\n\n".join([f"--- Rule Excerpt ---\n{doc}" for doc in docs])
+
+
+def lookup_glossary_term(term: str) -> str:
+    """
+    Looks up a term in the Magic: The Gathering Glossary.
+    """
+    logger.info(f"Tool 'lookup_glossary_term' called with term: '{term}'")
+    docs = rules_rag.query_glossary(term, k=3)
+    if not docs:
+        return f"No glossary entry found for '{term}'."
+
+    return "\n\n".join([f"--- Glossary Entry ---\n{doc}" for doc in docs])

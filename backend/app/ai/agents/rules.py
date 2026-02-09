@@ -2,7 +2,7 @@
 
 from google.genai import Client, types
 
-from app.ai.tools.rules import query_comprehensive_rules
+from app.ai.tools.rules import query_comprehensive_rules, lookup_glossary_term
 from app.ai.tools.scryfall import lookup_card_rulings
 from app.core.config import settings
 from app.core.logging import logger
@@ -27,9 +27,10 @@ Your goal is to answer questions about game rules and card interactions with hig
 INSTRUCTIONS:
 1. ALWAYS verify rules using the 'query_comprehensive_rules' tool. Do not rely on internal memory for specific rule numbers.
 2. If specific cards are mentioned, use 'lookup_card_rulings' to check for specific card errata or rulings.
-3. Answer strictly based on the provided context (Rules and Rulings).
-4. Cite rule numbers (e.g., "[CR 702.1]") in your explanation.
-5. If the user asks about deck building or strategy, politely decline and say you only focus on rules.
+3. If a specific keyword or term is unclear, use 'lookup_glossary_term' to find its definition.
+4. Answer strictly based on the provided context (Rules and Rulings).
+5. Cite rule numbers (e.g., "[CR 702.1]") in your explanation.
+6. If the user asks about deck building or strategy, politely decline and say you only focus on rules.
 
 Format:
 **Answer**: [Direct Answer]
@@ -49,6 +50,7 @@ Format:
         tool_map = {
             "query_comprehensive_rules": query_comprehensive_rules,
             "lookup_card_rulings": lookup_card_rulings,
+            "lookup_glossary_term": lookup_glossary_term,
         }
         
         # Configure the chat session with tools
@@ -70,7 +72,7 @@ Format:
             response = chat.send_message(full_message)
 
             # Tool execution loop
-            max_turns = 10
+            max_turns = 20
             for _ in range(max_turns):
                 # If there are no function calls, return the text
                 if not response.function_calls:

@@ -23,7 +23,9 @@ class RulesRAG(RAGService):
             print(f"Failed to initialize RAG: {e}")
             self._enabled = False
 
-    def query(self, text: str, k: int = 5) -> List[str]:
+    def query(
+        self, text: str, k: int = 5, filters: dict = None
+    ) -> List[str]:
         """
         Retrieves top-k relevant rules for the query.
         Returns a list of rule texts.
@@ -32,11 +34,19 @@ class RulesRAG(RAGService):
             return []
 
         try:
-            chunks: List[ProcessedChunk] = self.store.search(text, limit=k)
+            chunks: List[ProcessedChunk] = self.store.search(
+                text, limit=k, filters=filters
+            )
             return [chunk.text for chunk in chunks]
         except Exception as e:
             print(f"RAG Query validation failed: {e}")
             return []
+
+    def query_glossary(self, term: str, k: int = 3) -> List[str]:
+        """
+        Retrieves glossary definitions for a term.
+        """
+        return self.query(term, k=k, filters={"type": "glossary"})
 
 
 # @lru_cache()

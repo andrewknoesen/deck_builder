@@ -46,6 +46,8 @@ class WebSource(IngestionSource):
                 if response.status != 200:
                     raise Exception(f"Failed to download: {response.status}")
                 text = await response.text(encoding="utf-8", errors="ignore")
+                # Normalize line endings: generic fix for CR, CRLF, LF
+                text = text.replace("\r\n", "\n").replace("\r", "\n")
                 return IngestionDocument(
                     content=text,
                     source_id=self.url,
@@ -62,19 +64,61 @@ class MtgRulesContentSplitter(ContentSplitter):
         text = document.content
 
         # 1. Find Rules Start
-        rules_start_match = re.search(r"^1\. Game Concepts", text, re.MULTILINE)
-        rules_start_idx = rules_start_match.start() if rules_start_match else 0
+        # The first occurrence of "1. Game Concepts" is likely the TOC or the start.
+        # But wait, looking at the file structure, the TOC is usually at the top.
+        # If the TOC lists "1. Game Concepts", we want the *actual* start.
+        # However, typically the rules START with "1. Game Concepts".
+        # Let's rely on the structure: Rules -> Glossary -> Credits.
+        
+        # Robust strategy: 
+        # Glossary is definitely the LAST "Glossary" header before Credits.
+        # Credits is the LAST "Credits" header.
+        
+        glossary_matches = list(re.finditer(r"^Glossary$", text, re.MULTILINE))
+        credits_matches = list(re.finditer(r"^Credits$", text, re.MULTILINE))
+        
+        if not glossary_matches:
+            print("Warning: No Glossary section found.")
+            return []
 
-        # 2. Find Glossary Start
-        glossary_match = re.search(r"^Glossary$", text, re.MULTILINE)
+        # Assuming the real glossary is the last one
+        glossary_match = glossary_matches[-1]
+        
+        # Assuming the real credits is the last one
+        credits_match = credits_matches[-1] if credits_matches else None
+        
+        # Rules end where Glossary starts
+        rules_end = glossary_match.start()
+        
+        # Find start of rules (Header 1)
+        # We want the last one before the glossary?
+        # Actually, "1. Game Concepts" appears in the TOC (start) and then the actual section.
+        # But wait, looking at the patterns:
+        # The TOC has "1. Game Concepts"
+        # The Rules Section starts with "1. Game Concepts"
+        # And there are NO other occurrences (it's a chapter title).
+        # So there should be exactly 2 matches?
+        # Let's find all matches and take the last one that is BEFORE glossary_start.
+        
+        rules_start_matches = list(re.finditer(r"^1\. Game Concepts", text, re.MULTILINE))
+        if not rules_start_matches:
+            print("Warning: No Rules section found.")
+            return []
+            
+        # Filter matches that are before glossary
+        valid_rules_starts = [m for m in rules_start_matches if m.start() < rules_end]
+        if not valid_rules_starts:
+            # Fallback
+            rules_start_match = rules_start_matches[0]
+        else:
+            # Take the last one (closest to glossary, likely the real section)
+            rules_start_match = valid_rules_starts[-1]
 
-        # 3. Find Credits Start (End of Glossary)
-        credits_match = re.search(r"^Credits$", text, re.MULTILINE)
-
+        rules_start_idx = rules_start_match.start()
+        
         parts = []
 
         # Rules Section
-        rules_end = glossary_match.start() if glossary_match else len(text)
         rules_text = text[rules_start_idx:rules_end]
         parts.append(
             IngestionDocument(
@@ -85,17 +129,16 @@ class MtgRulesContentSplitter(ContentSplitter):
         )
 
         # Glossary Section
-        if glossary_match:
-            glossary_start = glossary_match.end()
-            glossary_end = credits_match.start() if credits_match else len(text)
-            glossary_text = text[glossary_start:glossary_end]
-            parts.append(
-                IngestionDocument(
-                    content=glossary_text,
-                    source_id=f"{document.source_id}#glossary",
-                    metadata={**document.metadata, "section": "glossary"},
-                )
+        glossary_start = glossary_match.end()
+        glossary_end = credits_match.start() if credits_match else len(text)
+        glossary_text = text[glossary_start:glossary_end]
+        parts.append(
+            IngestionDocument(
+                content=glossary_text,
+                source_id=f"{document.source_id}#glossary",
+                metadata={**document.metadata, "section": "glossary"},
             )
+        )
 
         return parts
 

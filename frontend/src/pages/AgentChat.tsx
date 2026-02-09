@@ -81,7 +81,7 @@ export const AgentChat: React.FC = () => {
           </Typography>
         </Box>
         <Divider />
-        
+
         <Box className="agent-chat-messages">
           <List>
             {messages.map((msg, index) => (
@@ -89,7 +89,7 @@ export const AgentChat: React.FC = () => {
             ))}
             {mutation.isPending && (
               <ListItem className="loading-item">
-                 <ListItemAvatar sx={{ minWidth: 40, mt: 0 }}>
+                <ListItemAvatar sx={{ minWidth: 40, mt: 0 }}>
                   <Avatar sx={{ bgcolor: "primary.main" }}>
                     <SmartToyIcon />
                   </Avatar>
@@ -102,7 +102,7 @@ export const AgentChat: React.FC = () => {
         </Box>
 
         <Divider />
-        <ChatInput onSend={handleSend} disabled={mutation.isPending} />
+        <ChatInput onSend={handleSend} />
       </Paper>
     </Container>
   );
