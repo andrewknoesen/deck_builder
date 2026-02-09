@@ -4,6 +4,7 @@ import chromadb
 from app.ai.types import PipelineContext, ProcessedChunk
 from app.ai.vector_store.base import EmbeddingModel, VectorStore
 from chromadb.config import Settings
+from app.core.config import settings
 
 
 class ChromaVectorStore(VectorStore):
@@ -11,11 +12,14 @@ class ChromaVectorStore(VectorStore):
 
     def __init__(
         self,
-        host: str = "localhost",
-        port: int = 8000,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
         collection_name: str = "mtg_rules",
         embedding_model: Optional[EmbeddingModel] = None,
     ):
+        host = host or settings.CHROMA_HOST
+        port = port or settings.CHROMA_PORT
+
         print(f"Connecting to ChromaDB at {host}:{port}...")
         self.client = chromadb.HttpClient(
             host=host,

@@ -1,10 +1,11 @@
-from functools import lru_cache
+# from functools import lru_cache
+
+from google.genai import Client, types
 
 from app.ai.tools.rules import query_comprehensive_rules
 from app.ai.tools.scryfall import lookup_card_rulings
 from app.core.config import settings
 from app.core.logging import logger
-from google.genai import Client, types
 
 
 class RulesAgent:
@@ -73,6 +74,8 @@ Format:
         return "I encountered an error processing your request."
 
 
-@lru_cache()
-def get_rules_agent() -> RulesAgent:
-    return RulesAgent()
+# @lru_cache()
+# def get_rules_agent() -> RulesAgent:
+#     return RulesAgent()
+
+rules_agent = RulesAgent()

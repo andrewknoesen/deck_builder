@@ -1,4 +1,5 @@
-from functools import lru_cache
+# from functools import lru_cache
+
 from typing import List
 
 from app.ai.rag.base import RAGService
@@ -38,12 +39,8 @@ class RulesRAG(RAGService):
             return []
 
 
-# ... (imports remain)
+# @lru_cache()
+# def get_rules_rag() -> RulesRAG:
+#     return RulesRAG()
 
-# ... (class definition remains)
-
-
-# Singleton instance via lru_cache
-@lru_cache()
-def get_rules_rag() -> RulesRAG:
-    return RulesRAG()
+rules_rag = RulesRAG()

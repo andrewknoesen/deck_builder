@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     SCRYFALL_BASE_URL: str = "https://api.scryfall.com"
 
     # AI Configuration
+    CHROMA_HOST: str = "localhost"
+    CHROMA_PORT: int = 8000
     HF_TOKEN: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
     GOOGLE_PROJECT_ID: Optional[str] = None

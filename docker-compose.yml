@@ -14,6 +14,8 @@ services:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/deck_builder
       - SCRYFALL_BASE_URL=https://api.scryfall.com
       - UV_LINK_MODE=copy
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
     # Keep the reload flag in command
     # Wait for DB to be ready ideally, or rely on restart_policy. 
     # For simplicity in dev, we just run. Optional: add a wait-for script.
