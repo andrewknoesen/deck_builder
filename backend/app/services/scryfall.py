@@ -27,7 +27,13 @@ class ScryfallService:
         response = await self.client.post("/cards/collection", json={"identifiers": identifiers})
         response.raise_for_status()
         data = response.json()
+    async def get_card_rulings(self, card_id: str) -> List[Dict[str, Any]]:
+        response = await self.client.get(f"/cards/{card_id}/rulings")
+        response.raise_for_status()
+        data = response.json()
         return data.get("data", [])
+
+
 
 async def get_scryfall_service():
     async with httpx.AsyncClient(base_url=settings.SCRYFALL_BASE_URL, timeout=30.0) as client:

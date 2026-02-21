@@ -1,8 +1,8 @@
-# from functools import lru_cache
+import inspect
 
 from google.genai import Client, types
 
-from app.ai.tools.rules import query_comprehensive_rules, lookup_glossary_term
+from app.ai.tools.rules import lookup_glossary_term, query_comprehensive_rules
 from app.ai.tools.scryfall import lookup_card_rulings
 from app.core.config import settings
 from app.core.logging import logger
@@ -52,14 +52,16 @@ Format:
             "lookup_card_rulings": lookup_card_rulings,
             "lookup_glossary_term": lookup_glossary_term,
         }
-        
+
         # Configure the chat session with tools
         chat = self.client.chats.create(
             model=self.model_name,
             config=types.GenerateContentConfig(
                 system_instruction=self._get_system_instruction(),
-                tools=list(tool_map.values()), 
-                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True), # We handle it manually for control/logging or if SDK auto-handling is tricky
+                tools=list(tool_map.values()),
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                    disable=True
+                ),  # We handle it manually for control/logging or if SDK auto-handling is tricky
             ),
         )
 
@@ -83,7 +85,7 @@ Format:
 
                 # Verify if we have parts to process
                 if not response.candidates or not response.candidates[0].content.parts:
-                     break
+                    break
 
                 # Execute all function calls in the response
                 function_responses = []
@@ -92,14 +94,21 @@ Format:
                         fc = part.function_call
                         func_name = fc.name
                         func_args = fc.args
-                        
-                        logger.info(f"Agent requesting tool execution: {func_name}({func_args})")
-                        
+
+                        logger.info(
+                            f"Agent requesting tool execution: {func_name}({func_args})"
+                        )
+
                         if func_name in tool_map:
                             try:
                                 # Call the tool
-                                result = tool_map[func_name](**func_args)
-                                logger.info(f"Tool {func_name} output: {str(result)[:100]}...")
+                                if inspect.iscoroutinefunction(tool_map[func_name]):
+                                    result = await tool_map[func_name](**func_args)
+                                else:
+                                    result = tool_map[func_name](**func_args)
+                                logger.info(
+                                    f"Tool {func_name} output: {str(result)[:100]}..."
+                                )
                             except Exception as e:
                                 logger.error(f"Tool {func_name} failed: {e}")
                                 result = f"Error executing tool: {e}"
@@ -109,19 +118,20 @@ Format:
                         # Create the function response part
                         function_responses.append(
                             types.Part.from_function_response(
-                                name=func_name,
-                                response={"result": result}
+                                name=func_name, response={"result": result}
                             )
                         )
 
                 # Send the tool outputs back to the model
                 if function_responses:
-                    logger.info(f"Sending {len(function_responses)} tool outputs back to model.")
+                    logger.info(
+                        f"Sending {len(function_responses)} tool outputs back to model."
+                    )
                     response = chat.send_message(function_responses)
                 else:
                     # Should not happen if response.function_calls was true, but safety break
                     break
-            
+
             return "I reached the maximum number of reasoning steps without a final answer."
 
         except Exception as e:
