@@ -9,7 +9,7 @@ from app.main import app
 MOCK_DECK_WITH_STATS = {
     "title": "Stats Test Deck", 
     "format": "Commander",
-    "user_id": 1,
+    "user_id": 102,
     "cards": [
         # Land (W)
         {"card_id": "plains-1", "quantity": 10, "board": "main"},
@@ -21,6 +21,8 @@ MOCK_DECK_WITH_STATS = {
         {"card_id": "counterspell", "quantity": 4, "board": "main"},
         # Sorcery (R) - CMC 5
         {"card_id": "big-boom", "quantity": 2, "board": "main"},
+        # Sideboard Card (Should be ignored)
+        {"card_id": "plains-1", "quantity": 5, "board": "side"},
     ]
 }
 
@@ -39,7 +41,7 @@ async def test_get_deck_stats(client: AsyncClient, db_session, mock_scryfall):
     app.dependency_overrides[get_scryfall_service] = lambda: mock_scryfall
     
     # 0. Create User
-    user = User(id=1, email="test@example.com", google_sub="sub123")
+    user = User(id=102, email="test_stats@example.com", google_sub="substats")
     db_session.add(user)
     
     # 1. Create Cards in DB

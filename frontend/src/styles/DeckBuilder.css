@@ -1,0 +1,212 @@
+/* Deck Builder Layout */
+.deck-builder-container {
+  display: flex;
+  height: calc(100vh - 64px);
+  overflow: hidden;
+}
+
+/* Left Pane: Deck Inventory */
+.deck-builder-pane-left {
+  width: 65%;
+  border-right: 1px solid #1e293b; /* divider */
+  display: flex;
+  flex-direction: column;
+  background-color: #0f172a; /* background.paper */
+  z-index: 10;
+}
+
+.deck-builder-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #1e293b; /* divider */
+  background-color: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.deck-builder-header-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.deck-builder-back-btn {
+  border: 1px solid #1e293b; /* divider */
+  border-radius: 8px;
+}
+
+.deck-builder-controls {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.deck-builder-title-input input {
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.deck-builder-search-row {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.deck-builder-search-box {
+  flex: 1;
+  max-width: 600px;
+}
+
+.deck-builder-count {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Validation Alert */
+.deck-builder-alert {
+  margin-top: 8px;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.deck-builder-alert .MuiAlert-icon {
+  align-items: center;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.deck-builder-alert .MuiAlert-message {
+  padding-top: 4px; /* 0.5 * 8px */
+  padding-bottom: 4px;
+}
+
+/* Deck Content */
+.deck-builder-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  padding-bottom: 80px;
+}
+
+.deck-builder-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  opacity: 0.5;
+  text-align: center;
+  gap: 16px;
+}
+
+.deck-builder-empty-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.08); /* action.hover */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.deck-builder-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.deck-builder-group-count {
+  padding: 4px 8px;
+  background-color: rgba(99, 102, 241, 0.16); /* action.selected approximation */
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #f1f5f9; /* text.primary */
+}
+
+/* Right Pane: Stats & Preview */
+.deck-builder-pane-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #020617; /* background.default */
+  min-width: 0;
+  border-left: 1px solid #1e293b; /* divider */
+  position: relative;
+}
+
+.deck-builder-stats {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: filter 0.2s, opacity 0.2s;
+}
+
+.deck-builder-stats.blurred {
+  filter: blur(8px);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.deck-builder-stats-header {
+  padding: 16px;
+  border-bottom: 1px solid #1e293b; /* divider */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.deck-builder-stats-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Card Overlay */
+.deck-builder-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.deck-builder-overlay-card {
+  width: auto;
+  height: auto;
+  max-height: 55%;
+  aspect-ratio: 2.5/3.5;
+  background-color: transparent;
+  border-radius: 4.5% / 3.5%;
+  box-shadow: 0px 11px 15px -7px rgba(0,0,0,0.2), 0px 24px 38px 3px rgba(0,0,0,0.14), 0px 9px 46px 8px rgba(0,0,0,0.12); /* elevation 24 */
+  overflow: hidden;
+  transform: perspective(1000px) rotateY(5deg);
+  flex-shrink: 1;
+}
+
+.deck-builder-overlay-info {
+  width: 100%;
+  max-width: 400px;
+  padding: 16px;
+  border-radius: 8px; /* Reduced radius from 16 to 8 per inline style */
+  background-color: #0f172a; /* background.paper */
+  backdrop-filter: blur(20px);
+  border: 1px solid #1e293b; /* divider */
+  display: flex;
+  flex-direction: column;
+  max-height: 40%;
+  overflow-y: auto;
+}

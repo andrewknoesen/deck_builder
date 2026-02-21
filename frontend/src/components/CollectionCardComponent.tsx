@@ -4,6 +4,8 @@ import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
 import type { CollectionCard } from '../types/mtg';
 
+import { useCardHover } from "../context/CardHoverContext";
+
 interface CollectionCardProps {
     collectionCard: CollectionCard;
     onUpdateQuantity: (id: number, delta: number) => void; // Using numerical ID for collection items
@@ -11,6 +13,8 @@ interface CollectionCardProps {
 }
 
 export const CollectionCardComponent = React.memo<CollectionCardProps>(({ collectionCard, onUpdateQuantity, onRemove }) => {
+    const { setHoveredCard } = useCardHover();
+
     return (
         <Box sx={{ position: 'relative', width: '100%', aspectRatio: '2.5/3.5' }}>
              {/* Quantity Badge */}
@@ -48,7 +52,10 @@ export const CollectionCardComponent = React.memo<CollectionCardProps>(({ collec
                 overflow: 'visible',
                 '&:hover': { zIndex: 10 },
             }}>
-                <Box sx={{ 
+                <Box 
+                    onMouseEnter={() => setHoveredCard(collectionCard.card || null)}
+                    onMouseLeave={() => setHoveredCard(null)}
+                    sx={{ 
                     position: 'relative', 
                     width: '100%', 
                     height: '100%', 

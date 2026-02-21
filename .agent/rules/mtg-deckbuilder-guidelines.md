@@ -15,3 +15,4 @@ trigger: always_on
 * Use postgres for the database.
 * Always manually test the code.
 * When testing the frontend always open the browser to test.
+* Always test all changes that you make. Do this by reruning all tests and when it is a frontend change open the browser to make test that the change is working correctly.

@@ -1,41 +1,40 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import "../styles/DeckBuilder.css";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate, Link as RouterLink } from "react-router-dom";
 import {
   Box,
   TextField,
   Typography,
-  Button,
   IconButton,
   Grid,
   Paper,
-  InputAdornment,
   Divider,
   Stack,
   CircularProgress,
-  Tabs,
-  Tab,
   Alert,
   Collapse,
+  Snackbar,
 } from "@mui/material";
 import {
   validateDeckSize,
+  validateSideboardSize,
   getCardLimit,
   isCardLegal,
   isValidCommander,
 } from "../utils/deckValidation";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import SearchIcon from "@mui/icons-material/Search";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import GridViewIcon from "@mui/icons-material/GridView";
 import { apiClient } from "../api/client";
 import type { ScryfallCard, Deck, DeckCard } from "../types/mtg";
 import { useAuth } from "../context/AuthContext";
-import { SearchCard } from "../components/SearchCard";
 import { DeckCard as DeckCardComponent } from "../components/DeckCard";
 import { DeckStats } from "../components/DeckStats";
+import { DeckBuilderSearch } from "../components/DeckBuilderSearch";
 import { useDebounce } from "../hooks/useDebounce";
+import { useCardHover } from "../context/CardHoverContext";
+import { Card, CardMedia } from "@mui/material";
 
 // Helper to determine primary type for grouping
 const getCardType = (typeLine?: string): string => {
@@ -81,6 +80,7 @@ export const DeckBuilder: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { hoveredCard } = useCardHover();
 
   const isNew = !deckId || deckId === "new";
 
@@ -92,6 +92,19 @@ export const DeckBuilder: React.FC = () => {
     "saved",
   );
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: "error" | "warning" | "info" | "success";
+  }>({
+    open: false,
+    message: "",
+    severity: "info",
+  });
+
+  const handleCloseSnackbar = () => {
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
 
   // Debounce critical state for auto-save
   const debouncedTitle = useDebounce(title, 1000);
@@ -173,37 +186,22 @@ export const DeckBuilder: React.FC = () => {
     }
   }, [debouncedTitle, debouncedFormat, debouncedCards]);
 
-  // Search State
-  const [rightTab, setRightTab] = useState(0);
-  const [query, setQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<ScryfallCard[]>([]);
-  const [searching, setSearching] = useState(false);
+  // Search State removed (now handled by DeckBuilderSearch)
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query) return;
-    setSearching(true);
-    try {
-      const res = await apiClient.get(`/cards/search`, {
-        params: { q: query },
-      });
-      setSearchResults(res.data.data || []);
-    } catch (err) {
-      console.error("Search failed", err);
-    } finally {
-      setSearching(false);
-    }
-  };
+  /* 
+   * Card Management Logic (Board-Aware)
+   * We now support the same card existing in multiple boards (e.g. 3 Main, 1 Side).
+   */
 
   const addCard = useCallback(
     (card: ScryfallCard) => {
       setDeckCards((prev) => {
-        const existing = prev.find((dc) => dc.card_id === card.id);
+        // Default to adding to Mainboard
+        const existingMain = prev.find((dc) => dc.card_id === card.id && dc.board === "main");
 
-        if (existing) {
-          // Allow exceeding limit (visual warning handled in DeckCard)
-          return prev.map((dc) =>
-            dc.card_id === card.id ? { ...dc, quantity: dc.quantity + 1 } : dc,
+        if (existingMain) {
+           return prev.map((dc) =>
+            dc === existingMain ? { ...dc, quantity: dc.quantity + 1 } : dc
           );
         }
         return [
@@ -215,87 +213,203 @@ export const DeckBuilder: React.FC = () => {
     [format],
   );
 
-  const updateQuantity = useCallback((cardId: string, delta: number) => {
-    setDeckCards((prev) =>
-      prev
+  const updateQuantity = useCallback((cardId: string, board: string, delta: number) => {
+    setDeckCards((prev) => {
+      // Logic for Sideboard Limit Check
+      if (board === "side" && delta > 0) {
+          const currentSideboardCount = prev
+              .filter(c => c.board === "side")
+              .reduce((acc, curr) => acc + curr.quantity, 0);
+          
+          const splitRes = validateSideboardSize(format, currentSideboardCount + delta);
+          // Block if it's an error (e.g. > 15 in constructed). Warnings (e.g. >0 in Commander) allow through.
+          if (!splitRes.valid && splitRes.severity === "error") {
+              setSnackbar({
+                  open: true,
+                  message: splitRes.message || "Sideboard limit reached.",
+                  severity: "error",
+              });
+              return prev; // Do not apply change
+          }
+      }
+
+      return prev
         .map((dc) => {
-          if (dc.card_id === cardId) {
+          if (dc.card_id === cardId && dc.board === board) {
             const newQty = Math.max(0, dc.quantity + delta);
             return { ...dc, quantity: newQty };
           }
           return dc;
         })
-        .filter((dc) => dc.quantity > 0),
-    );
+        .filter((dc) => dc.quantity > 0);
+    });
+  }, [format]);
+
+  const removeCard = useCallback((cardId: string, board: string) => {
+    setDeckCards((prev) => prev.filter((dc) => !(dc.card_id === cardId && dc.board === board)));
   }, []);
 
-  const removeCard = useCallback((cardId: string) => {
-    setDeckCards((prev) => prev.filter((dc) => dc.card_id !== cardId));
-  }, []);
-
-  const handleMoveToBoard = useCallback((cardId: string, newBoard: string) => {
-    setDeckCards((prev) =>
-      prev.map((dc) => {
-        if (dc.card_id === cardId) {
-          if (newBoard === "commander" && !isValidCommander(dc.card)) {
-            return dc; // Prevent illegal commander
-          }
-          // If moving to commander, quantity max 1
-          const quantity = newBoard === "commander" ? 1 : dc.quantity;
-          return { ...dc, board: newBoard, quantity };
+  const handleMoveCard = useCallback((cardId: string, fromBoard: string, toBoard: string, quantity: number = 1) => {
+    setDeckCards((prev) => {
+        const sourceIndex = prev.findIndex(dc => dc.card_id === cardId && dc.board === fromBoard);
+        if (sourceIndex === -1) return prev;
+        
+        const source = prev[sourceIndex];
+        
+        // Validation: Commander
+        if (toBoard === "commander" && !isValidCommander(source.card)) {
+             setSnackbar({
+               open: true,
+               message: "This card cannot be your commander.",
+               severity: "error",
+             });
+             return prev;
         }
-        return dc;
-      }),
-    );
-  }, []);
+
+        // Validation: Sideboard Limit
+        if (toBoard === "side") {
+            const currentSideboardCount = prev
+                .filter(c => c.board === "side")
+                .reduce((acc, curr) => acc + curr.quantity, 0);
+            
+            // moving FROM side TO side shouldn't happen, but if it did, net change is 0. 
+            // Here we assume moving from Main/Maybe TO Side.
+            if (fromBoard !== "side") {
+                const splitRes = validateSideboardSize(format, currentSideboardCount + quantity);
+                if (!splitRes.valid && splitRes.severity === "error") {
+                    setSnackbar({
+                        open: true,
+                        message: splitRes.message || "Sideboard limit reached.",
+                        severity: "error",
+                    });
+                    return prev; 
+                }
+            }
+        }
+
+        const newCards = [...prev];
+        
+        // 1. Decrement Source
+        if (source.quantity <= quantity) {
+             // Moved entire stack
+             newCards.splice(sourceIndex, 1);
+        } else {
+             newCards[sourceIndex] = { ...source, quantity: source.quantity - quantity };
+        }
+        
+        // 2. Increment/Create Destination
+        // Commander can only have 1
+        const actualQuantityToAdd = toBoard === "commander" ? 1 : quantity;
+
+        const destIndex = newCards.findIndex(dc => dc.card_id === cardId && dc.board === toBoard);
+        
+        if (destIndex !== -1) {
+             // Add to existing stack
+             const dest = newCards[destIndex];
+             // If commander, ensure quantity is 1 (idempotent)
+             const newDestQty = toBoard === "commander" ? 1 : dest.quantity + actualQuantityToAdd;
+             newCards[destIndex] = { ...dest, quantity: newDestQty };
+        } else {
+             // Create new stack
+             newCards.push({
+                 card_id: cardId,
+                 quantity: actualQuantityToAdd,
+                 board: toBoard,
+                 card: source.card
+             });
+        }
+        
+        return newCards;
+    });
+  }, [format]);
 
   // Group cards
   const groupedCards = useMemo(() => {
     const groups: Record<string, DeckCard[]> = {};
-    deckCards.forEach((dc) => {
-      // Logic for grouping:
-      // 1. If board is commander, group is "Commander"
-      // 2. Else group by type
-      let groupKey = getCardType(dc.card?.type_line);
-      if (dc.board === "commander") {
-        groupKey = "Commander";
-      }
 
-      if (!groups[groupKey]) groups[groupKey] = [];
-      groups[groupKey].push(dc);
+    // Initialize standard mainboard groups
+    TYPE_ORDER.forEach((t) => (groups[t] = []));
+    groups["Commander"] = [];
+    groups["Sideboard"] = [];
+    groups["Maybeboard"] = [];
+
+    deckCards.forEach((dc) => {
+      if (dc.board === "commander") {
+        groups["Commander"].push(dc);
+      } else if (dc.board === "side") {
+        groups["Sideboard"].push(dc);
+      } else if (dc.board === "maybe") {
+        groups["Maybeboard"].push(dc);
+      } else {
+        // Mainboard - group by type
+        const typeKey = getCardType(dc.card?.type_line);
+        if (!groups[typeKey]) groups[typeKey] = [];
+        groups[typeKey].push(dc);
+      }
     });
+
+    // Remove empty groups
+    Object.keys(groups).forEach((key) => {
+      if (groups[key].length === 0) delete groups[key];
+    });
+
     return groups;
   }, [deckCards]);
 
   const sortedGroups = useMemo(() => {
-    const customOrder = ["Commander", ...TYPE_ORDER];
+    // Order: Commander, then Mainboard types, then Sideboard, then Maybeboard
+    const sectionOrder = [
+      "Commander",
+      ...TYPE_ORDER,
+      "Sideboard",
+      "Maybeboard",
+    ];
     return Object.keys(groupedCards).sort((a, b) => {
-      return customOrder.indexOf(a) - customOrder.indexOf(b);
+      return sectionOrder.indexOf(a) - sectionOrder.indexOf(b);
     });
   }, [groupedCards]);
 
   const totalCards = useMemo(
-    () => deckCards.reduce((acc, curr) => acc + curr.quantity, 0),
+    () => deckCards.filter(c => c.board === "main" || c.board === "commander").reduce((acc, curr) => acc + curr.quantity, 0),
     [deckCards],
   );
 
-  const validation = useMemo(
-    () => validateDeckSize(format, totalCards),
-    [format, totalCards],
+  const sideboardCount = useMemo(
+    () => deckCards.filter(c => c.board === "side").reduce((acc, curr) => acc + curr.quantity, 0),
+    [deckCards],
   );
+
+  // Global card counts (Main + Side + Commander) for limit validation
+  const globalCardCounts = useMemo(() => {
+     const counts: Record<string, number> = {};
+     deckCards.forEach(dc => {
+         // Maybeboard usually doesn't count towards limit, but let's assume limit applies to Deck (Main+Side)
+         if (dc.board !== "maybe") {
+             counts[dc.card_id] = (counts[dc.card_id] || 0) + dc.quantity;
+         }
+     });
+     return counts;
+  }, [deckCards]);
+
+  const validation = useMemo(() => {
+    const deckVal = validateDeckSize(format, totalCards);
+    const sideVal = validateSideboardSize(format, sideboardCount);
+    
+    if (!deckVal.valid) return deckVal;
+    if (!sideVal.valid) return sideVal;
+    
+    return { valid: true, severity: "success", message: "" };
+  }, [format, totalCards, sideboardCount]);
+
+
+
+// ... existing imports ...
+
+// ... within Code ...
 
   if (loadingDecks) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "calc(100vh - 64px)",
-          gap: 2,
-        }}
-      >
+      <Box className="deck-builder-loading">
         <CircularProgress size={48} color="primary" />
         <Typography variant="body1" color="text.secondary">
           Conjuring your deck...
@@ -305,101 +419,77 @@ export const DeckBuilder: React.FC = () => {
   }
 
   return (
-    <Box
-      sx={{ display: "flex", height: "calc(100vh - 64px)", overflow: "hidden" }}
-    >
+    <Box className="deck-builder-container">
       {/* Left Column: Deck Inventory (Expanded to 65%) */}
       <Paper
         square
         elevation={0}
-        sx={{
-          width: "65%", // Expanded from 45%
-          borderRight: 1,
-          borderColor: "divider",
-          display: "flex",
-          flexDirection: "column",
-          bgcolor: "background.paper",
-          zIndex: 10,
-        }}
+        className="deck-builder-pane-left"
       >
         {/* Header */}
-        <Box
-          sx={{
-            p: 3,
-            borderBottom: 1,
-            borderColor: "divider",
-            bgcolor: "rgba(15, 23, 42, 0.8)",
-            backdropFilter: "blur(12px)",
-            position: "sticky",
-            top: 0,
-            zIndex: 20,
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+        <Box className="deck-builder-header">
+          <Box className="deck-builder-header-top">
             <IconButton
               component={RouterLink}
               to="/decks"
               size="small"
-              sx={{ border: 1, borderColor: "divider", borderRadius: 2 }}
+              className="deck-builder-back-btn"
             >
               <ArrowBackIcon fontSize="small" />
             </IconButton>
-            <Box
-              sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}
-            >
-              <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
-                <TextField
-                  fullWidth
-                  variant="standard"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Deck Title"
-                  InputProps={{
-                    disableUnderline: true,
-                    sx: { fontSize: "1.5rem", fontWeight: 900 },
-                  }}
-                />
-                <TextField
-                  select
-                  value={format}
-                  onChange={(e) => setFormat(e.target.value)}
-                  variant="outlined"
-                  size="small"
-                  SelectProps={{ native: true }}
-                  sx={{ width: 220 }}
-                >
-                  {FORMATS.map((fmt) => (
-                    <option key={fmt} value={fmt}>
-                      {fmt}
-                    </option>
-                  ))}
-                </TextField>
-              </Box>
-              <Typography
-                variant="caption"
-                fontWeight="700"
-                color="text.secondary"
-                sx={{ textTransform: "uppercase", letterSpacing: 1 }}
-              >
-                {totalCards} Cards
-              </Typography>
-            </Box>
 
-            {/* Status Indicator */}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}></Box>
+            {/* Title & Format Row */}
+            <Box className="deck-builder-controls">
+              <TextField
+                fullWidth
+                variant="standard"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Deck Title"
+                className="deck-builder-title-input"
+                InputProps={{
+                  disableUnderline: true,
+                  // CSS class deck-builder-title-input handles font size/weight on input
+                }}
+              />
+              <TextField
+                select
+                value={format}
+                onChange={(e) => setFormat(e.target.value)}
+                variant="outlined"
+                size="small"
+                SelectProps={{ native: true }}
+                sx={{ width: 140, "& .MuiInputBase-input": { py: 0.5 } }} // Keep minimal sizing SX if tricky in CSS or move to class
+              >
+                {FORMATS.map((fmt) => (
+                  <option key={fmt} value={fmt}>
+                    {fmt}
+                  </option>
+                ))}
+              </TextField>
+            </Box>
+          </Box>
+
+          {/* Search Row */}
+          <Box className="deck-builder-search-row">
+            <Box className="deck-builder-search-box">
+              <DeckBuilderSearch onAddCard={addCard} />
+            </Box>
+            <Typography
+              variant="caption"
+              fontWeight="700"
+              color="text.secondary"
+              className="deck-builder-count"
+            >
+              {totalCards} Cards
+            </Typography>
           </Box>
 
           <Collapse in={!validation.valid}>
             {validation.message && (
               <Alert
                 severity={validation.severity === "error" ? "error" : "warning"}
-                sx={{
-                  mx: 3,
-                  mb: 2,
-                  borderRadius: 2,
-                  fontWeight: 500,
-                  "& .MuiAlert-icon": { alignItems: "center" },
-                }}
+                className="deck-builder-alert"
               >
                 {validation.message}
               </Alert>
@@ -408,31 +498,10 @@ export const DeckBuilder: React.FC = () => {
         </Box>
 
         {/* Deck Content */}
-        <Box sx={{ flex: 1, overflowY: "auto", p: 3, pb: 10 }}>
+        <Box className="deck-builder-content">
           {deckCards.length === 0 ? (
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "100%",
-                opacity: 0.5,
-                textAlign: "center",
-                gap: 2,
-              }}
-            >
-              <Box
-                sx={{
-                  width: 80,
-                  height: 80,
-                  borderRadius: "50%",
-                  bgcolor: "action.hover",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
+            <Box className="deck-builder-empty">
+              <Box className="deck-builder-empty-icon">
                 <GridViewIcon sx={{ fontSize: 40, color: "text.secondary" }} />
               </Box>
               <Box>
@@ -448,14 +517,7 @@ export const DeckBuilder: React.FC = () => {
             <Stack spacing={4}>
               {sortedGroups.map((type) => (
                 <Box key={type}>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      mb: 2,
-                    }}
-                  >
+                  <Box className="deck-builder-group-header">
                     <Typography
                       variant="subtitle2"
                       fontWeight="900"
@@ -464,17 +526,7 @@ export const DeckBuilder: React.FC = () => {
                     >
                       {type}
                     </Typography>
-                    <Box
-                      sx={{
-                        px: 1,
-                        py: 0.5,
-                        bgcolor: "action.selected",
-                        borderRadius: 1,
-                        fontSize: "0.7rem",
-                        fontWeight: 700,
-                        color: "text.primary",
-                      }}
-                    >
+                    <Box className="deck-builder-group-count">
                       {groupedCards[type].reduce((a, c) => a + c.quantity, 0)}
                     </Box>
                     <Divider sx={{ flex: 1 }} />
@@ -492,9 +544,9 @@ export const DeckBuilder: React.FC = () => {
                           return (
                             <DeckCardComponent
                               deckCard={dc}
-                              onUpdateQuantity={updateQuantity}
-                              onRemove={removeCard}
-                              onMoveToBoard={handleMoveToBoard}
+                              onUpdateQuantity={(cid, delta) => updateQuantity(cid, dc.board, delta)}
+                              onRemove={(cid) => removeCard(cid, dc.board)}
+                              onMoveCard={handleMoveCard}
                               limit={getCardLimit(format, dc.card)}
                               isCommanderFormat={isCommanderLike}
                               isIllegal={
@@ -502,6 +554,7 @@ export const DeckBuilder: React.FC = () => {
                                 isIllegalPlacement
                               }
                               canBeCommander={isValidCommander(dc.card)}
+                              currentTotalQuantity={globalCardCounts[dc.card_id]}
                             />
                           );
                         })()}
@@ -515,144 +568,127 @@ export const DeckBuilder: React.FC = () => {
         </Box>
       </Paper>
 
-      {/* Right Column: Search + Stats */}
-      <Box
-        sx={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          bgcolor: "background.default",
-          minWidth: 0,
-        }}
-      >
-        <Box
-          sx={{
-            px: 2,
-            pt: 2,
-            zIndex: 10,
-            bgcolor: "background.default",
-            borderBottom: 1,
-            borderColor: "divider",
-          }}
-        >
-          <Tabs value={rightTab} onChange={(_, v) => setRightTab(v)}>
-            <Tab
-              icon={<SearchIcon />}
-              label="Search Cards"
-              iconPosition="start"
-              sx={{ minHeight: 64 }}
-            />
-            <Tab
-              icon={<BarChartIcon />}
-              label="Deck Stats"
-              iconPosition="start"
-              sx={{ minHeight: 64 }}
-            />
-          </Tabs>
+      {/* Right Column: Stats (Blurred) or Card Preview */}
+      <Box className="deck-builder-pane-right">
+        {/* Main Content (Stats) - active when NO hover */}
+        <Box className={`deck-builder-stats ${hoveredCard ? "blurred" : ""}`}>
+          <Box className="deck-builder-stats-header">
+            <BarChartIcon color="primary" />
+            <Typography variant="h6" fontWeight="700">
+              Deck Statistics
+            </Typography>
+          </Box>
 
-          {rightTab === 0 && (
-            <Box
-              component="form"
-              onSubmit={handleSearch}
-              sx={{ position: "relative", my: 2 }}
-            >
-              <TextField
-                fullWidth
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by name, type, or color..."
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon color="action" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={searching}
-                        sx={{ minWidth: 80, borderRadius: 2 }}
-                      >
-                        {searching ? (
-                          <CircularProgress size={20} color="inherit" />
-                        ) : (
-                          "Find"
-                        )}
-                      </Button>
-                    </InputAdornment>
-                  ),
-                  sx: {
-                    borderRadius: 4,
-                    bgcolor: "background.paper",
-                    boxShadow: 2,
-                    pl: 2,
-                    pr: 1,
-                    py: 1,
-                    "& fieldset": { border: "none" },
-                  },
-                }}
-              />
-            </Box>
-          )}
-        </Box>
-
-        <Box sx={{ flex: 1, overflowY: "auto", p: rightTab === 0 ? 4 : 0 }}>
-          {rightTab === 0 ? (
-            <>
-              {searching ? (
-                <Grid container spacing={2}>
-                  {[...Array(10)].map((_, i) => (
-                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={i}>
-                      <Box
-                        sx={{
-                          aspectRatio: "2.5/3.5",
-                          bgcolor: "action.hover",
-                          borderRadius: 3,
-                          animation: "pulse 1.5s infinite opacity",
-                        }}
-                      />
-                    </Grid>
-                  ))}
-                </Grid>
-              ) : (
-                <Grid container spacing={3}>
-                  {searchResults.map((card) => (
-                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={card.id}>
-                      <SearchCard card={card} onAdd={addCard} />
-                    </Grid>
-                  ))}
-                  {searchResults.length === 0 && !searching && (
-                    <Box
-                      sx={{
-                        gridColumn: "1 / -1",
-                        py: 10,
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        opacity: 0.3,
-                        gap: 2,
-                      }}
-                    >
-                      <AutoAwesomeIcon sx={{ fontSize: 60 }} />
-                      <Typography variant="h5" fontWeight="700">
-                        Search the multiverse
-                      </Typography>
-                    </Box>
-                  )}
-                </Grid>
-              )}
-            </>
-          ) : (
+          <Box className="deck-builder-stats-content">
             <DeckStats
-              cards={deckCards}
+              cards={deckCards.filter(
+                (c) => c.board === "main" || c.board === "commander",
+              )}
               deckId={deck ? deck.id : undefined}
               format={format}
             />
-          )}
+          </Box>
         </Box>
+
+        {/* Hover Overlay */}
+        {hoveredCard && (
+          <Box className="deck-builder-overlay">
+            <Card className="deck-builder-overlay-card">
+              {hoveredCard.image_uris?.normal ? (
+                <CardMedia
+                  component="img"
+                  image={hoveredCard.image_uris.normal}
+                  alt={hoveredCard.name}
+                  sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <Box
+                  sx={{
+                    width: "100%",
+                    height: "100%",
+                    bgcolor: "background.paper",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    p: 4,
+                    textAlign: "center",
+                  }}
+                >
+                  <Typography variant="h5" fontWeight="700">
+                    {hoveredCard.name}
+                  </Typography>
+                </Box>
+              )}
+            </Card>
+
+            {/* Info Panel */}
+            <Paper className="deck-builder-overlay-info">
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  mb: 1,
+                  flexShrink: 0,
+                }}
+              >
+                <Typography variant="h6" fontWeight="900" lineHeight={1.1}>
+                  {hoveredCard.name}
+                </Typography>
+                <Typography
+                  variant="subtitle2"
+                  sx={{
+                    bgcolor: "action.hover",
+                    px: 1,
+                    py: 0.5,
+
+                    borderRadius: 1,
+                    fontFamily: "monospace",
+                    flexShrink: 0,
+                  }}
+                >
+                  {hoveredCard.mana_cost}
+                </Typography>
+              </Box>
+              <Typography
+                variant="subtitle2"
+                color="primary.main"
+                fontWeight="700"
+                gutterBottom
+                sx={{ flexShrink: 0 }}
+              >
+                {hoveredCard.type_line}
+              </Typography>
+              <Divider sx={{ my: 1.5, flexShrink: 0 }} />
+              <Typography
+                variant="body2"
+                sx={{
+                  whiteSpace: "pre-wrap",
+                  lineHeight: 1.6,
+                  color: "text.primary",
+                }}
+              >
+                {hoveredCard.oracle_text}
+              </Typography>
+            </Paper>
+          </Box>
+        )}
       </Box>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
-};
+};;

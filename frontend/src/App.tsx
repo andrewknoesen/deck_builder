@@ -4,10 +4,13 @@ import { DeckList } from "./pages/DeckList";
 import { DeckBuilder } from "./pages/DeckBuilder";
 import { LandingPage } from "./pages/LandingPage";
 import { Collection } from "./pages/Collection";
+import { AgentChat } from "./pages/AgentChat";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 import { theme } from "./theme";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MainLayout } from "./components/Layout/MainLayout";
+import { CardHoverProvider } from "./context/CardHoverContext";
+import { CardHoverPreview } from "./components/CardHoverPreview";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,17 +27,21 @@ function App() {
       <CssBaseline />
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <Router>
-            <MainLayout>
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/collection" element={<Collection />} />
-                <Route path="/decks" element={<DeckList />} />
-                <Route path="/decks/:deckId" element={<DeckBuilder />} />
-                <Route path="/decks/new" element={<DeckBuilder />} />
-              </Routes>
-            </MainLayout>
-          </Router>
+          <CardHoverProvider>
+            <Router>
+              <MainLayout>
+                <Routes>
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/collection" element={<Collection />} />
+                  <Route path="/decks" element={<DeckList />} />
+                  <Route path="/decks/:deckId" element={<DeckBuilder />} />
+                  <Route path="/decks/new" element={<DeckBuilder />} />
+                  <Route path="/agents" element={<AgentChat />} />
+                </Routes>
+                <CardHoverPreview />
+              </MainLayout>
+            </Router>
+          </CardHoverProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>

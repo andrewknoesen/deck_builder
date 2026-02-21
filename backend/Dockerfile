@@ -1,5 +1,7 @@
-FROM python:3.14-slim
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+FROM astral/uv:python3.13-bookworm-slim
+
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -18,7 +20,9 @@ COPY pyproject.toml uv.lock ./
 # No, usually we run from /app/backend.
 # Let's assume we copy everything.
 
-COPY . .
+COPY backend ./backend
+COPY scripts ./scripts
+COPY .python-version ./
 
 # Now sync. Since we have full source, 'uv sync' works.
 RUN uv sync --frozen --no-install-project

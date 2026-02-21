@@ -1,12 +1,18 @@
+from app.ai.agents.rules import rules_agent
+from app.schemas.ai import ChatRequest, ChatResponse
 from fastapi import APIRouter
-from pydantic import BaseModel
-from typing import List
 
 router = APIRouter()
+
+from typing import List
+
+from pydantic import BaseModel
+
 
 class SuggestCardRequest(BaseModel):
     deck_context: List[str]
     query: str
+
 
 @router.post("/suggest")
 def suggest_cards(request: SuggestCardRequest):
@@ -15,9 +21,11 @@ def suggest_cards(request: SuggestCardRequest):
     """
     return {"message": "AI suggestion placeholder", "query": request.query}
 
-@router.post("/chat")
-def chat_assistant():
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat_assistant(request: ChatRequest):
     """
-    Simple chat interface for deck building advice.
+    Chat with the Rules Agent.
     """
-    return {"message": "AI chat placeholder"}
+    response = await rules_agent.chat(request.message, request.context_cards)
+    return ChatResponse(response=response)

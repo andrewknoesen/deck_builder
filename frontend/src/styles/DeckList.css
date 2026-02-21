@@ -1,0 +1,145 @@
+/* Deck List Container */
+.deck-list-container {
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+
+/* Loading State */
+.deck-list-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 16px;
+}
+
+/* Header Section */
+.deck-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center; /* Default for larger screens */
+  gap: 32px;
+  margin-bottom: 48px;
+}
+
+@media (max-width: 900px) {
+  .deck-list-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+
+
+.deck-list-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.deck-list-new-btn {
+  border-radius: 16px;
+  padding: 12px 32px;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+/* Empty State */
+.deck-list-empty {
+  border: 2px dashed #1e293b; /* divider */
+  border-radius: 32px;
+  padding-top: 96px;
+  padding-bottom: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background-color: #0f172a; /* background.paper */
+}
+
+.deck-list-empty-icon {
+  width: 80px;
+  height: 80px;
+  background-color: #020617; /* background.default */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.deck-list-empty-text {
+  max-width: 300px;
+  margin-bottom: 32px;
+}
+
+/* Deck List Item */
+.deck-list-item-card {
+  height: 100%;
+  border-radius: 16px;
+  border: 1px solid #1e293b; /* divider */
+  background-color: #0f172a; /* background.paper */
+  transition: all 0.3s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.deck-list-item-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0px 10px 15px -3px rgba(0,0,0,0.4);
+  border-color: #6366f1; /* primary.main */
+}
+
+.deck-list-item-action {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 24px;
+}
+
+.deck-list-item-header {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.deck-list-item-content {
+  margin-bottom: 16px;
+  flex-grow: 1;
+}
+
+.deck-list-item-stats {
+  display: flex;
+  gap: 16px;
+  margin-top: auto;
+}
+
+.deck-list-item-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #94a3b8; /* text.secondary */
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.deck-list-item-delete-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  background-color: rgba(15, 23, 42, 0.8);
+}
+
+.deck-list-item-card:hover .deck-list-item-delete-btn {
+  opacity: 1;
+}

@@ -1,0 +1,183 @@
+/* Collection Layout */
+.collection-container {
+  display: flex;
+  height: calc(100vh - 64px);
+  overflow: hidden;
+  background-color: #020617;
+}
+
+/* Left Pane: Inventory */
+.collection-pane-left {
+  width: 65%; /* Expanded to match DeckBuilder */
+  border-right: 1px solid #1e293b; /* divider */
+  display: flex;
+  flex-direction: column;
+  background-color: #0f172a; /* background.paper */
+  z-index: 10;
+  overflow: hidden; /* Ensure pane itself doesn't scroll, only content */
+}
+
+.collection-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid #1e293b; /* divider */
+  background-color: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(12px);
+  z-index: 20;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+
+
+.collection-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.collection-count-badge {
+  padding: 4px 16px;
+  background-color: #6366f1; /* primary.main */
+  color: #ffffff; /* primary.contrastText */
+  border-radius: 16px;
+  font-weight: bold;
+}
+
+.collection-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  padding-bottom: 80px;
+}
+
+/* Empty Collection State */
+.collection-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  opacity: 0.5;
+  text-align: center;
+  gap: 16px;
+}
+
+.collection-empty-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.08); /* action.hover */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Group Headers */
+.collection-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.collection-group-count {
+  padding: 4px 8px;
+  background-color: rgba(99, 102, 241, 0.16); /* action.selected approximation */
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #f1f5f9; /* text.primary */
+}
+
+/* Right Pane: Search */
+.collection-pane-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #020617; /* background.default */
+  min-width: 0;
+  border-left: 1px solid #1e293b; /* divider */
+  position: relative;
+  overflow: hidden; /* Prevent pane from scrolling */
+}
+
+.collection-search-header {
+  padding: 32px;
+  z-index: 10;
+  background-color: #020617; /* background.default */
+  border-bottom: 1px solid #1e293b; /* divider */
+  flex-shrink: 0;
+}
+
+.collection-search-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+
+
+.collection-search-box {
+  flex: 1;
+  max-width: 800px;
+}
+
+/* Right Pane Content Wrapper */
+.collection-right-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  transition: filter 0.2s, opacity 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.collection-right-content.blurred {
+  filter: blur(8px);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Card Overlay (Copied from DeckBuilder) */
+.collection-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.collection-overlay-card {
+  width: auto;
+  height: auto;
+  max-height: 55%;
+  aspect-ratio: 2.5/3.5;
+  background-color: transparent;
+  border-radius: 4.5% / 3.5%;
+  box-shadow: 0px 11px 15px -7px rgba(0,0,0,0.2), 0px 24px 38px 3px rgba(0,0,0,0.14), 0px 9px 46px 8px rgba(0,0,0,0.12); /* elevation 24 */
+  overflow: hidden;
+  transform: perspective(1000px) rotateY(5deg);
+  flex-shrink: 1;
+}
+
+.collection-overlay-info {
+  width: 100%;
+  max-width: 400px;
+  padding: 16px;
+  border-radius: 8px;
+  background-color: #0f172a; /* background.paper */
+  backdrop-filter: blur(20px);
+  border: 1px solid #1e293b; /* divider */
+  display: flex;
+  flex-direction: column;
+  max-height: 40%;
+  overflow-y: auto;
+}

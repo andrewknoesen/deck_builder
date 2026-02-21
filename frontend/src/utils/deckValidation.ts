@@ -140,3 +140,39 @@ export const isValidCommander = (
 
   return false;
 };
+
+export const validateSideboardSize = (
+  format: string = "Standard",
+  sideboardCount: number
+): ValidationResult => {
+  const f = format.toLowerCase();
+
+  // Limited formats - Sideboard is usually "all other cards in pool" -> valid
+  if (f === "limited" || f === "draft" || f === "sealed") {
+    return { valid: true, severity: "success", message: "Sideboard size is legal." };
+  }
+
+  // Commander - Technically no sideboard, but sometimes used for wishboards (optional, usually 0 or agreed upon). 
+  // We'll warn if > 0 but not strict error unless desired.
+  if (f === "commander" || f === "edh" || f === "brawl" || f === "oathbreaker") {
+      if (sideboardCount > 0) {
+           return {
+               valid: false,
+               severity: "warning",
+               message: "Commander decks typically do not use a sideboard."
+           };
+      }
+      return { valid: true, severity: "success", message: "Sideboard legal." };
+  }
+
+  // Constructed 60-card formats (Standard, Modern, Pauper, etc.) -> Max 15
+  if (sideboardCount <= 15) {
+    return { valid: true, severity: "success", message: "Sideboard size is legal." };
+  }
+  
+  return {
+    valid: false,
+    severity: "error",
+    message: "Sideboard must be 15 cards or fewer.",
+  };
+};

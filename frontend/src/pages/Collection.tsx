@@ -1,26 +1,26 @@
 import React, { useState, useMemo } from 'react';
+import "../styles/Collection.css";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Box,
-    TextField,
     Typography,
-    Button,
     Grid,
     CircularProgress,
-    InputAdornment,
     Divider,
     Paper,
     Stack,
     Snackbar,
-    Alert
+    Alert,
+    Card,
+    CardMedia
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CollectionsIcon from '@mui/icons-material/Collections';
 import { apiClient } from '../api/client';
 import type { ScryfallCard, CollectionCard } from '../types/mtg';
-import { SearchCard } from '../components/SearchCard';
+import { DeckBuilderSearch } from '../components/DeckBuilderSearch';
 import { CollectionCardComponent } from '../components/CollectionCardComponent';
+import { useCardHover } from "../context/CardHoverContext";
 
 // Helper to determine primary type for grouping (reused logic)
 const getCardType = (typeLine?: string): string => {
@@ -40,10 +40,9 @@ const TYPE_ORDER = ['Creatures', 'Planeswalkers', 'Instants', 'Sorceries', 'Arti
 
 export const Collection: React.FC = () => {
     const queryClient = useQueryClient();
-    const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<ScryfallCard[]>([]);
-    const [searchLoading, setSearchLoading] = useState(false);
+    const { hoveredCard } = useCardHover();
     const [toast, setToast] = useState<{ open: boolean, message: string, severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
+    const [searchKey, setSearchKey] = useState(0); // Force remount of search component to clear input
 
     // Fetch Collection
     const { data: collection = [], isLoading: collectionLoading } = useQuery<CollectionCard[]>({
@@ -53,6 +52,11 @@ export const Collection: React.FC = () => {
             return res.data;
         }
     });
+
+    const handleAddCard = (card: ScryfallCard) => {
+        addMutation.mutate(card);
+        setSearchKey(prev => prev + 1); // Force remount to clear
+    };
 
     // Mutations
     const addMutation = useMutation({
@@ -97,20 +101,7 @@ export const Collection: React.FC = () => {
         }
     });
 
-    const handleSearch = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!searchQuery.trim()) return;
-        setSearchLoading(true);
-        try {
-            const res = await apiClient.get('/cards/search', { params: { q: searchQuery } });
-            setSearchResults(res.data.data || []);
-        } catch (error) {
-            console.error("Search failed", error);
-            setSearchResults([]);
-        } finally {
-            setSearchLoading(false);
-        }
-    };
+
 
     const handleCloseToast = () => setToast({ ...toast, open: false });
 
@@ -131,46 +122,43 @@ export const Collection: React.FC = () => {
 
     const totalCards = collection.reduce((acc, curr) => acc + curr.quantity, 0);
 
+
+
+// ... imports remain the same ...
+
     return (
-        <Box sx={{ display: 'flex', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
+        <Box className="collection-container">
             {/* Left Pane: Collection Inventory */}
             <Paper
                 square
                 elevation={0}
-                sx={{
-                    width: '45%',
-                    borderRight: 1,
-                    borderColor: 'divider',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    bgcolor: 'background.paper',
-                    zIndex: 10
-                }}
+                className="collection-pane-left"
             >
                 {/* Header */}
-                <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider', bgcolor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(12px)', position: 'sticky', top: 0, zIndex: 20 }}>
-                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Box className="collection-header">
+                    <Box className="collection-title">
                         <Typography variant="h5" fontWeight="900" sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <CollectionsIcon /> My Collection
                         </Typography>
-                        <Box sx={{ px: 2, py: 0.5, bgcolor: 'primary.main', color: 'primary.contrastText', borderRadius: 4, fontWeight: 'bold' }}>
-                             {totalCards} Cards
+                        <Box className="collection-count-badge">
+                            {totalCards} Cards
                         </Box>
                     </Box>
-                    <Typography variant="body2" color="text.secondary">
-                        Manage your card inventory.
-                    </Typography>
+                    
+                    <Box className="collection-search-box">
+                        <DeckBuilderSearch key={searchKey} onAddCard={handleAddCard} />
+                    </Box>
                 </Box>
 
                 {/* Collection Content */}
-                <Box sx={{ flex: 1, overflowY: 'auto', p: 3, pb: 10 }}>
+                <Box className="collection-content">
                     {collectionLoading ? (
                          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
                             <CircularProgress />
                         </Box>
                     ) : collection.length === 0 ? (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', opacity: 0.5, textAlign: 'center', gap: 2 }}>
-                            <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: 'action.hover', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Box className="collection-empty">
+                            <Box className="collection-empty-icon">
                                 <CollectionsIcon sx={{ fontSize: 40, color: 'text.secondary' }} />
                             </Box>
                             <Box>
@@ -182,11 +170,11 @@ export const Collection: React.FC = () => {
                         <Stack spacing={4}>
                             {sortedGroups.map(type => (
                                 <Box key={type}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                    <Box className="collection-group-header">
                                         <Typography variant="subtitle2" fontWeight="900" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
                                             {type}
                                         </Typography>
-                                        <Box sx={{ px: 1, py: 0.5, bgcolor: 'action.selected', borderRadius: 1, fontSize: '0.7rem', fontWeight: 700, color: 'text.primary' }}>
+                                        <Box className="collection-group-count">
                                             {groupedCards[type].reduce((a, c) => a + c.quantity, 0)}
                                         </Box>
                                         <Divider sx={{ flex: 1 }} />
@@ -209,81 +197,100 @@ export const Collection: React.FC = () => {
                 </Box>
             </Paper>
 
-            {/* Right Pane: Card Database Search */}
-            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
-                <Box sx={{ p: 4, zIndex: 10, bgcolor: 'background.default', borderBottom: 1, borderColor: 'divider' }}>
-                    <Typography variant="h4" fontWeight="900" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        Card Database <AutoAwesomeIcon sx={{ color: 'warning.main', fontSize: 28 }} />
-                    </Typography>
-
-                    <Box component="form" onSubmit={handleSearch} sx={{ position: 'relative', mt: 3 }}>
-                        <TextField
-                            fullWidth
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search cards..."
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <SearchIcon color="action" />
-                                    </InputAdornment>
-                                ),
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <Button
-                                            type="submit" 
-                                            variant="contained" 
-                                            disabled={searchLoading} 
-                                            sx={{ minWidth: 80, borderRadius: 2 }}
-                                        >
-                                            {searchLoading ? <CircularProgress size={20} color="inherit" /> : 'Find'}
-                                        </Button>
-                                    </InputAdornment>
-                                ),
-                                sx: {
-                                    borderRadius: 4,
-                                    bgcolor: 'background.paper',
-                                    boxShadow: 2,
-                                    pl: 2,
-                                    pr: 1,
-                                    py: 1,
-                                    '& fieldset': { border: 'none' }
-                                }
-                            }}
-                        />
+            {/* Right Pane: Stats / Overlay */}
+            {/* Right Pane: Stats / Overlay */}
+            <Box className="collection-pane-right">
+                <Box className={`collection-right-content ${hoveredCard ? "blurred" : ""}`}>
+                     {/* Default Content when no hover - Placeholder */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', opacity: 0.3, textAlign: 'center', gap: 2 }}>
+                        <AutoAwesomeIcon sx={{ fontSize: 60 }} />
+                        <Typography variant="h6" fontWeight="700">Hover over a card to view details</Typography>
+                        <Typography variant="body2">Or search for cards above to add them.</Typography>
                     </Box>
                 </Box>
 
-                <Box sx={{ flex: 1, overflowY: 'auto', p: 4 }}>
-                    {searchLoading ? (
-                         <Grid container spacing={2}>
-                            {[...Array(10)].map((_, i) => (
-                                <Grid size={{ xs: 4, sm: 3, md: 2 }} key={i}>
-                                    <Box sx={{ aspectRatio: '2.5/3.5', bgcolor: 'action.hover', borderRadius: 3, animation: 'pulse 1.5s infinite opacity' }} />
-                                </Grid>
-                            ))}
-                        </Grid>
-                    ) : (
-                        <Grid container spacing={3}>
-                            {searchResults.map((card) => (
-                                <Grid size={{ xs: 4, sm: 3, md: 2 }} key={card.id}>
-                                    <SearchCard card={card} onAdd={() => addMutation.mutate(card)} />
-                                </Grid>
-                            ))}
-                             {searchResults.length === 0 && !searchLoading && searchQuery && (
-                                <Box sx={{ gridColumn: '1 / -1', py: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.5, gap: 2 }}>
-                                    <Typography variant="h6" color="text.secondary">No results found</Typography>
+                 {/* Hover Overlay */}
+                {hoveredCard && (
+                    <Box className="collection-overlay">
+                        <Card className="collection-overlay-card">
+                            {hoveredCard.image_uris?.normal ? (
+                                <CardMedia
+                                    component="img"
+                                    image={hoveredCard.image_uris.normal}
+                                    alt={hoveredCard.name}
+                                    sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                />
+                            ) : (
+                                <Box
+                                    sx={{
+                                        width: "100%",
+                                        height: "100%",
+                                        bgcolor: "background.paper",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        p: 4,
+                                        textAlign: "center",
+                                    }}
+                                >
+                                    <Typography variant="h5" fontWeight="700">
+                                        {hoveredCard.name}
+                                    </Typography>
                                 </Box>
-                             )}
-                              {searchResults.length === 0 && !searchLoading && !searchQuery && (
-                                <Box sx={{ gridColumn: '1 / -1', py: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.3, gap: 2 }}>
-                                    <AutoAwesomeIcon sx={{ fontSize: 60 }} />
-                                    <Typography variant="h5" fontWeight="700">Search the multiverse</Typography>
-                                </Box>
-                             )}
-                        </Grid>
-                    )}
-                </Box>
+                            )}
+                        </Card>
+
+                        {/* Info Panel */}
+                        <Paper className="collection-overlay-info">
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "flex-start",
+                                    mb: 1,
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <Typography variant="h6" fontWeight="900" lineHeight={1.1}>
+                                    {hoveredCard.name}
+                                </Typography>
+                                <Typography
+                                    variant="subtitle2"
+                                    sx={{
+                                        bgcolor: "action.hover",
+                                        px: 1,
+                                        py: 0.5,
+                                        borderRadius: 1,
+                                        fontFamily: "monospace",
+                                        flexShrink: 0,
+                                    }}
+                                >
+                                    {hoveredCard.mana_cost}
+                                </Typography>
+                            </Box>
+                            <Typography
+                                variant="subtitle2"
+                                color="primary.main"
+                                fontWeight="700"
+                                gutterBottom
+                                sx={{ flexShrink: 0 }}
+                            >
+                                {hoveredCard.type_line}
+                            </Typography>
+                            <Divider sx={{ my: 1.5, flexShrink: 0 }} />
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    whiteSpace: "pre-wrap",
+                                    lineHeight: 1.6,
+                                    color: "text.primary",
+                                }}
+                            >
+                                {hoveredCard.oracle_text}
+                            </Typography>
+                        </Paper>
+                    </Box>
+                )}
             </Box>
 
              <Snackbar open={toast.open} autoHideDuration={4000} onClose={handleCloseToast}>

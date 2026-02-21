@@ -13,7 +13,8 @@ class DeckStatsService:
         cards = deck.cards
         
         # 1. Prepare Data
-        total_cards = sum(dc.quantity for dc in cards)
+        main_cards = [dc for dc in cards if dc.board == "main"]
+        total_cards = sum(dc.quantity for dc in main_cards)
         non_lands = []
         lands = []
         ramp_count = 0
@@ -25,7 +26,7 @@ class DeckStatsService:
         total_cmc = 0.0
         
         for dc in cards:
-            if not dc.card:
+            if not dc.card or dc.board != "main":
                 continue
                 
             qty = dc.quantity

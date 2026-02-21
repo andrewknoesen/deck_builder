@@ -16,37 +16,16 @@ import StyleIcon from "@mui/icons-material/Style"; // Represents Decks
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome"; // Represents Brewing
 import CollectionsIcon from "@mui/icons-material/Collections"; // Represents Collection
 
+import "../styles/LandingPage.css";
+
 export const LandingPage = () => {
   return (
-    <Box sx={{ bgcolor: "background.default", minHeight: "100%", pb: 8 }}>
+    <Box className="landing-container">
       {/* Hero Section */}
-      <Box
-        sx={{
-          bgcolor: "background.paper",
-          pt: 4,
-          pb: 4,
-          background:
-            "linear-gradient(180deg, rgba(15,23,42,1) 0%, rgba(2,6,23,1) 100%)", // Slate-900 to Slate-950
-          borderBottom: 1,
-          borderColor: "divider",
-          textAlign: "center",
-        }}
-      >
+      <Box className="landing-hero">
         <Container maxWidth="md">
           <Stack spacing={2} alignItems="center">
-            <Box
-              sx={{
-                width: 48,
-                height: 48,
-                bgcolor: "primary.main",
-                borderRadius: 3,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: 8,
-                mb: 2,
-              }}
-            >
+            <Box className="landing-hero-icon-box">
               <StyleIcon sx={{ fontSize: 24, color: "white" }} />
             </Box>
 
@@ -54,36 +33,30 @@ export const LandingPage = () => {
               variant="h4"
               component="h1"
               fontWeight="900"
-              sx={{ letterSpacing: "-0.02em" }}
+              className="landing-hero-title"
             >
               Master Your{" "}
-              <Box component="span" sx={{ color: "primary.main" }}>
+              <Box component="span" className="landing-hero-highlight">
                 Magic
               </Box>
             </Typography>
             <Typography
               variant="subtitle1"
               color="text.secondary"
-              sx={{ maxWidth: "600px", mx: "auto", lineHeight: 1.6 }}
+              className="landing-hero-subtitle"
             >
               The ultimate tool for deck brewing, collection management, and
               theory-crafting. Built for modern Magic: The Gathering players.
             </Typography>
 
-            <Stack direction="row" spacing={2} sx={{ pt: 2 }}>
+            <Stack direction="row" spacing={2} className="landing-cta-stack">
               <Button
                 component={RouterLink}
                 to="/decks/new"
                 variant="contained"
                 size="medium"
                 startIcon={<AddCircleOutlineIcon />}
-                sx={{
-                  borderRadius: 3,
-                  px: 3,
-                  py: 1,
-                  fontSize: "1rem",
-                  boxShadow: 8,
-                }}
+                className="landing-btn-primary"
               >
                 Start Brewing
               </Button>
@@ -93,7 +66,7 @@ export const LandingPage = () => {
                 variant="outlined"
                 size="medium"
                 startIcon={<StyleIcon />}
-                sx={{ borderRadius: 3, px: 3, py: 1, fontSize: "1rem" }}
+                className="landing-btn-outlined"
               >
                 View Decks
               </Button>
@@ -103,41 +76,18 @@ export const LandingPage = () => {
       </Box>
 
       {/* Features Section */}
-      <Container maxWidth="xl" sx={{ mt: 8 }}>
+      <Container maxWidth="xl" className="landing-features-container">
         <Grid container spacing={4}>
           {/* Decks Section */}
           <Grid size={{ xs: 12, md: 4 }}>
-            <Card
-              sx={{
-                height: "100%",
-                borderRadius: 0,
-                border: 1,
-                borderColor: "divider",
-                bgcolor: "transparent",
-              }}
-            >
+            <Card className="landing-feature-card">
               <CardActionArea
                 component={RouterLink}
                 to="/decks"
-                sx={{ height: "100%", p: 2 }}
+                className="landing-feature-action"
               >
-                <CardContent
-                  sx={{
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    textAlign: "center",
-                    gap: 2,
-                  }}
-                >
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: "50%",
-                      bgcolor: "rgba(99, 102, 241, 0.1)",
-                    }}
-                  >
+                <CardContent className="landing-feature-content">
+                  <Box className="landing-feature-icon-box feature-icon-primary">
                     <StyleIcon sx={{ fontSize: 40, color: "primary.main" }} />
                   </Box>
                   <Typography variant="h4" fontWeight="800">
@@ -154,37 +104,14 @@ export const LandingPage = () => {
 
           {/* Brewing Section */}
           <Grid size={{ xs: 12, md: 4 }}>
-            <Card
-              sx={{
-                height: "100%",
-                borderRadius: 0,
-                border: 1,
-                borderColor: "divider",
-                bgcolor: "transparent",
-              }}
-            >
+            <Card className="landing-feature-card">
               <CardActionArea
                 component={RouterLink}
                 to="/decks/new"
-                sx={{ height: "100%", p: 2 }}
+                className="landing-feature-action"
               >
-                <CardContent
-                  sx={{
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    textAlign: "center",
-                    gap: 2,
-                  }}
-                >
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: "50%",
-                      bgcolor: "rgba(244, 63, 94, 0.1)",
-                    }}
-                  >
+                <CardContent className="landing-feature-content">
+                  <Box className="landing-feature-icon-box feature-icon-secondary">
                     <AutoAwesomeIcon
                       sx={{ fontSize: 40, color: "secondary.main" }}
                     />
@@ -203,38 +130,15 @@ export const LandingPage = () => {
 
           {/* Collection Section */}
           <Grid size={{ xs: 12, md: 4 }}>
-            <Card
-              sx={{
-                height: "100%",
-                borderRadius: 0,
-                border: 1,
-                borderColor: "divider",
-                bgcolor: "transparent",
-              }}
-            >
+            <Card className="landing-feature-card">
               {/* Pointing to decks for now as a placeholder, or could be /collection if we had it */}
               <CardActionArea
                 component={RouterLink}
                 to="/decks"
-                sx={{ height: "100%", p: 2 }}
+                className="landing-feature-action"
               >
-                <CardContent
-                  sx={{
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    textAlign: "center",
-                    gap: 2,
-                  }}
-                >
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: "50%",
-                      bgcolor: "rgba(16, 185, 129, 0.1)",
-                    }}
-                  >
+                <CardContent className="landing-feature-content">
+                  <Box className="landing-feature-icon-box feature-icon-success">
                     <CollectionsIcon sx={{ fontSize: 40, color: "#10b981" }} />
                   </Box>
                   <Typography variant="h4" fontWeight="800">
