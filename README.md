@@ -49,21 +49,26 @@ uv run pytest
 - `backend/`: FastAPI application, models, and Scryfall services.
 - `frontend/`: React frontend with modern UI components.
 - `docker-compose.yml`: Orchestrates the backend, frontend, and database volumes.
-- `scripts/`: Helper scripts for development and orchestration.
+- `bin/`: Helper utility scripts for development and orchestration.
+- `docs/`: Architecture diagrams, technical specifications, and design documents.
+- `references/`: Essential reference materials, like the Magic: The Gathering comprehensive rules.
+- `.agent/`: Workflows and instructions for the Google Agent Development Kit framework.
+- `backups/`: Database backups and snapshot points.
 
 ## 🛠️ Utility Scripts
 
-The project includes several helper scripts in the `scripts/` directory to simplify common tasks:
+The project includes several helper scripts in the `bin/` directory to simplify common tasks:
 
 - **Full Stack:**
-  - `./scripts/start-compose.sh`: Start the entire application using Docker Compose.
+  - `./bin/start-compose.sh`: Start the entire application using Docker Compose.
+  - `./bin/dev.sh`: Centralized script for various dev workflows.
 - **Backend:**
-  - `./scripts/backend-dev.sh`: Start the backend development server.
-  - `./scripts/backend-test.sh`: Run backend tests.
-  - `./scripts/backend-lint.sh`: Run linter (Ruff) on backend code.
-  - `./scripts/backend-format.sh`: Format backend code.
+  - `./bin/backend-dev.sh`: Start the backend development server.
+  - `./bin/backend-test.sh`: Run backend tests.
+  - `./bin/backend-lint.sh`: Run linter (Ruff) on backend code.
+  - `./bin/backend-format.sh`: Format backend code.
 - **Frontend:**
-  - `./scripts/frontend-dev.sh`: Start the frontend development server.
+  - `./bin/frontend-dev.sh`: Start the frontend development server.
 
 ## 🔑 Key Features
 

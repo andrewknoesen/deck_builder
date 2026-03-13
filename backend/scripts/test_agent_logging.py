@@ -6,7 +6,7 @@ import asyncio
 # Ensure backend directory is in python path
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from app.ai.agents import RulesAgent
+from app.ai.agents.rules.rules_agent import RulesAgent
 from app.core.logging import logger
 
 async def main():

@@ -24,13 +24,13 @@ Format:
 **Citations**: [List of Rules/Rulings]
 **Explanation**: [Detailed walkthrough]"""
 
-rules_agent = Agent(
-    name="rules_agent",
-    model=settings.AI_MODEL_NAME,
-    description=("Agent to answer questions about the time and weather in a city."),
-    instruction=PROMPT,
-    tools=[get_weather, get_current_time],
-)
+# rules_agent = Agent(
+#     name="rules_agent",
+#     model=settings.AI_MODEL_NAME,
+#     description=("Agent to answer questions about the time and weather in a city."),
+#     instruction=PROMPT,
+#     tools=[get_weather, get_current_time],
+# )
 
 
 class RulesAgent:

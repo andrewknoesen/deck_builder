@@ -2,11 +2,11 @@ from app.ai.agents.rules import rules_agent
 from app.schemas.ai import ChatRequest, ChatResponse
 from fastapi import APIRouter
 
-router = APIRouter()
-
 from typing import List
 
 from pydantic import BaseModel
+router = APIRouter()
+
 
 
 class SuggestCardRequest(BaseModel):

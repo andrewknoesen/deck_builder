@@ -28,7 +28,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 45s
       timeout: 5s
-      retries: 10
+      retries: 20
       start_period: 60s
     networks:
       - mtg-network
@@ -93,9 +93,9 @@ services:
     command: sh -c "npm install && npm run dev -- --host"
     networks:
       - mtg-network
-    depends_on:
-      backend:
-         condition: service_healthy
+    # depends_on:
+    #   backend:
+    #      condition: service_healthy
 
 volumes:
   postgres_data:

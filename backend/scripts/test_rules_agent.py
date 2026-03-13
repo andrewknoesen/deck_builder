@@ -6,7 +6,7 @@ import sys
 # Ensure we can import from backend/app
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.ai.agents import rules_agent
+from app.ai.agents.rules.rules_agent import rules_agent
 
 
 async def main():
