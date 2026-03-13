@@ -21,7 +21,6 @@ COPY pyproject.toml uv.lock ./
 # Let's assume we copy everything.
 
 COPY backend ./backend
-COPY scripts ./scripts
 COPY .python-version ./
 
 # Now sync. Since we have full source, 'uv sync' works.

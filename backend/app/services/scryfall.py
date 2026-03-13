@@ -1,10 +1,12 @@
+from app.core.logging import setup_logging
+from logging import getLogger
 from typing import Any, Dict, List
 
 import httpx
 
 from app.core.config import settings
 
-
+logger = setup_logging()
 class ScryfallService:
     def __init__(self, client: httpx.AsyncClient):
         self.client = client
@@ -27,6 +29,7 @@ class ScryfallService:
         response = await self.client.post("/cards/collection", json={"identifiers": identifiers})
         response.raise_for_status()
         data = response.json()
+        return data.get("data", [])
     async def get_card_rulings(self, card_id: str) -> List[Dict[str, Any]]:
         response = await self.client.get(f"/cards/{card_id}/rulings")
         response.raise_for_status()

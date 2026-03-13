@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 
@@ -24,6 +25,10 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 @app.get("/")
 async def root():
     return {"message": "Welcome to MTG Deck Builder API"}
+
+@app.get("/docs", include_in_schema=False)
+async def redirect_to_docs():
+    return RedirectResponse(url=f"{settings.API_V1_STR}/docs")
 
 @app.get("/health")
 async def health_check():
