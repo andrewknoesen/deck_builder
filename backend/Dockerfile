@@ -1,27 +1,41 @@
-FROM astral/uv:python3.13-bookworm-slim
+ARG SKIP_COPY=false
 
+FROM astral/uv:python3.13-bookworm-slim AS base
+
+# Enable bytecode compilation and copy mode for mounted volumes
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+
+# Configure Python directory to be consistent
+ENV UV_PYTHON_INSTALL_DIR=/python
+
+# Only use the managed Python version
+ENV UV_PYTHON_PREFERENCE=only-managed
 # Install curl for healthcheck
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Ensure byte compilation and use copy instead of hardlink for UV (essential for Docker/Volumes)
-ENV UV_COMPILE_BYTECODE=1
-ENV UV_LINK_MODE=copy
+# Install Python version specified in .python-version
+COPY .python-version ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=.python-version,target=.python-version \
+    uv python install
 
 # Copy dependency files
 # Using monorepo context (build from root)
 COPY pyproject.toml uv.lock ./
-# Copy backend specific config if needed, or just rely on root
-# We need to install the project dependencies. 
-# Since 'backend' is a member, we might need the backend directory structure present if we wanted to install it editable,
-# but 'uv sync' might just need pyproject.toml if we don't install root? 
-# Actually, let's copy the backend directory to /app/backend to match structure expected by imports if running from root?
-# No, usually we run from /app/backend.
-# Let's assume we copy everything.
 
+RUN --mount=type=cache,target=/root/.cache/uv \
+    sh -c 'uv sync --frozen --no-dev --no-editable --package=mtg-deck-builder-backend'
+
+FROM base AS copy-step-true
+# Skipping copy steps when flag is passed
+
+FROM base AS copy-step-false
 COPY backend ./backend
-COPY .python-version ./
+
+FROM copy-step-${SKIP_COPY} AS final
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Now sync. Since we have full source, 'uv sync' works.
 RUN uv sync --frozen --no-install-project
