@@ -54,7 +54,6 @@ async def add_to_collection(
             oracle_text=scryfall_card.get("oracle_text"),
             colors=scryfall_card.get("colors"),
             image_uris=scryfall_card.get("image_uris"),
-            scryfall_uri=scryfall_card.get("scryfall_uri"),
         )
         db.add(card)
         await db.commit()
