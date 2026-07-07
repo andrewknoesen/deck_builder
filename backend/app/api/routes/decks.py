@@ -1,5 +1,6 @@
 from typing import List
 
+from app.api.deps import get_current_user
 from app.core.db import get_db
 from app.models.card import Card
 from app.models.deck import (
@@ -9,6 +10,7 @@ from app.models.deck import (
     DeckPublic,
     DeckUpdate,
 )
+from app.models.user import User
 from app.services.scryfall import ScryfallService, get_scryfall_service
 from app.services.stats import calculate_stats
 from fastapi import APIRouter, Depends, HTTPException
@@ -89,13 +91,16 @@ async def sync_cards(db: AsyncSession, card_ids: List[str], scryfall: ScryfallSe
 @router.get("/", response_model=List[DeckPublic])
 async def read_decks(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Retrieve decks (fast, from local DB).
     """
     # Eager load cards AND the nested card definition
     result = await db.execute(
-        select(Deck).options(
+        select(Deck)
+        .where(Deck.user_id == current_user.id)
+        .options(
             selectinload(Deck.cards).selectinload(DeckCard.card)  # type: ignore[arg-type]
         )
     )
@@ -108,6 +113,7 @@ async def create_deck(
     deck_in: DeckCreate,
     db: AsyncSession = Depends(get_db),
     scryfall: ScryfallService = Depends(get_scryfall_service),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Create new deck. Safely syncs cards to local DB first.
@@ -118,7 +124,9 @@ async def create_deck(
         await sync_cards(db, card_ids, scryfall)
 
     # 2. Create Deck
-    db_deck = Deck.model_validate(deck_in, update={"cards": []})
+    db_deck = Deck.model_validate(
+        deck_in, update={"cards": [], "user_id": current_user.id}
+    )
 
     # 3. Create DeckCards
     if deck_in.cards:
@@ -144,6 +152,7 @@ async def create_deck(
 async def read_deck(
     deck_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get deck by ID (fast).
@@ -156,6 +165,8 @@ async def read_deck(
     deck = result.scalar_one_or_none()
     if not deck:
         raise HTTPException(status_code=404, detail="Deck not found")
+    if deck.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     return deck
 
 
@@ -165,6 +176,7 @@ async def update_deck(
     deck_in: DeckUpdate,
     db: AsyncSession = Depends(get_db),
     scryfall: ScryfallService = Depends(get_scryfall_service),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Update deck. Syncs new cards if added.
@@ -175,6 +187,8 @@ async def update_deck(
     db_deck = result.scalar_one_or_none()
     if not db_deck:
         raise HTTPException(status_code=404, detail="Deck not found")
+    if db_deck.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
 
     # Sync any new cards in the update payload
     if deck_in.cards:
@@ -222,7 +236,11 @@ async def update_deck(
 
 
 @router.delete("/{deck_id}")
-async def delete_deck(deck_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_deck(
+    deck_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
     Delete deck.
     """
@@ -230,6 +248,8 @@ async def delete_deck(deck_id: int, db: AsyncSession = Depends(get_db)):
     deck = result.scalar_one_or_none()
     if not deck:
         raise HTTPException(status_code=404, detail="Deck not found")
+    if deck.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     await db.delete(deck)
     await db.commit()
     return {"status": "ok"}
@@ -239,6 +259,7 @@ async def delete_deck(deck_id: int, db: AsyncSession = Depends(get_db)):
 async def get_deck_stats(
     deck_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get deck statistics.
@@ -251,6 +272,8 @@ async def get_deck_stats(
     deck = result.scalar_one_or_none()
     if not deck:
         raise HTTPException(status_code=404, detail="Deck not found")
-        
+    if deck.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
     stats = calculate_stats(deck)
     return stats

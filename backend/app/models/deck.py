@@ -41,6 +41,7 @@ class Deck(DeckBase, table=True):
 
 
 class DeckCreate(DeckBase):
+    user_id: Optional[int] = None  # derived server-side from the authenticated user
     cards: Optional[List[DeckCardCreate]] = None
 
 

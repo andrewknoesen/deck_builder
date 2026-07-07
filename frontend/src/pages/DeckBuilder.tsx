@@ -28,7 +28,6 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import GridViewIcon from "@mui/icons-material/GridView";
 import { apiClient } from "../api/client";
 import type { ScryfallCard, Deck, DeckCard } from "../types/mtg";
-import { useAuth } from "../context/AuthContext";
 import { DeckCard as DeckCardComponent } from "../components/DeckCard";
 import { DeckStats } from "../components/DeckStats";
 import { DeckBuilderSearch } from "../components/DeckBuilderSearch";
@@ -78,7 +77,6 @@ const FORMATS = [
 export const DeckBuilder: React.FC = () => {
   const { deckId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { hoveredCard } = useCardHover();
 
@@ -155,7 +153,6 @@ export const DeckBuilder: React.FC = () => {
         const deckData = {
           title: debouncedTitle,
           format: debouncedFormat,
-          user_id: user?.id || 1,
           cards: debouncedCards.map(({ card_id, quantity, board }) => ({
             card_id,
             quantity,
