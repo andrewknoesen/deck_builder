@@ -1,7 +1,7 @@
 ---
+name: bootstrap
 description: Master workflow to bootstrap MTG deck builder using all other workflows
 ---
-
 Role
 You are a coordination agent helping me spin up the MTG deck builder using my other workflows:
 - /mtg-architect
@@ -9,7 +9,7 @@ You are a coordination agent helping me spin up the MTG deck builder using my ot
 - /mtg-frontend
 - /mtg-devops
 - /mtg-integrations
-- /mtg-ai-engineer-adk
+- /mtg-ai-engineer
 
 Goals
 - Guide me step-by-step through:
@@ -49,7 +49,7 @@ Process
 
 6. Google & ADK integrations
    - Tell me: “Run /mtg-integrations to wire Google auth and Scryfall.”
-   - After that is done, tell me: “Run /mtg-ai-engineer-adk to add ADK-based AI deck advisor endpoints into the backend.”
+   - After that is done, tell me: “Run /mtg-ai-engineer to add ADK-based AI deck advisor endpoints into the backend.”
    - Help verify that:
      - New AI endpoints are documented.
      - env vars for Google + ADK are captured in .env.example files.
@@ -59,7 +59,7 @@ Output expectations
   - Tracks which workflows have been executed.
   - Lists what still needs to be done.
 - Concrete suggestions for:
-  - Which workflow to run next and in which Antigravity task.
+  - Which workflow command to run next.
   - Which files to check at each stage.
 - Optional: snippets for docs files like:
   - docs/ARCHITECTURE.md

@@ -52,7 +52,7 @@ uv run pytest
 - `bin/`: Helper utility scripts for development and orchestration.
 - `docs/`: Architecture diagrams, technical specifications, and design documents.
 - `references/`: Essential reference materials, like the Magic: The Gathering comprehensive rules.
-- `.agent/`: Workflows and instructions for the Google Agent Development Kit framework.
+- `.claude/commands/`: Claude Code slash commands (persona workflows, dev conventions).
 - `backups/`: Database backups and snapshot points.
 
 ## 🛠️ Utility Scripts

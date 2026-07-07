@@ -35,8 +35,7 @@ deck_builder/
 │       ├── components/         ← Shared UI components
 │       ├── hooks/              ← Custom React hooks
 │       └── types/              ← Shared TypeScript types
-├── docker-compose.yml          ← Local dev stack
-└── .agent/                     ← ADK agent rules + workflows
+└── docker-compose.yml          ← Local dev stack
 ```
 
 ---
@@ -91,8 +90,12 @@ docker compose up
 - **Card data = Scryfall only.** Never hallucinate card names, costs, or rules text. Use `ScryfallService` or the Scryfall tools.
 - **Agent tools are plain async functions** registered directly on the ADK `Agent` — not classes. See `tools/rules.py` for the pattern.
 - **New agents** extend `BaseAgent` from `core/base.py` and live in their own subfolder under `agents/`.
+- **Backend REST endpoints** live under `/api/...` and are the single source of truth for data.
+- **Auth** defaults to Google login (Google SDK on the frontend, ID token verified on the backend).
 - **Migrations** via Alembic in `backend/alembic/`. Run `uv run alembic upgrade head`.
 - **Ruff** for linting/formatting: `uv run ruff check . && uv run ruff format .`
+- **Tests**: update or add pytest (backend) / React Testing Library (frontend) tests alongside feature changes. Manually re-run tests and, for frontend changes, verify in the browser before calling work done.
+- **Config** is env-driven (`.env` files) — no hard-coded secrets or URLs.
 
 ---
 
@@ -110,4 +113,14 @@ Rules:
 
 ## Skills
 
-- `/ponytail` — Lazy senior dev mode. Enforces YAGNI, stdlib-first, shortest working diff. Use by default unless the task explicitly needs complexity. See `.claude/commands/ponytail.md`.
+Custom slash commands live in `.claude/commands/`:
+
+- `/ponytail` — Lazy senior dev mode. Enforces YAGNI, stdlib-first, shortest working diff. Use by default unless the task explicitly needs complexity.
+- `/bootstrap` — Coordinator that walks through the other MTG persona workflows in order.
+- `/mtg-architect` — Lead architect persona for high-level design/task breakdown.
+- `/mtg-backend` — Backend FastAPI engineer persona.
+- `/mtg-frontend` — Frontend React engineer persona.
+- `/mtg-devops` — Docker/infra engineer persona.
+- `/mtg-integrations` — Google auth & Scryfall integrations persona.
+- `/mtg-ai-engineer` — ADK agent engineer persona.
+- `/mtg-maths` — MTG deck-stats/math persona (mana curve, draw odds, land counts).
