@@ -1,8 +1,21 @@
+from unittest.mock import AsyncMock
+
 import pytest
 from app.core.config import settings
+from app.main import app
 from app.models.user import User
+from app.services.scryfall import get_scryfall_service
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+
+
+@pytest.fixture(autouse=True)
+def mock_scryfall():
+    mock = AsyncMock()
+    mock.get_cards_by_ids.return_value = []
+    app.dependency_overrides[get_scryfall_service] = lambda: mock
+    yield mock
+    app.dependency_overrides.pop(get_scryfall_service, None)
 
 
 @pytest.mark.asyncio

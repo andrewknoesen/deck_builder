@@ -3,43 +3,40 @@ from typing import AsyncGenerator
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
 
 from app.core.db import get_db
 from app.main import app
 
-# Use a dedicated SQLite database for testing to avoid external dependencies
-TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
-
-engine = create_async_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    future=True,
-)
-TestingSessionLocal = async_sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
-
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def create_test_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
-    yield
-    # Cleanup: drop tables after session
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.drop_all)
+# In-memory SQLite, fresh per test: avoids cross-test data leakage that a
+# shared file-based db + session-scoped create/drop can't prevent, since app
+# code commits directly and a post-test rollback only undoes uncommitted work.
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    async with TestingSessionLocal() as session:
+    engine = create_async_engine(
+        TEST_DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+        future=True,
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+
+    session_local = async_sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    async with session_local() as session:
         yield session
-        # Rollback after each test to keep isolation
-        await session.rollback()
+
+    await engine.dispose()
 
 
 @pytest_asyncio.fixture

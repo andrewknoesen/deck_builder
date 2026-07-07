@@ -4,6 +4,7 @@ from app.ai.agents.rules.rules_agent import rules_agent
 from app.schemas.ai import ChatRequest, ChatResponse
 from fastapi import APIRouter
 from google.adk.runners import InMemoryRunner
+from google.genai import types as genai_types
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -28,7 +29,18 @@ async def chat_assistant(request: ChatRequest):
     Chat with the Rules Agent.
     """
     runner = InMemoryRunner(agent=rules_agent)
-    # response = await rules_agent.chat(request.message, request.context_cards)
-    # response = await runner.run_debug(request.message)
-    response = await runner.run(request.message)
-    return ChatResponse(response=f"{response}")
+    session = await runner.session_service.create_session(
+        app_name=runner.app_name, user_id="api-user"
+    )
+    message = genai_types.Content(
+        role="user", parts=[genai_types.Part(text=request.message)]
+    )
+
+    final_text = ""
+    async for event in runner.run_async(
+        user_id=session.user_id, session_id=session.id, new_message=message
+    ):
+        if event.is_final_response() and event.content and event.content.parts:
+            final_text = event.content.parts[0].text or ""
+
+    return ChatResponse(response=final_text)
