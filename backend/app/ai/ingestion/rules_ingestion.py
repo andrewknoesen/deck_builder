@@ -4,18 +4,13 @@ from typing import List
 
 import aiohttp
 
-from app.ai.ingestion.base import (
-    ContentSplitter,
-    IngestionDocument,
-    IngestionSource,
-    SectionParser,
-)
+from app.ai.ingestion.base import IngestionDocument, SectionParser
 from app.ai.types import PipelineContext, ProcessedChunk
 from app.ai.vector_store.chroma import ChromaVectorStore
 from app.ai.vector_store.embedding import SentenceTransformerEmbedder
 
 
-class WebSource(IngestionSource):
+class WebSource:
     """Downloads content from a web URL."""
 
     def __init__(self, url: str):
@@ -55,7 +50,7 @@ class WebSource(IngestionSource):
                 )
 
 
-class MtgRulesContentSplitter(ContentSplitter):
+class MtgRulesContentSplitter:
     """Splits the Big Text File into Rules and Glossary."""
 
     def split(

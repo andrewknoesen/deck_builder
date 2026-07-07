@@ -10,6 +10,7 @@ from app.models.deck import (
     DeckUpdate,
 )
 from app.services.scryfall import ScryfallService, get_scryfall_service
+from app.services.stats import calculate_stats
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -234,9 +235,6 @@ async def delete_deck(deck_id: int, db: AsyncSession = Depends(get_db)):
     return {"status": "ok"}
 
 
-from app.services.stats import DeckStatsService
-
-
 @router.get("/{deck_id}/stats")
 async def get_deck_stats(
     deck_id: int,
@@ -254,5 +252,5 @@ async def get_deck_stats(
     if not deck:
         raise HTTPException(status_code=404, detail="Deck not found")
         
-    stats = DeckStatsService.calculate_stats(deck)
+    stats = calculate_stats(deck)
     return stats
