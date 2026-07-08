@@ -15,7 +15,6 @@ deck_builder/
 │   └── app/
 │       ├── ai/                 ← Agent layer (ADK, RAG, tools)
 │       │   ├── agents/
-│       │   │   ├── core/       ← BaseTool, BaseAgent abstractions
 │       │   │   └── rules/      ← rules_agent (ADK Agent, Gemini model)
 │       │   ├── tools/
 │       │   │   ├── rules.py    ← query_comprehensive_rules, lookup_glossary_term
@@ -33,8 +32,12 @@ deck_builder/
 │       ├── pages/              ← AgentChat, DeckBuilder, DeckList, Collection, LandingPage
 │       ├── api/                ← API client layer
 │       ├── components/         ← Shared UI components
+│       ├── context/            ← React context providers (e.g. auth)
 │       ├── hooks/              ← Custom React hooks
-│       └── types/              ← Shared TypeScript types
+│       ├── types/              ← Shared TypeScript types
+│       ├── utils/              ← Helpers
+│       ├── styles/             ← Global styles
+│       └── assets/             ← Static assets
 └── docker-compose.yml          ← Local dev stack
 ```
 
@@ -58,7 +61,6 @@ deck_builder/
 The AI layer lives in `backend/app/ai/`. Current state:
 
 - **`rules_agent`** — Google ADK `Agent` wired to `gemini-2.5-flash`. Tools: `query_comprehensive_rules`, `lookup_glossary_term`, `lookup_card_rulings`. Acts as an L3 judge. Lives at `backend/app/ai/agents/rules/rules_agent.py`.
-- **`BaseTool` / `BaseAgent`** — Abstract base classes in `backend/app/ai/agents/core/base.py`. New agents/tools extend these.
 - **RAG** — MTG Comprehensive Rules ingested into Chroma. Query via `backend/app/ai/rag/`.
 - **Scryfall tools** — Async HTTP via `ScryfallService` (`backend/app/services/scryfall.py`).
 
@@ -68,11 +70,15 @@ Config lives in `backend/app/core/config.py` (pydantic-settings). Key env vars: 
 
 ## Dev Setup
 
+`backend/` is a standalone uv project — its own `pyproject.toml`, `uv.lock`, and `.venv`, all
+inside `backend/`. There is no repo-wide uv workspace; the root `pyproject.toml` exists only to
+give editors opened at the repo root the right `pyright`/`mypy` paths.
+
 ```bash
 # Backend
 cd backend
 uv sync
-uv run uvicorn main:app --reload
+uv run uvicorn app.main:app --reload
 
 # Frontend
 cd frontend
@@ -89,7 +95,7 @@ docker compose up
 
 - **Card data = Scryfall only.** Never hallucinate card names, costs, or rules text. Use `ScryfallService` or the Scryfall tools.
 - **Agent tools are plain async functions** registered directly on the ADK `Agent` — not classes. See `tools/rules.py` for the pattern.
-- **New agents** extend `BaseAgent` from `core/base.py` and live in their own subfolder under `agents/`.
+- **New agents** are plain ADK `Agent` instances (see `agents/rules/rules_agent.py`) and live in their own subfolder under `agents/`. If a second agent introduces real duplication (e.g. repeated `model=settings.AI_MODEL_NAME` boilerplate), extract a thin factory *function* — not a class hierarchy.
 - **Backend REST endpoints** live under `/api/...` and are the single source of truth for data.
 - **Auth** defaults to Google login (Google SDK on the frontend, ID token verified on the backend).
 - **Migrations** via Alembic in `backend/alembic/`. Run `uv run alembic upgrade head`.
