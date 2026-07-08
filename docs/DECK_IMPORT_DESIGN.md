@@ -1,5 +1,9 @@
 # Deck Import Feature Design
 
+> **Status: not implemented (2026-07-08).** No `POST /api/v1/decks/import` endpoint or
+> `DeckImportModal` component exist yet — this is still a forward-looking design, not a
+> description of current behavior.
+
 This document outlines the design for importing decks via text paste (MTGA format).
 
 ## 1. Feature Overview

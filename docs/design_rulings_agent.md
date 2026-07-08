@@ -1,5 +1,11 @@
 # AI Rulings Agent Design
 
+> **Status: superseded (2026-07-08).** This proposed an in-memory FAISS/numpy vector index and a
+> `POST /api/v1/ai/rulings` endpoint. What was actually built uses a persistent ChromaDB store and
+> `POST /api/v1/ai/chat`, and the agent lives at `backend/app/ai/agents/rules/rules_agent.py`
+> (not `agents.py`). Kept for historical context on the cost/latency reasoning; for the current
+> design see `backend/app/ai/README.md` and `docs/ARCHITECTURE.md`.
+
 **Status**: Draft
 **Target Audience**: @[/mtg-ai-engineer], @[/mtg-backend], @[/mtg-frontend]
 
