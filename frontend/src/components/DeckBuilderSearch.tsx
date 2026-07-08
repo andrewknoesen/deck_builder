@@ -11,7 +11,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import { apiClient } from "../api/client";
 import type { ScryfallCard } from "../types/mtg";
 import { useDebounce } from "../hooks/useDebounce";
-import { useCardHover } from "../context/CardHoverContext";
+import { useCardHover } from "../context/useCardHover";
 
 interface DeckBuilderSearchProps {
   onAddCard: (card: ScryfallCard) => void;
@@ -29,13 +29,12 @@ export const DeckBuilderSearch: React.FC<DeckBuilderSearchProps> = ({
   const { setHoveredCard } = useCardHover();
 
   useEffect(() => {
-    let active = true;
-
     if (debouncedInput === "") {
-      setOptions([]);
       return undefined;
     }
 
+    let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
 
     const fetchCards = async () => {
@@ -71,7 +70,12 @@ export const DeckBuilderSearch: React.FC<DeckBuilderSearchProps> = ({
       onOpen={() => setOpen(true)}
       onClose={() => setOpen(false)}
       inputValue={inputValue}
-      onInputChange={(_, newInputValue) => setInputValue(newInputValue)}
+      onInputChange={(_, newInputValue) => {
+        setInputValue(newInputValue);
+        if (newInputValue === "") {
+          setOptions([]);
+        }
+      }}
       options={options}
       getOptionLabel={(option) => option.name}
       loading={loading}

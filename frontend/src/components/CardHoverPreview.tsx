@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Card, CardMedia, Fade, Typography, Stack, Divider } from "@mui/material";
-import { useCardHover } from "../context/CardHoverContext";
+import { useCardHover } from "../context/useCardHover";
 import { useLocation } from "react-router-dom";
 
 export const CardHoverPreview: React.FC = () => {

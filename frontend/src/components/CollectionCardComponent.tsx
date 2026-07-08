@@ -4,7 +4,7 @@ import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
 import type { CollectionCard } from '../types/mtg';
 
-import { useCardHover } from "../context/CardHoverContext";
+import { useCardHover } from "../context/useCardHover";
 
 interface CollectionCardProps {
     collectionCard: CollectionCard;

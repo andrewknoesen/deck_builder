@@ -12,7 +12,7 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import { Link as RouterLink, useLocation } from "react-router-dom";
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { Sidebar } from './Sidebar';
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {

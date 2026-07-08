@@ -32,7 +32,7 @@ import { DeckCard as DeckCardComponent } from "../components/DeckCard";
 import { DeckStats } from "../components/DeckStats";
 import { DeckBuilderSearch } from "../components/DeckBuilderSearch";
 import { useDebounce } from "../hooks/useDebounce";
-import { useCardHover } from "../context/CardHoverContext";
+import { useCardHover } from "../context/useCardHover";
 import { Card, CardMedia } from "@mui/material";
 
 // Helper to determine primary type for grouping
@@ -120,10 +120,12 @@ export const DeckBuilder: React.FC = () => {
     enabled: !isNew,
   });
 
-  // Sync remote data to local state when loaded
-  // Sync remote data to local state ONLY on initial load
+  // Sync remote data to local state ONLY on initial load. Intentionally one-shot
+  // (guarded by isInitialLoad) rather than derived, since local state diverges
+  // from the query result the moment the user starts editing.
   useEffect(() => {
     if (deck && isInitialLoad) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTitle(deck.title);
       setFormat(deck.format || "Commander");
       setDeckCards(deck.cards || []);
@@ -133,11 +135,11 @@ export const DeckBuilder: React.FC = () => {
     }
   }, [deck, isNew, isInitialLoad]);
 
-  // Track if we have unsaved changes locally
+  // Mark dirty on any edit after initial load; the auto-save effect below reads
+  // saveStatus to decide whether to fire.
   useEffect(() => {
     if (!isInitialLoad) {
-      // Check if current state differs from debounced (roughly implies typing)
-      // Or simpler: just set to unsaved on any change, and let debounce effect handle save
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSaveStatus("unsaved");
     }
   }, [title, format, deckCards, isInitialLoad]);
@@ -181,6 +183,11 @@ export const DeckBuilder: React.FC = () => {
     if (saveStatus === "unsaved") {
       saveDeck();
     }
+    // Intentionally keyed only off the debounced values: this should fire once per
+    // settled edit, not on every saveStatus transition it causes, or on deckId/isNew
+    // changing as a result of the navigate() call inside saveDeck. navigate and
+    // queryClient are stable across renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedTitle, debouncedFormat, debouncedCards]);
 
   // Search State removed (now handled by DeckBuilderSearch)
@@ -207,7 +214,7 @@ export const DeckBuilder: React.FC = () => {
         ];
       });
     },
-    [format],
+    [],
   );
 
   const updateQuantity = useCallback((cardId: string, board: string, delta: number) => {
