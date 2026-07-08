@@ -1,5 +1,4 @@
 from app.core.logging import setup_logging
-from logging import getLogger
 from typing import Any, Dict, List
 
 import httpx
