@@ -21,18 +21,17 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=.python-version,target=.python-version \
     uv python install
 
-# Copy dependency files
-# Using monorepo context (build from root)
+# Copy dependency files (build context is backend/ itself)
 COPY pyproject.toml uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    sh -c 'uv sync --frozen --no-dev --no-editable --package=mtg-deck-builder-backend'
+    uv sync --frozen --no-dev --no-editable --no-install-project
 
 FROM base AS copy-step-true
 # Skipping copy steps when flag is passed
 
 FROM base AS copy-step-false
-COPY backend ./backend
+COPY . .
 
 FROM copy-step-${SKIP_COPY} AS final
 ENV PATH="/app/.venv/bin:$PATH"
@@ -43,9 +42,7 @@ RUN uv sync --frozen --no-install-project
 # Expose port
 EXPOSE 8000
 
-# Command to run the application
-# We need to point to existing app.
-# If we are in /app, and we copied . ., then backend code is at /app/backend/app.
-# So we should change WORKDIR to /app/backend or run uvicorn with full path.
+# WORKDIR /app is the backend project root (context == backend/), so app/ is
+# directly at /app/app.
 CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 

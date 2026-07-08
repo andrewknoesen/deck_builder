@@ -1,7 +1,4 @@
 #!/bin/bash
 cd "$(dirname "$0")/.."
-uv sync --all-groups --all-packages
-cd backend
-uv lock --frozen
-cd ..
+(cd backend && uv sync)
 ./bin/start-compose.sh

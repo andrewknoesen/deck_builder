@@ -3,14 +3,15 @@ services:
     env_file:
       - backend/.env
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
       args:
         SKIP_COPY: ${SKIP_COPY:-true}
-    working_dir: /app/backend
+    working_dir: /app
     restart: unless-stopped
     volumes:
-      - .:/app
+      - ./backend:/app
+      - /app/.venv
     ports:
       - "8000:8000"
     environment:
@@ -86,6 +87,7 @@ services:
     working_dir: /app
     volumes:
       - ./frontend:/app
+      - /app/node_modules
     ports:
       - "5173:5173"
     environment:

@@ -1,22 +1,6 @@
-[project]
-name = "mtg-deck-builder-monorepo"
-version = "0.1.0"
-description = "Monorepo for MTG Deck Builder"
-requires-python = ">=3.13"
-dependencies = [
-    "aiosqlite>=0.22.1",
-    "alembic>=1.18.1",
-    "google-adk>=1.24.1",
-    "greenlet>=3.3.0",
-    "httpx>=0.28.1",
-    "pydantic-settings>=2.12.0",
-    "ruff>=0.15.0",
-    "sqlmodel>=0.0.31",
-]
-
-[tool.uv.workspace]
-members = ["backend"]
-
+# Not a uv project — `backend/` is a standalone uv project with its own
+# pyproject.toml, uv.lock, and .venv. This file exists only so editors opened
+# at the repo root (rather than in backend/) can resolve backend's modules.
 [tool.pyright]
 extraPaths = ["backend"]
 
