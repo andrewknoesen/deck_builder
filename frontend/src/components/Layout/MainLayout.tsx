@@ -24,7 +24,8 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
   const isAppMode =
     (location.pathname.startsWith("/decks/") &&
     location.pathname !== "/decks") ||
-    location.pathname === "/collection";
+    location.pathname === "/collection" ||
+    location.pathname.startsWith("/goldfish/");
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);

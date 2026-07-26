@@ -44,6 +44,7 @@ Base URL: `/api/v1` (mounted in `backend/app/api/api.py`).
 | `decks` | `/decks` | Full CRUD + `GET /{deck_id}/stats` + `POST /import` (paste-text import, best-effort — see `backend/app/services/deck_import.py`) |
 | `collection` | `/collection` | Full CRUD for a user's card collection |
 | `ai` | `/ai` | `POST /chat` (wired to `rules_agent`), `POST /suggest` (wired to `deck_advisor_agent`; takes `deck_id` + `query`, ownership-checked like every other deck route) |
+| `goldfish` | `/goldfish` | `POST /sessions`, `GET /sessions?deck_id=`, `GET /sessions/{id}` (flat node list, client builds the tree), `POST /sessions/{id}/nodes`, `DELETE /nodes/{id}` (cascades to descendants) — practice-mode branching action tree, Phase 3a |
 
 For exact request/response shapes, read the router file directly (`backend/app/api/routes/`) and
 its paired schema in `backend/app/schemas/` — they're the source of truth, not this doc.
@@ -53,8 +54,9 @@ its paired schema in `backend/app/schemas/` — they're the source of truth, not
 Kept here deliberately so this doc doesn't silently go stale again the way its predecessor did:
 
 - **Real Google ID token verification**: see the Auth note above.
-- **Practice Mode / goldfishing** (branching action-tree simulator): see `PLAN.md`'s Phase 3 for
-  the staged design (manual action log → assisted simulator → rules-aware simulator).
+- **Practice Mode / goldfishing, 3b and 3c**: Phase 3a (manual action log + branching tree) is
+  built — see the `goldfish` router above. 3b (real library/hand/battlefield state per node) and
+  3c (rules-aware legality/resolution) are not — see `PLAN.md`'s Phase 3 for the staged design.
 - **Scryfall bulk-data ingestion pipeline**: all Scryfall access today is either live per-request
   (`search_cards`) or a lazy, never-refreshed cache (`sync_cards`) — no scheduled job keeps the
   local `Card` table current against Scryfall's own bulk-data dumps. Means legality data can go
