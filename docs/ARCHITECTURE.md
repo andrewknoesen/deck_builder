@@ -37,7 +37,7 @@ Base URL: `/api/v1` (mounted in `backend/app/api/api.py`).
 | `auth` | `/auth` | `POST /login` |
 | `users` | `/users` | `POST /`, `GET /me` |
 | `cards` | `/cards` | `GET /search`, `GET /{card_id}` — Scryfall proxy |
-| `decks` | `/decks` | Full CRUD + `GET /{deck_id}/stats` |
+| `decks` | `/decks` | Full CRUD + `GET /{deck_id}/stats` + `POST /import` (paste-text import, best-effort — see `backend/app/services/deck_import.py`) |
 | `collection` | `/collection` | Full CRUD for a user's card collection |
 | `ai` | `/ai` | `POST /chat` (wired to `rules_agent`), `POST /suggest` (**placeholder** — returns a canned response, not implemented) |
 

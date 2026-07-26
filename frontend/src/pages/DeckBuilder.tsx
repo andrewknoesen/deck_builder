@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import "../styles/DeckBuilder.css";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams, useNavigate, Link as RouterLink } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link as RouterLink } from "react-router-dom";
 import {
   Box,
   TextField,
@@ -77,6 +77,7 @@ const FORMATS = [
 export const DeckBuilder: React.FC = () => {
   const { deckId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { hoveredCard } = useCardHover();
 
@@ -90,6 +91,9 @@ export const DeckBuilder: React.FC = () => {
     "saved",
   );
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [missingCards, setMissingCards] = useState<string[]>(
+    (location.state as { missingCards?: string[] } | null)?.missingCards ?? [],
+  );
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -488,6 +492,23 @@ export const DeckBuilder: React.FC = () => {
               {totalCards} Cards
             </Typography>
           </Box>
+
+          <Collapse in={missingCards.length > 0}>
+            <Alert
+              severity="warning"
+              className="deck-builder-alert"
+              onClose={() => setMissingCards([])}
+            >
+              {missingCards.length} card{missingCards.length === 1 ? "" : "s"}{" "}
+              from the import couldn't be found and {missingCards.length === 1 ? "was" : "were"}{" "}
+              left out — use the search above to add the right card for each:
+              <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2.5 }}>
+                {missingCards.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </Box>
+            </Alert>
+          </Collapse>
 
           <Collapse in={!validation.valid}>
             {validation.message && (

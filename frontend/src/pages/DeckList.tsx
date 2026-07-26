@@ -18,9 +18,11 @@ import AddIcon from "@mui/icons-material/Add";
 import LayersIcon from "@mui/icons-material/Layers";
 import AutoStoriesIcon from "@mui/icons-material/AutoStories";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
 import { apiClient } from "../api/client";
 import type { Deck } from "../types/mtg";
 import { DeckListItem } from "../components/DeckListItem";
+import { DeckImportModal } from "../components/DeckImportModal";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -28,6 +30,7 @@ export const DeckList: React.FC = () => {
   const queryClient = useQueryClient();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deckToDelete, setDeckToDelete] = useState<number | null>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   const { data: decks = [], isLoading: loading } = useQuery({
     queryKey: ["decks"],
@@ -96,17 +99,32 @@ export const DeckList: React.FC = () => {
             Manage and refine your Magic: The Gathering decks.
           </Typography>
         </Box>
-        <Button
-          component={RouterLink}
-          to="/decks/new"
-          variant="contained"
-          size="large"
-          startIcon={<AddIcon />}
-          className="deck-list-new-btn"
-        >
-          New Deck
-        </Button>
+        <Box sx={{ display: "flex", gap: 1.5 }}>
+          <Button
+            variant="outlined"
+            size="large"
+            startIcon={<UploadFileIcon />}
+            onClick={() => setImportModalOpen(true)}
+          >
+            Import Deck
+          </Button>
+          <Button
+            component={RouterLink}
+            to="/decks/new"
+            variant="contained"
+            size="large"
+            startIcon={<AddIcon />}
+            className="deck-list-new-btn"
+          >
+            New Deck
+          </Button>
+        </Box>
       </Box>
+
+      <DeckImportModal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+      />
 
       {decks.length === 0 ? (
         <Box className="deck-list-empty">

@@ -11,6 +11,8 @@ from app.models.deck import (
     DeckUpdate,
 )
 from app.models.user import User
+from app.schemas.deck_import import DeckImportRequest, DeckImportResponse
+from app.services.deck_import import parse_decklist, resolve_entries
 from app.services.scryfall import ScryfallService, get_scryfall_service
 from app.services.stats import calculate_stats
 from fastapi import APIRouter, Depends, HTTPException
@@ -146,6 +148,45 @@ async def create_deck(
         .options(selectinload(Deck.cards).selectinload(DeckCard.card))  # type: ignore[arg-type]
     )
     return result.scalar_one()
+
+
+@router.post("/import", response_model=DeckImportResponse)
+async def import_deck(
+    import_in: DeckImportRequest,
+    db: AsyncSession = Depends(get_db),
+    scryfall: ScryfallService = Depends(get_scryfall_service),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Import a deck from pasted text (simple list or MTGA export format).
+    Best-effort: cards that can't be resolved are reported as warnings
+    instead of failing the whole import.
+    """
+    parsed = parse_decklist(import_in.text)
+    resolved, missing = await resolve_entries(parsed.entries, scryfall)
+
+    # Merge duplicate (card_id, board) pairs so a repeated line in the pasted
+    # text can't violate DeckCard's (deck_id, card_id, board) primary key.
+    merged: dict[tuple[str, str], int] = {}
+    for entry in resolved:
+        key = (entry.card_id, entry.board)
+        merged[key] = merged.get(key, 0) + entry.quantity
+
+    if merged:
+        await sync_cards(db, [card_id for card_id, _ in merged], scryfall)
+
+    title = import_in.name or parsed.name or "Imported Deck"
+    db_deck = Deck(title=title, user_id=current_user.id)
+    db_deck.cards = [
+        DeckCard(card_id=card_id, quantity=quantity, board=board)
+        for (card_id, board), quantity in merged.items()
+    ]
+
+    db.add(db_deck)
+    await db.commit()
+    await db.refresh(db_deck)
+
+    return DeckImportResponse(id=db_deck.id, title=db_deck.title, missing_cards=missing)
 
 
 @router.get("/{deck_id}", response_model=DeckPublic)
