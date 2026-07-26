@@ -5,9 +5,14 @@ import SendIcon from "@mui/icons-material/Send";
 interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
+  placeholder?: string;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({
+  onSend,
+  disabled,
+  placeholder = "Ask a rules question...",
+}) => {
   const [input, setInput] = useState("");
 
   const handleSend = () => {
@@ -27,7 +32,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
     <Box className="agent-chat-input-area">
       <TextField
         fullWidth
-        placeholder="Ask a rules question..."
+        placeholder={placeholder}
         variant="outlined"
         value={input}
         onChange={(e) => setInput(e.target.value)}

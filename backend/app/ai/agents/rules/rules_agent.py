@@ -1,8 +1,6 @@
-from google.adk.agents import Agent
-
+from app.ai.agents.factory import make_agent
 from app.ai.tools.rules import lookup_glossary_term, query_comprehensive_rules
 from app.ai.tools.scryfall import lookup_card_rulings
-from app.core.config import settings
 
 PROMPT = """You are a Level 3 Magic: The Gathering Judge.
 Your goal is to answer questions about game rules and card interactions with high precision.
@@ -20,9 +18,8 @@ Format:
 **Citations**: [List of Rules/Rulings]
 **Explanation**: [Detailed walkthrough]"""
 
-rules_agent = Agent(
+rules_agent = make_agent(
     name="rules_agent",
-    model=settings.AI_MODEL_NAME,
     description="Level 3 Magic: The Gathering Judge agent answering questions about game rules and card interactions.",
     instruction=PROMPT,
     tools=[query_comprehensive_rules, lookup_card_rulings, lookup_glossary_term],

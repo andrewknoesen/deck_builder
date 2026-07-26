@@ -13,8 +13,15 @@ bottom of this file for the full record, or `git log` — it landed as 9 commits
 the advisor shipping first. `POST /decks/import` + `DeckImportModal`, best-effort resolution with
 an inline search-to-replace path for unresolved cards. See Phase 2 below for the full record.
 
-**Phase 1 (AI Deck Advisor) — not started, up next.** Feature completeness chosen over
-production-readiness (auth/CI/deploy explicitly deferred, see "Deferred" below). Detailed below.
+**Phase 1 (AI Deck Advisor) — done, 2026-07-26.** `POST /ai/suggest` wired to a new
+`deck_advisor_agent` (stateless `search_cards` tool, deck stats/list folded into prompt context).
+Second agent existing triggered the deferred factory-function check from Phase 0 — real
+duplication showed up, so `make_agent` was extracted and both agents now use it. UI lives inside
+`DeckBuilder.tsx` as a tab next to Deck Statistics (not `AgentChat.tsx` — scoped to the deck
+already open, no deck picker needed). Feature completeness chosen over production-readiness
+(auth/CI/deploy explicitly deferred, see "Deferred" below).
+
+**Phase 3 (Practice Mode) — not started, up next.** Detailed below.
 
 **Every phase gets an interview before implementation** — a short round of clarifying questions
 on the genuinely open design decisions, resolved and recorded before any code is written. Applied
@@ -22,7 +29,7 @@ to Phase 2 already; apply to Phase 1 and Phase 3 the same way when they're picke
 
 ---
 
-## Phase 1 — AI Deck Advisor
+## Phase 1 — AI Deck Advisor (done, 2026-07-26)
 
 ### Why this one, and why now
 
@@ -131,6 +138,27 @@ mid-conversation (not needed for "suggest cards for the deck I'm looking at").
   Scryfall card, confirm it respects the deck's format.
 - `docs/ARCHITECTURE.md`'s "What's not built yet" section currently lists this exact gap —
   update it once this ships, so that doc doesn't silently go stale the way its predecessor did.
+
+### Shipped: as designed, one perf caveat found in manual testing
+
+Built as planned above — `make_agent` factory extracted (step 2's trigger condition fired for
+real: `deck_advisor_agent` duplicated `rules_agent`'s `model=settings.AI_MODEL_NAME` boilerplate
+exactly), advisor UI landed inside `DeckBuilder.tsx` as a tab next to Deck Statistics per step 6's
+decision. Verified against the live docker-stack deck `pauper test` (60 cards): a real `/suggest`
+call returned a suggestion citing `search_cards` results, correctly flagged the deck's own cards
+as illegal for Pauper, and rendered in the chat UI.
+
+**Perf issue found in that manual run, since fixed**: the agent was calling `search_cards` once
+per *existing* deck card, sequentially — for a 60-card deck this took ~60-90 seconds end to end,
+just re-verifying cards it had already been told about. Fix: `_build_deck_context`
+(`backend/app/api/routes/ai.py`) now includes each existing card's mana cost/type/format legality
+directly (data already loaded in memory, zero extra queries), and the prompt tells the agent not
+to call `search_cards` for cards already in that list — only for new candidates. Cut the same
+manual test to ~15-20s and 2-3 `search_cards` calls (only for genuinely new suggestions).
+Considered making `search_cards` itself DB-backed for that remaining case too (a real local card
+copy would still be faster/more scalable than live Scryfall for new-candidate searches) but hit a
+real architectural blocker doing it as a quick add-on — see Phase 4 below, which is the properly
+scoped version of that idea.
 
 ---
 
@@ -340,6 +368,67 @@ targeting, triggered/replacement effects, and continuous-effect layers. That's a
 undertaking on its own and should get its own dedicated planning pass once 3a/3b have shipped and
 it's clear the tree/session infrastructure they build is actually being used and is the right
 foundation. Revisit this section then, don't try to design it in advance.
+
+---
+
+## Phase 4 — Scryfall bulk-data ingestion pipeline (not started, independent of Phase 3)
+
+### Why this one, and why now
+
+Every Scryfall-touching code path today either calls Scryfall live per-request
+(`search_cards`, `ScryfallService.search_cards`/`get_card_by_id`) or lazily caches into the local
+`Card` table only when a card is actually added to a deck (`sync_cards`, `decks.py:26`), and never
+refreshes a row once cached (`sync_cards` treats non-`NULL` `produced_mana` as "done forever" —
+see `decks.py:33-44`). Two concrete problems this causes:
+
+1. **Staleness**: a card's `legalities` can go stale forever once synced (e.g. a ban).
+   `deck_advisor_agent` relies on exactly this data for its legality checks (see Phase 1's
+   context-enrichment fix above) — a real correctness risk once this is a public, long-lived app.
+2. **Scale**: `search_cards` hitting live Scryfall per call is fine at today's usage but won't
+   hold up under concurrent users — Phase 2's post-ship bug (`get_collection` rate-limit crash)
+   already showed how quickly Scryfall's rate limits bite even for a single user's request.
+
+Attempted a smaller version of this during Phase 1 (point `search_cards` at the local `Card`
+table before falling back to Scryfall) and hit a real blocker worth recording: ADK tool functions
+are called by the agent framework with only their declared LLM-facing args (`query`, `format`) —
+there's no request-scoped dependency injection like FastAPI's `Depends(get_db)`. Reaching for
+`app.core.db`'s module-level `engine`/`SessionLocal` directly from the tool bypasses the test
+suite's SQLite override entirely and tries to hit real Postgres — confirmed by a failing test run
+(`OSError: Multiple exceptions: ... Connect call failed ... 5432`). Went with a different, safe
+Phase 1 fix instead (full card details already in the prompt context, since the deck's cards are
+already loaded in memory at the route level — zero extra queries). That fix doesn't help
+`search_cards` calls for cards *not* already in the deck (i.e. suggesting something new), which is
+the actual remaining gap this phase closes.
+
+### Design
+
+- **A separate ingestion service/container**, not code bolted onto the API container — mirrors
+  the shape `backend/app/ai/ingestion/rules_ingestion.py` already uses for the Chroma rules
+  index, just pointed at Scryfall's bulk-data endpoint instead of the comprehensive rules text.
+  Runs on a schedule (daily is plenty — Scryfall's own bulk files update daily), pulls the
+  `default_cards` bulk-data file (~30k cards, all printings' worth of core fields including
+  `legalities`), and upserts into the `Card` table — this is a refresh, not the lazy
+  create-once `sync_cards` does today.
+- **This is what makes a DB-backed `search_cards` safe to build**: once there's a real,
+  continuously-refreshed local copy, `search_cards` can be pointed at it without inventing
+  request-scoped DI for ADK tools. Two ways to wire that once ingestion exists, decide when this
+  phase is actually picked up: (a) the ingestion service also exposes a small internal read-only
+  HTTP search endpoint that the tool calls via its own `httpx.AsyncClient` per call (same
+  resource-per-call shape every existing tool already uses, just pointed internally instead of at
+  Scryfall), or (b) a dedicated read-only engine/session helper for tool code, separate from
+  `app.core.db`'s request-scoped one, that a test fixture can override the same way `db_session`
+  overrides `get_db` today.
+- **Docker Compose**: new service alongside `backend`/`frontend`/`db`/`chromadb`, own Dockerfile
+  or a `command:` override reusing the backend image — decide when this is actually built,
+  don't over-design the container shape in advance of writing the ingestion script itself.
+
+### Verify (once built)
+
+- Ingestion run populates/refreshes the `Card` table without touching decks/user data.
+- `search_cards` (however it ends up wired) returns current legality data for a card known to
+  have had a legality change since the app's last lazy `sync_cards` cache of it.
+- Re-run the ingestion container twice in a row — confirm it's a safe upsert (no duplicate rows,
+  no FK breakage against existing `DeckCard` references).
 
 ---
 

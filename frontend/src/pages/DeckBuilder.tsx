@@ -24,12 +24,14 @@ import {
   isValidCommander,
 } from "../utils/deckValidation";
 import BarChartIcon from "@mui/icons-material/BarChart";
+import SmartToyIcon from "@mui/icons-material/SmartToy";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import GridViewIcon from "@mui/icons-material/GridView";
 import { apiClient } from "../api/client";
 import type { ScryfallCard, Deck, DeckCard } from "../types/mtg";
 import { DeckCard as DeckCardComponent } from "../components/DeckCard";
 import { DeckStats } from "../components/DeckStats";
+import { DeckAdvisor } from "../components/DeckAdvisor";
 import { DeckBuilderSearch } from "../components/DeckBuilderSearch";
 import { useDebounce } from "../hooks/useDebounce";
 import { useCardHover } from "../context/useCardHover";
@@ -87,6 +89,7 @@ export const DeckBuilder: React.FC = () => {
   const [title, setTitle] = useState("New Deck");
   const [format, setFormat] = useState("Commander");
   const [deckCards, setDeckCards] = useState<DeckCard[]>([]);
+  const [rightPaneTab, setRightPaneTab] = useState<"stats" | "advisor">("stats");
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">(
     "saved",
   );
@@ -598,20 +601,37 @@ export const DeckBuilder: React.FC = () => {
         {/* Main Content (Stats) - active when NO hover */}
         <Box className={`deck-builder-stats ${hoveredCard ? "blurred" : ""}`}>
           <Box className="deck-builder-stats-header">
-            <BarChartIcon color="primary" />
+            <IconButton
+              size="small"
+              onClick={() => setRightPaneTab("stats")}
+              color={rightPaneTab === "stats" ? "primary" : "default"}
+            >
+              <BarChartIcon />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={() => setRightPaneTab("advisor")}
+              color={rightPaneTab === "advisor" ? "primary" : "default"}
+            >
+              <SmartToyIcon />
+            </IconButton>
             <Typography variant="h6" fontWeight="700">
-              Deck Statistics
+              {rightPaneTab === "stats" ? "Deck Statistics" : "Deck Advisor"}
             </Typography>
           </Box>
 
           <Box className="deck-builder-stats-content">
-            <DeckStats
-              cards={deckCards.filter(
-                (c) => c.board === "main" || c.board === "commander",
-              )}
-              deckId={deck ? deck.id : undefined}
-              format={format}
-            />
+            {rightPaneTab === "stats" ? (
+              <DeckStats
+                cards={deckCards.filter(
+                  (c) => c.board === "main" || c.board === "commander",
+                )}
+                deckId={deck ? deck.id : undefined}
+                format={format}
+              />
+            ) : (
+              <DeckAdvisor deckId={deck ? deck.id : undefined} />
+            )}
           </Box>
         </Box>
 
