@@ -365,6 +365,36 @@ stack. Fixed by generating a naive UTC datetime instead (`datetime.now(timezone.
 (tzinfo=None)`, not the deprecated `datetime.utcnow()`). Worth remembering for any future model
 with a `datetime` column: SQLite-backed tests can't catch tz-awareness mismatches against Postgres.
 
+### Phase 3a follow-up: usability feedback from actually using it
+
+Real usage of the shipped 3a surfaced four gaps, all fixed:
+
+1. **No entry point on the homepage.** `LandingPage.tsx`'s feature grid only had Decks/Brewing/
+   Collection. Added a fourth `Practice Mode` tile (`/goldfish`), regrid to 4 even columns
+   (`md: 3` instead of `md: 4`).
+2. **No entry point from the deck itself** — had to go to Practice Mode and re-pick the same
+   deck from a list. Added a gamepad icon button in `DeckBuilder.tsx`'s header (next to the
+   format selector) linking to `/goldfish?deckId={id}`, disabled until the deck is saved.
+   `Goldfish.tsx` now reads a `deckId` query param (`useSearchParams`) and pre-selects it,
+   skipping the picker straight to that deck's session list.
+3. **Deck list was text-only, no way to actually see a card.** Added card thumbnails
+   (`image_uris.small`) to each deck-list row in `GoldfishSessionPage.tsx`, and wired
+   `onMouseEnter`/`onMouseLeave` to the existing global `useCardHover` context — the same
+   `CardHoverPreview` overlay `SearchCard.tsx` already uses elsewhere, no new preview component
+   needed (this page isn't in `CardHoverPreview`'s DeckBuilder/Collection exclusion list, so it
+   renders automatically).
+4. **No way to track life total or anything else per node.** Added a genuinely generic
+   `trackers: Optional[Dict[str, int]]` JSON column on `GoldfishNode` (migration
+   `2040f7f42c18`) — an opaque name->value map, not a hardcoded `life_total` field, per the
+   explicit ask for "a generic way." Each node stores its own full snapshot (not a diff),
+   consistent with the snapshot approach Phase 3b below already commits to. The backend does zero
+   inheritance logic — `trackers` is just whatever the request provides (`{}` if omitted).
+   `NodeTrackerEditor.tsx` (new) is a small chip-list editor: existing tracker values are
+   editable, new named trackers can be added inline. The frontend owns the "carry forward"
+   behavior: selecting a node re-seeds the draft from that node's own `trackers`, so life (or
+   anything else) persists turn-to-turn until edited. Node boxes in `GoldfishTree.tsx` now show
+   a compact `Name: value` summary line under the label.
+
 ### Phase 3b — Assisted simulator
 
 Builds on 3a's tree unchanged; nodes now carry real state instead of free text.

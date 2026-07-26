@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Dict, Optional
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Column, Field, JSON, SQLModel
 
 
 def _utcnow_naive() -> datetime:
@@ -39,6 +39,13 @@ class GoldfishNodeBase(SQLModel):
     label: str
     turn_number: Optional[int] = None
     order_index: int = 0
+    # Generic named-counter snapshot at this node (life totals, poison, storm
+    # count, whatever the user is tracking) — an opaque key->value map, not a
+    # fixed set of fields, so the frontend can add arbitrary trackers without
+    # a schema change. Each node stores its own full snapshot (not a diff),
+    # matching the state-snapshot approach PLAN.md's Phase 3b already commits
+    # to for the same reason: simpler than replaying deltas up the tree.
+    trackers: Optional[Dict[str, int]] = Field(default=None, sa_column=Column(JSON))
 
 
 class GoldfishNode(GoldfishNodeBase, table=True):
@@ -50,6 +57,7 @@ class GoldfishNodeCreate(SQLModel):
     parent_id: Optional[int] = None
     label: str
     turn_number: Optional[int] = None
+    trackers: Optional[Dict[str, int]] = None
 
 
 class GoldfishNodePublic(GoldfishNodeBase):

@@ -58,22 +58,34 @@ export const GoldfishTree: React.FC<GoldfishTreeProps> = ({
   const { flowNodes, flowEdges } = useMemo(() => {
     const positions = layoutTree(nodes);
 
-    const flowNodes: Node[] = nodes.map((n) => ({
-      id: String(n.id),
-      position: positions.get(n.id) || { x: 0, y: 0 },
-      data: {
-        label: n.turn_number ? `T${n.turn_number}: ${n.label}` : n.label,
-      },
-      style: {
-        border: `2px solid ${n.id === selectedNodeId ? "#6366f1" : "#1e293b"}`,
-        background: n.id === selectedNodeId ? "#312e81" : "#0f172a",
-        color: "#f1f5f9",
-        borderRadius: 12,
-        padding: 8,
-        width: NODE_WIDTH - 20,
-        fontSize: 13,
-      },
-    }));
+    const flowNodes: Node[] = nodes.map((n) => {
+      const trackerSummary =
+        n.trackers && Object.keys(n.trackers).length > 0
+          ? Object.entries(n.trackers)
+              .map(([name, value]) => `${name}: ${value}`)
+              .join(" · ")
+          : null;
+
+      const label = `${n.turn_number ? `T${n.turn_number}: ` : ""}${n.label}${
+        trackerSummary ? `\n${trackerSummary}` : ""
+      }`;
+
+      return {
+        id: String(n.id),
+        position: positions.get(n.id) || { x: 0, y: 0 },
+        data: { label },
+        style: {
+          border: `2px solid ${n.id === selectedNodeId ? "#6366f1" : "#1e293b"}`,
+          background: n.id === selectedNodeId ? "#312e81" : "#0f172a",
+          color: "#f1f5f9",
+          borderRadius: 12,
+          padding: 8,
+          width: NODE_WIDTH - 20,
+          fontSize: 13,
+          whiteSpace: "pre-line" as const,
+        },
+      };
+    });
 
     const flowEdges: Edge[] = nodes
       .filter((n) => n.parent_id !== null)

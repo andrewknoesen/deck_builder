@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Container,
   Grid,
@@ -31,7 +31,11 @@ import type { GoldfishSession } from "../types/goldfish";
 export const Goldfish: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [selectedDeckId, setSelectedDeckId] = useState<number | null>(null);
+  const [searchParams] = useSearchParams();
+  const deckIdParam = searchParams.get("deckId");
+  const [selectedDeckId, setSelectedDeckId] = useState<number | null>(
+    deckIdParam ? Number(deckIdParam) : null,
+  );
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState("");
 

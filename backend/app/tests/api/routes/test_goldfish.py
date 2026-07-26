@@ -143,6 +143,50 @@ async def test_add_root_and_branching_nodes(client: AsyncClient, db_session) -> 
 
 
 @pytest.mark.asyncio
+async def test_node_trackers_are_a_generic_opaque_snapshot(
+    client: AsyncClient, db_session
+) -> None:
+    """Trackers are a free-form key->value map (life, poison, storm count,
+    whatever) — the backend just stores whatever snapshot it's given, no
+    fixed schema, no inheritance logic. The frontend decides what to carry
+    forward from the selected node into the next one."""
+    _user, deck_id = await _make_user_and_deck(
+        client, db_session, "goldfish_trackers@example.com", "gf_sub_trackers"
+    )
+    session_id = (
+        await client.post(
+            f"{settings.API_V1_STR}/goldfish/sessions", json={"deck_id": deck_id}
+        )
+    ).json()["id"]
+
+    root_res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={"label": "Start", "trackers": {"life": 40}},
+    )
+    assert root_res.status_code == 200
+    root = root_res.json()
+    assert root["trackers"] == {"life": 40}
+
+    child_res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={
+            "parent_id": root["id"],
+            "label": "Took a hit, played a poison counter card",
+            "trackers": {"life": 37, "poison": 1},
+        },
+    )
+    assert child_res.status_code == 200
+    assert child_res.json()["trackers"] == {"life": 37, "poison": 1}
+
+    no_tracker_res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={"parent_id": root["id"], "label": "no trackers given"},
+    )
+    assert no_tracker_res.status_code == 200
+    assert no_tracker_res.json()["trackers"] == {}
+
+
+@pytest.mark.asyncio
 async def test_add_node_to_nonexistent_parent_404(
     client: AsyncClient, db_session
 ) -> None:

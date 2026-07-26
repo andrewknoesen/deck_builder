@@ -13,6 +13,9 @@ export interface GoldfishNode {
   label: string;
   turn_number: number | null;
   order_index: number;
+  // Generic named-counter snapshot at this node (life, poison, storm count,
+  // whatever) - an opaque key->value map, not a fixed set of fields.
+  trackers: Record<string, number> | null;
   created_at: string;
 }
 

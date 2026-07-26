@@ -15,6 +15,7 @@ import {
   Alert,
   Collapse,
   Snackbar,
+  Tooltip,
 } from "@mui/material";
 import {
   validateDeckSize,
@@ -25,6 +26,7 @@ import {
 } from "../utils/deckValidation";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
+import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import GridViewIcon from "@mui/icons-material/GridView";
 import { apiClient } from "../api/client";
@@ -479,6 +481,26 @@ export const DeckBuilder: React.FC = () => {
                 ))}
               </TextField>
             </Box>
+
+            <Tooltip
+              title={
+                deck?.id
+                  ? "Practice with this deck"
+                  : "Save this deck first to practice with it"
+              }
+            >
+              <span>
+                <IconButton
+                  component={RouterLink}
+                  to={deck?.id ? `/goldfish?deckId=${deck.id}` : "#"}
+                  size="small"
+                  disabled={!deck?.id}
+                  className="deck-builder-practice-btn"
+                >
+                  <SportsEsportsIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
           </Box>
 
           {/* Search Row */}

@@ -133,6 +133,7 @@ async def add_node(
         label=node_in.label,
         turn_number=node_in.turn_number,
         order_index=order_index,
+        trackers=node_in.trackers or {},
     )
     db.add(db_node)
     await db.commit()

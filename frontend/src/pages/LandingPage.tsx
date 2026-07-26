@@ -15,6 +15,7 @@ import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import StyleIcon from "@mui/icons-material/Style"; // Represents Decks
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome"; // Represents Brewing
 import CollectionsIcon from "@mui/icons-material/Collections"; // Represents Collection
+import SportsEsportsIcon from "@mui/icons-material/SportsEsports"; // Represents Practice Mode
 
 import "../styles/LandingPage.css";
 
@@ -79,7 +80,7 @@ export const LandingPage = () => {
       <Container maxWidth="xl" className="landing-features-container">
         <Grid container spacing={4}>
           {/* Decks Section */}
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Card className="landing-feature-card">
               <CardActionArea
                 component={RouterLink}
@@ -103,7 +104,7 @@ export const LandingPage = () => {
           </Grid>
 
           {/* Brewing Section */}
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Card className="landing-feature-card">
               <CardActionArea
                 component={RouterLink}
@@ -129,7 +130,7 @@ export const LandingPage = () => {
           </Grid>
 
           {/* Collection Section */}
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Card className="landing-feature-card">
               {/* Pointing to decks for now as a placeholder, or could be /collection if we had it */}
               <CardActionArea
@@ -147,6 +148,33 @@ export const LandingPage = () => {
                   <Typography variant="body1" color="text.secondary">
                     Track every card you own. Filter by set, rarity, and foil
                     status. (Coming Soon)
+                  </Typography>
+                </CardContent>
+              </CardActionArea>
+            </Card>
+          </Grid>
+
+          {/* Practice Mode Section */}
+          <Grid size={{ xs: 12, md: 3 }}>
+            <Card className="landing-feature-card">
+              <CardActionArea
+                component={RouterLink}
+                to="/goldfish"
+                className="landing-feature-action"
+              >
+                <CardContent className="landing-feature-content">
+                  <Box className="landing-feature-icon-box feature-icon-primary">
+                    <SportsEsportsIcon
+                      sx={{ fontSize: 40, color: "primary.main" }}
+                    />
+                  </Box>
+                  <Typography variant="h4" fontWeight="800">
+                    Practice Mode
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    Goldfish a deck with a branching action tree. Rewind to
+                    any point and try a different line without losing the
+                    original.
                   </Typography>
                 </CardContent>
               </CardActionArea>
