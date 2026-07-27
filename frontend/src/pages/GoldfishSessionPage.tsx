@@ -6,21 +6,27 @@ import {
   IconButton,
   TextField,
   Button,
-  Paper,
   CircularProgress,
   List,
   ListItemButton,
   ListItemText,
+  Divider,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/DeleteOutline";
 import LayersIcon from "@mui/icons-material/Layers";
+import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../api/client";
-import type { GoldfishSessionTree, GoldfishNode } from "../types/goldfish";
-import type { Deck } from "../types/mtg";
+import type {
+  GoldfishSessionTree,
+  GoldfishNode,
+  GoldfishAction,
+} from "../types/goldfish";
+import type { Deck, ScryfallCard } from "../types/mtg";
 import { GoldfishTree } from "../components/GoldfishTree";
 import { NodeTrackerEditor } from "../components/NodeTrackerEditor";
+import { GoldfishPlaymat } from "../components/GoldfishPlaymat";
 import { useCardHover } from "../context/useCardHover";
 
 export const GoldfishSessionPage: React.FC = () => {
@@ -31,6 +37,7 @@ export const GoldfishSessionPage: React.FC = () => {
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
   const [actionText, setActionText] = useState("");
   const [showDeckList, setShowDeckList] = useState(true);
+  const [showTree, setShowTree] = useState(true);
   const [trackerDraft, setTrackerDraft] = useState<Record<string, number>>({});
 
   const queryKey = ["goldfishTree", sessionId];
@@ -64,12 +71,28 @@ export const GoldfishSessionPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedNodeId, data]);
 
+  // Auto-select the session's root node once it loads, so a fresh 3b
+  // session is immediately ready to draw/act on without an extra click.
+  useEffect(() => {
+    if (data && selectedNodeId === null) {
+      const root = data.nodes.find((n) => n.parent_id === null);
+      if (root) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setSelectedNodeId(root.id);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
   const addNode = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (payload: {
+      label?: string;
+      trackers?: Record<string, number>;
+      action?: GoldfishAction;
+    }) => {
       const res = await apiClient.post(`/goldfish/sessions/${sessionId}/nodes`, {
         parent_id: selectedNodeId,
-        label: actionText,
-        trackers: trackerDraft,
+        ...payload,
       });
       return res.data as GoldfishNode;
     },
@@ -102,6 +125,11 @@ export const GoldfishSessionPage: React.FC = () => {
     .filter((dc) => dc.board === "main" || dc.board === "commander")
     .slice()
     .sort((a, b) => (a.card?.name ?? "").localeCompare(b.card?.name ?? ""));
+
+  const cardById: Record<string, ScryfallCard> = {};
+  (deck?.cards ?? []).forEach((dc) => {
+    if (dc.card) cardById[dc.card_id] = dc.card;
+  });
 
   const addCardToActionText = (name: string) => {
     setActionText((prev) => (prev ? `${prev}, ${name}` : name));
@@ -139,6 +167,14 @@ export const GoldfishSessionPage: React.FC = () => {
           title="Toggle deck list"
         >
           <LayersIcon fontSize="small" />
+        </IconButton>
+        <IconButton
+          onClick={() => setShowTree((v) => !v)}
+          size="small"
+          color={showTree ? "primary" : "default"}
+          title="Toggle branch tree"
+        >
+          <AccountTreeIcon fontSize="small" />
         </IconButton>
       </Box>
 
@@ -196,59 +232,89 @@ export const GoldfishSessionPage: React.FC = () => {
           </Box>
         )}
 
-        <Box sx={{ flex: 1, minHeight: 0 }}>
-          <GoldfishTree
-            nodes={data.nodes}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={setSelectedNodeId}
-          />
-        </Box>
-      </Box>
-
-      <Paper square sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
-        <Typography variant="caption" color="text.secondary">
-          {data.nodes.length === 0
-            ? "Add the first action to start this session."
-            : selectedNode
-              ? `Adding after: "${selectedNode.label}". Adding another action here (instead of pruning first) creates a branch.`
-              : "No node selected — the next action starts a new root line."}
-        </Typography>
-
-        <Box sx={{ mt: 1 }}>
-          <NodeTrackerEditor trackers={trackerDraft} onChange={setTrackerDraft} />
-        </Box>
-
-        <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder='e.g. "Turn 2: cast Llanowar Elves"'
-            value={actionText}
-            onChange={(e) => setActionText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && actionText.trim()) addNode.mutate();
-            }}
-          />
-          <Button
-            variant="contained"
-            onClick={() => addNode.mutate()}
-            disabled={!actionText.trim() || addNode.isPending}
-          >
-            Add
-          </Button>
-          {selectedNode && (
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteIcon />}
-              onClick={() => deleteNode.mutate(selectedNode.id)}
-              disabled={deleteNode.isPending}
-            >
-              Prune
-            </Button>
+        {/* Main view: the playmat is what you look at while goldfishing, so
+            it gets the primary flexible area, scrolling on its own if a big
+            hand/battlefield doesn't fit — never hiding Add/Prune below the
+            fold the way the old fixed-height footer could. */}
+        <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+          {selectedNode?.state && (
+            <>
+              <GoldfishPlaymat
+                state={selectedNode.state}
+                cardById={cardById}
+                turnNumber={selectedNode.turn_number}
+                onAction={(action) => addNode.mutate({ action })}
+                disabled={addNode.isPending}
+              />
+              <Divider />
+            </>
           )}
+
+          <Box sx={{ p: 2 }}>
+            <Typography variant="caption" color="text.secondary">
+              {selectedNode
+                ? `Adding after: "${selectedNode.label}". Adding another action here (instead of pruning first) creates a branch.`
+                : "No node selected — the next action starts a new root line."}
+            </Typography>
+
+            <Box sx={{ mt: 1 }}>
+              <NodeTrackerEditor trackers={trackerDraft} onChange={setTrackerDraft} />
+            </Box>
+
+            <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder='e.g. "Opponent passed the turn" (or use the actions above)'
+                value={actionText}
+                onChange={(e) => setActionText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && actionText.trim()) {
+                    addNode.mutate({ label: actionText, trackers: trackerDraft });
+                  }
+                }}
+              />
+              <Button
+                variant="contained"
+                onClick={() =>
+                  addNode.mutate({ label: actionText, trackers: trackerDraft })
+                }
+                disabled={!actionText.trim() || addNode.isPending}
+              >
+                Add
+              </Button>
+              {selectedNode && (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={() => deleteNode.mutate(selectedNode.id)}
+                  disabled={deleteNode.isPending}
+                >
+                  Prune
+                </Button>
+              )}
+            </Box>
+          </Box>
         </Box>
-      </Paper>
+
+        {showTree && (
+          <Box
+            sx={{
+              width: 380,
+              flexShrink: 0,
+              borderLeft: 1,
+              borderColor: "divider",
+            }}
+          >
+            <GoldfishTree
+              nodes={data.nodes}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={setSelectedNodeId}
+            />
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 };

@@ -29,7 +29,20 @@ already-answered node visibly branches (siblings side by side). Verified end-to-
 against the live docker stack: created a session, added a root + child, branched a second child
 off the root, and pruned one branch back out — cascade-delete confirmed working. Interview
 resolved the one open design decision (tree viz library: went with the plan's `@xyflow/react`
-recommendation over hand-rolling). **Phase 3b/3c are next**, whenever picked up.
+recommendation over hand-rolling).
+
+**Phase 3b (Assisted simulator) — done, 2026-07-26.** `GoldfishNode.state` (JSON: library/hand/
+battlefield/graveyard/exile + `life_total`) alongside 3a's `trackers` — kept deliberately separate
+per an explicit decision: life stays a first-class field on the structured game state, not folded
+into the generic tracker map. Sessions auto-create a shuffled "Game start" root node
+(`build_initial_state`, Fisher-Yates via stdlib `random.shuffle`); structured actions (`draw`,
+`play_land`, `cast`, `move_zone`, `set_life`) apply against the parent node's state and
+auto-generate the node's label server-side. `GoldfishPlaymat.tsx` (new) renders hand/battlefield
+as card images with per-card action buttons, library/graveyard/exile as click-to-expand counts,
+and an editable life total. Verified end-to-end against the live docker stack: drew a card, played
+it, adjusted life, moved it to the graveyard, and retrieved it back to hand via the graveyard
+popover — full chain rendered correctly in the tree with auto-generated labels throughout.
+**Phase 3c is next**, whenever picked up.
 
 **Every phase gets an interview before implementation** — a short round of clarifying questions
 on the genuinely open design decisions, resolved and recorded before any code is written. Applied
@@ -395,7 +408,7 @@ Real usage of the shipped 3a surfaced four gaps, all fixed:
    anything else) persists turn-to-turn until edited. Node boxes in `GoldfishTree.tsx` now show
    a compact `Name: value` summary line under the label.
 
-### Phase 3b — Assisted simulator
+### Phase 3b — Assisted simulator (done, 2026-07-26)
 
 Builds on 3a's tree unchanged; nodes now carry real state instead of free text.
 
@@ -418,6 +431,78 @@ Builds on 3a's tree unchanged; nodes now carry real state instead of free text.
   `CardMedia` pattern), battlefield area, library/graveyard/exile as counts (with a
   click-to-expand list), life total. This is the meaningfully bigger lift in this sub-phase, not
   the tree itself (that's already built in 3a).
+
+### Shipped: as designed, plus one interview decision worth recording
+
+Built as planned above, with one deliberate deviation from this section's original sketch: an
+interview before starting resolved that `life_total` stays a first-class field on `state` (not
+folded into 3a's generic `trackers` map) — trackers remain for arbitrary freeform counters, `state`
+is specifically the structured game snapshot. Also: `action` is accepted on the *same*
+`POST /goldfish/sessions/{id}/nodes` endpoint 3a already uses (an optional field, not a parallel
+API) — when given, the backend applies it against the parent's state and auto-generates the
+node's label; when omitted, the existing free-text/`trackers` path is unchanged, and a freeform
+note under a 3b node now carries the parent's state forward unchanged (nothing happened to the
+game, so nothing should be lost). Every session auto-creates a shuffled "Game start" root node at
+creation time, so there's always a valid state to act against — the frontend auto-selects it on
+load so a fresh session is immediately playable with no extra click.
+
+Caught a real bug while writing the dedicated 3b test file, not from the app itself: a test helper
+called `app.dependency_overrides.clear()` after a scoped `get_scryfall_service` override, which
+also wiped the `client` fixture's `get_db` override — every DB call after that point in the test
+tried to hit real Postgres. Fixed by deleting only the specific override key. Worth remembering:
+`dependency_overrides.clear()` in a test is only safe as the very last override-touching statement
+in that test, never mid-test with more DB-dependent calls still to come.
+
+**Follow-up, same day**: two usability requests after trying the assisted simulator live —
+- **Opponent life**: `GameState` gained `opponent_life_total` (default same as `life_total`,
+  following the same Commander-format-aware starting value). `set_life` takes a `target: "self" |
+  "opponent"` field (defaults to `"self"`, so the existing self-life call sites didn't need
+  updating). `GoldfishPlaymat.tsx`'s life counter was extracted into a reusable `LifeCounter`
+  sub-component so both counters (`Life` / `Opp`) share the same -/+/edit behavior. No migration
+  needed — `state` is a JSON blob, and pydantic backfills the new field's default for any old
+  stored state missing the key.
+- **Auto-draw opening hand**: `create_session` now creates a second node (child of "Game start")
+  via a new `draw_opening_hand(state, count=7)` service function right after the root, drawing up
+  to 7 cards (fewer if the library's smaller, never raises). Kept as a *separate* node rather than
+  folding into "Game start" itself — matches this system's own convention that every meaningful
+  change gets its own node, and leaves "Game start" as a pure pre-game reference point. Guarded to
+  skip creating this node entirely when the library is empty (0 drawn), so the existing
+  empty-deck test (`test_get_session_tree_starts_with_auto_created_root`, asserting exactly 1
+  node) needed no change.
+
+**Follow-up #2, same day**: shuffle and next-turn buttons.
+- **Shuffle**: a new `apply_action` branch (`type: "shuffle"`) that reshuffles `state.library` in
+  place via `random.shuffle` and labels the node "Shuffled library" — a pure `GameState` mutation,
+  fits the existing action dispatch exactly like `draw`/`move_zone`.
+- **Next turn**: architecturally different from the other actions — advancing the turn is a
+  `GoldfishNode.turn_number` concern, not a `GameState` mutation, so `"next_turn"` is handled
+  directly in the `add_node` route rather than inside `apply_action` (which would have nothing to
+  do with it). `turn_number` now inherits from the parent node for *every* node type (actions and
+  freeform notes alike) unless a `next_turn` action bumps it or the caller explicitly overrides it
+  — same carry-forward philosophy as `state`. Auto-label is `"Turn {n}"`, overridable like every
+  other auto-label. `GoldfishTree.tsx` got a small fix alongside this: its existing `"T{n}: "`
+  label prefix would otherwise double up with next_turn's own label into "T1: Turn 1" — skipped
+  when the label already matches `/^Turn \d+/`.
+- **Next turn also auto-draws**, added right after: extracted a shared `draw_card(state)` helper
+  (used by the `draw` action, `draw_opening_hand`, and now `next_turn`) so "draw one card" is one
+  implementation, not three. Label becomes `"Turn {n}: drew {card}"` (or `"Turn {n} (empty
+  library)"` if the library's out) — still overridable via an explicit `label`.
+
+**Bug found immediately after, real UX problem not a transient state issue**: "when I play a card
+I can't delete that node." Root cause: `GoldfishSessionPage.tsx`'s footer `Paper` capped itself at
+`maxHeight: "50%"` with `overflowY: "auto"` — once the playmat's hand/battlefield sections grew
+past that cap, the Add/Prune row got pushed below the fold with no obvious way to scroll to it.
+Fixed by the layout restructure requested right after (see next entry) rather than just patching
+the height cap — a goldfishing session spends most of its time looking at the playmat, so giving
+it the primary flexible area (not a capped footer) fixes the visibility bug and matches actual
+usage at the same time.
+
+**Layout restructure**: playmat is now the main view (`flex: 1`, its own `overflowY: auto`, so
+Add/Prune can never be pushed off-screen again regardless of hand/battlefield size); the tree
+moved to a 380px right-side panel, toggleable via a new `AccountTreeIcon` button next to the
+existing deck-list toggle. Verified live: cast a card, confirmed Prune stayed visible and
+clickable, confirmed pruning that branch actually worked (tree updated, selection reset to the
+parent).
 
 ### Phase 3c — Full rules-aware simulator
 

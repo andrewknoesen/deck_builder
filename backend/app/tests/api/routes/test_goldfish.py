@@ -81,7 +81,9 @@ async def test_create_session_rejects_deck_owned_by_another_user(
 
 
 @pytest.mark.asyncio
-async def test_get_session_tree_starts_empty(client: AsyncClient, db_session) -> None:
+async def test_get_session_tree_starts_with_auto_created_root(
+    client: AsyncClient, db_session
+) -> None:
     _user, deck_id = await _make_user_and_deck(
         client, db_session, "goldfish2@example.com", "gf_sub_2"
     )
@@ -94,7 +96,13 @@ async def test_get_session_tree_starts_empty(client: AsyncClient, db_session) ->
     assert tree_res.status_code == 200
     data = tree_res.json()
     assert data["session"]["id"] == session_id
-    assert data["nodes"] == []
+    assert len(data["nodes"]) == 1
+
+    root = data["nodes"][0]
+    assert root["label"] == "Game start"
+    assert root["parent_id"] is None
+    assert root["state"]["library"] == []  # this test deck has no cards
+    assert root["state"]["life_total"] == 20  # no format set -> not commander-like
 
 
 @pytest.mark.asyncio
@@ -107,14 +115,17 @@ async def test_add_root_and_branching_nodes(client: AsyncClient, db_session) -> 
             f"{settings.API_V1_STR}/goldfish/sessions", json={"deck_id": deck_id}
         )
     ).json()["id"]
+    auto_root_id = (
+        await client.get(f"{settings.API_V1_STR}/goldfish/sessions/{session_id}")
+    ).json()["nodes"][0]["id"]
 
     root_res = await client.post(
         f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
-        json={"label": "Turn 1: play a land"},
+        json={"parent_id": auto_root_id, "label": "Turn 1: play a land"},
     )
     assert root_res.status_code == 200
     root = root_res.json()
-    assert root["parent_id"] is None
+    assert root["parent_id"] == auto_root_id
     assert root["order_index"] == 0
 
     child_a = (
@@ -138,8 +149,13 @@ async def test_add_root_and_branching_nodes(client: AsyncClient, db_session) -> 
 
     tree_res = await client.get(f"{settings.API_V1_STR}/goldfish/sessions/{session_id}")
     nodes = tree_res.json()["nodes"]
-    assert len(nodes) == 3
-    assert {n["id"] for n in nodes} == {root["id"], child_a["id"], child_b["id"]}
+    assert len(nodes) == 4
+    assert {n["id"] for n in nodes} == {
+        auto_root_id,
+        root["id"],
+        child_a["id"],
+        child_b["id"],
+    }
 
 
 @pytest.mark.asyncio
@@ -226,7 +242,11 @@ async def test_delete_node_cascades_to_descendants_only(
         )
         return res.json()
 
-    root = await add(None, "root")
+    auto_root_id = (
+        await client.get(f"{settings.API_V1_STR}/goldfish/sessions/{session_id}")
+    ).json()["nodes"][0]["id"]
+
+    root = await add(auto_root_id, "root")
     branch_to_prune = await add(root["id"], "prune me")
     grandchild = await add(branch_to_prune["id"], "should also die")
     surviving_sibling = await add(root["id"], "keep me")
@@ -239,7 +259,7 @@ async def test_delete_node_cascades_to_descendants_only(
 
     tree_res = await client.get(f"{settings.API_V1_STR}/goldfish/sessions/{session_id}")
     remaining_ids = {n["id"] for n in tree_res.json()["nodes"]}
-    assert remaining_ids == {root["id"], surviving_sibling["id"]}
+    assert remaining_ids == {auto_root_id, root["id"], surviving_sibling["id"]}
     assert grandchild["id"] not in remaining_ids
     assert branch_to_prune["id"] not in remaining_ids
 

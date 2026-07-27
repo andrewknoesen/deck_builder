@@ -66,7 +66,10 @@ export const GoldfishTree: React.FC<GoldfishTreeProps> = ({
               .join(" · ")
           : null;
 
-      const label = `${n.turn_number ? `T${n.turn_number}: ` : ""}${n.label}${
+      // Skip the "T{n}:" prefix when the label already says "Turn N" (the
+      // next_turn action's own auto-generated label) - avoids "T1: Turn 1".
+      const needsTurnPrefix = n.turn_number && !/^Turn \d+/.test(n.label);
+      const label = `${needsTurnPrefix ? `T${n.turn_number}: ` : ""}${n.label}${
         trackerSummary ? `\n${trackerSummary}` : ""
       }`;
 

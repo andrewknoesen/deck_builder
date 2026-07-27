@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Dict, List, Literal, Optional
 
+from pydantic import BaseModel
 from sqlmodel import Column, Field, JSON, SQLModel
 
 
@@ -8,6 +9,42 @@ def _utcnow_naive() -> datetime:
     """Naive UTC datetime, matching the migration's TIMESTAMP WITHOUT TIME ZONE
     columns — asyncpg rejects a tz-aware value against a naive column."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+ZONES = ("library", "hand", "battlefield", "graveyard", "exile")
+
+
+class GameState(BaseModel):
+    """
+    A full snapshot of the goldfish game state at one node — library/hand/
+    battlefield/graveyard/exile as ordered card_id lists, plus life totals for
+    both players. Stored whole on every node (not a diff), same reasoning as
+    `trackers`: reading a node's state should never require replaying history.
+    """
+
+    library: List[str] = []
+    hand: List[str] = []
+    battlefield: List[str] = []
+    graveyard: List[str] = []
+    exile: List[str] = []
+    life_total: int = 20
+    opponent_life_total: int = 20
+
+    def zone(self, name: str) -> List[str]:
+        if name not in ZONES:
+            raise ValueError(f"Unknown zone: {name}")
+        return getattr(self, name)
+
+
+class GoldfishActionIn(BaseModel):
+    type: Literal[
+        "draw", "play_land", "cast", "move_zone", "set_life", "shuffle", "next_turn"
+    ]
+    card_id: Optional[str] = None
+    from_zone: Optional[str] = None
+    to_zone: Optional[str] = None
+    life_total: Optional[int] = None
+    target: Literal["self", "opponent"] = "self"
 
 
 class GoldfishSessionBase(SQLModel):
@@ -46,6 +83,12 @@ class GoldfishNodeBase(SQLModel):
     # matching the state-snapshot approach PLAN.md's Phase 3b already commits
     # to for the same reason: simpler than replaying deltas up the tree.
     trackers: Optional[Dict[str, int]] = Field(default=None, sa_column=Column(JSON))
+    # Phase 3b game-state snapshot (library/hand/battlefield/graveyard/exile +
+    # life_total) — None for plain 3a free-text sessions/notes. Stored as a
+    # plain dict column (not GameState directly) since SQLModel/SQLAlchemy
+    # JSON columns hold JSON-serializable data, not pydantic model instances;
+    # routes parse it into GameState via GameState(**node.state) to work with it.
+    state: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
 
 
 class GoldfishNode(GoldfishNodeBase, table=True):
@@ -55,9 +98,10 @@ class GoldfishNode(GoldfishNodeBase, table=True):
 
 class GoldfishNodeCreate(SQLModel):
     parent_id: Optional[int] = None
-    label: str
+    label: Optional[str] = None
     turn_number: Optional[int] = None
     trackers: Optional[Dict[str, int]] = None
+    action: Optional[GoldfishActionIn] = None
 
 
 class GoldfishNodePublic(GoldfishNodeBase):
