@@ -42,7 +42,15 @@ as card images with per-card action buttons, library/graveyard/exile as click-to
 and an editable life total. Verified end-to-end against the live docker stack: drew a card, played
 it, adjusted life, moved it to the graveyard, and retrieved it back to hand via the graveyard
 popover — full chain rendered correctly in the tree with auto-generated labels throughout.
-**Phase 3c is next**, whenever picked up.
+
+**Phase 4 (Scryfall bulk-data ingestion) — partially done, 2026-07-27.** Picked up ahead of
+Phase 3c (deliberately deferred, still a multi-month undertaking not ready to design) since Phase 4
+was already independent and had a concrete design sketched. `run_ingestion()` refreshes the local
+`Card` table from Scryfall's bulk `default_cards` file; `search_cards` now checks that cache first
+for plain-name queries via a new tool-side DB session, falling back to live Scryfall on a cache
+miss or Scryfall operator syntax. **Scheduling deliberately left manual** — no cron/loop/new
+container, run by hand until there's a real deployment target. **Phase 3c is still next** after
+this, whenever picked up.
 
 **Every phase gets an interview before implementation** — a short round of clarifying questions
 on the genuinely open design decisions, resolved and recorded before any code is written. Applied
@@ -515,7 +523,7 @@ foundation. Revisit this section then, don't try to design it in advance.
 
 ---
 
-## Phase 4 — Scryfall bulk-data ingestion pipeline (not started, independent of Phase 3)
+## Phase 4 — Scryfall bulk-data ingestion pipeline (partially done, 2026-07-27)
 
 ### Why this one, and why now
 
@@ -543,6 +551,39 @@ Phase 1 fix instead (full card details already in the prompt context, since the 
 already loaded in memory at the route level — zero extra queries). That fix doesn't help
 `search_cards` calls for cards *not* already in the deck (i.e. suggesting something new), which is
 the actual remaining gap this phase closes.
+
+### Interview outcome (resolved before writing code, per-phase process)
+
+This phase's Design section (below, written earlier) left two decisions explicitly open ("decide
+when this phase is actually picked up"). Both resolved by interview before implementation started:
+
+1. **Ingestion trigger: manual script, no scheduling infra.** Checked ground truth first —
+   `rules_ingestion.py`, the pattern this phase's Design section originally said to mirror, turned
+   out to *not* actually run as a separate scheduled service; it's bolted into the backend
+   container's startup command chain (`docker-compose.yml`), re-running on every container
+   restart. Fine for a small rules-text index, but re-fetching and upserting Scryfall's full
+   `default_cards` bulk file (tens of thousands of rows, not the ~30k this section originally
+   estimated) on every dev restart would make `docker compose up` noticeably slower for no real
+   benefit in dev. Decided instead: a plain idempotent script
+   (`uv run python -m app.ai.ingestion.scryfall_ingestion`), run by hand. Real recurring scheduling
+   (cron, a sleep-loop service, etc.) is deferred until there's an actual deployment target to
+   schedule against — see Deferred below — rather than building scheduling infra twice.
+2. **Tool DB access: a dedicated direct-session helper, not an internal HTTP endpoint.** Chosen for
+   scale/simplicity: a direct DB session reuses the existing connection-pooled async engine with no
+   extra hop; an internal HTTP endpoint would add a self-referential network round trip and a new
+   internal-only route to secure, for what is really just a local read. New
+   `backend/app/ai/tools/db.py` exposes `get_tool_session()` — a plain function (not a FastAPI
+   dependency) that tool code calls directly. Tests patch `get_tool_session` itself (via
+   `unittest.mock.patch`), since ADK tool functions never go through FastAPI's request cycle and so
+   can't be reached by `app.dependency_overrides`.
+
+A third decision surfaced only once implementation started, not anticipated in the original Design
+section: `search_cards`'s `query` argument is live Scryfall search syntax (`t:creature c:red`, ...),
+and reproducing that whole grammar against Postgres is a real sub-project on its own, not something
+to bolt on here. Scoped down safely: the local cache only serves **plain name-substring queries**;
+anything containing a Scryfall `key:value` operator skips the cache and goes straight to live
+Scryfall, so results stay correct for complex queries at the cost of not caching them. Revisit only
+if the operator-query volume turns out to be high enough to matter.
 
 ### Design
 
@@ -573,6 +614,36 @@ the actual remaining gap this phase closes.
   have had a legality change since the app's last lazy `sync_cards` cache of it.
 - Re-run the ingestion container twice in a row — confirm it's a safe upsert (no duplicate rows,
   no FK breakage against existing `DeckCard` references).
+
+### Shipped: ingestion + tool wiring done, scheduling deliberately not
+
+Built per the interview outcome above. `backend/app/ai/ingestion/scryfall_ingestion.py`:
+`fetch_bulk_data_uri()` looks up the current `default_cards` download URL from Scryfall's
+`/bulk-data` endpoint (rotates daily, so it's always looked up fresh, never hardcoded);
+`download_bulk_cards()` fetches and parses it; `upsert_cards()` batches rows (1000/batch), splits
+each batch into already-existing IDs (one bulk `UPDATE` via SQLAlchemy's executemany-style
+ORM update) vs. new IDs (`session.add_all`) — deliberately plain ORM operations rather than a
+Postgres-specific `ON CONFLICT` upsert, so the same code path is exercised by the SQLite test
+engine, not just Postgres in production. `run_ingestion()` wires it together; entry point is
+`uv run python -m app.ai.ingestion.scryfall_ingestion`, run by hand, not wired into any container
+command or scheduler.
+
+`backend/app/ai/tools/db.py` (new) is the tool-side DB session seam from decision 2 above.
+`search_cards` (`backend/app/ai/tools/cards.py`) now tries a local `Card.name ILIKE` lookup first
+for any query without a Scryfall operator, falling back to live Scryfall on a miss or on operator
+syntax — the scope-narrowing decision recorded above. Caught and fixed a real regression while
+implementing this: three pre-existing `search_cards` tests didn't patch the new DB seam, so they
+started trying to hit real Postgres the moment `search_cards` gained its local-first read path
+(same class of failure this phase's own "Why this one" section already predicted from the Phase 1
+attempt) — fixed by patching `get_tool_session` in those tests too, using the existing SQLite
+`db_session` fixture. `cd backend && uv run pytest` (79 passed) and `uv run ruff check .` both
+clean.
+
+**Not done**: the scheduling half of the original two-problem framing ("Staleness"/"Scale" above).
+Running `run_ingestion()` once now populates/refreshes the cache, but nothing keeps it refreshed
+automatically — by design, per the interview decision, until there's a real deployment target.
+Also not done: Docker Compose service shape was never decided because there's no new service to
+place — the "manual script" decision made that whole sub-question moot for now.
 
 ---
 

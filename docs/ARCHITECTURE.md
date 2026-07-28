@@ -58,9 +58,16 @@ Kept here deliberately so this doc doesn't silently go stale again the way its p
   library/hand/battlefield/graveyard/exile state, structured actions, mini-playmat UI) are both
   built — see the `goldfish` router above. 3c (rules-aware legality/resolution) is not — see
   `PLAN.md`'s Phase 3 for the staged design.
-- **Scryfall bulk-data ingestion pipeline**: all Scryfall access today is either live per-request
-  (`search_cards`) or a lazy, never-refreshed cache (`sync_cards`) — no scheduled job keeps the
-  local `Card` table current against Scryfall's own bulk-data dumps. Means legality data can go
-  stale after a card is first synced, and `search_cards` for cards not already in a deck still
-  means a live Scryfall round trip. See `PLAN.md`'s Phase 4 for the planned design (a separate
-  ingestion container/service, not bolted onto the API).
+- **Scryfall bulk-data ingestion — refresh script built, scheduling still open**:
+  `backend/app/ai/ingestion/scryfall_ingestion.py`'s `run_ingestion()` pulls Scryfall's
+  `default_cards` bulk file and upserts it into the local `Card` table (batched insert/update, not
+  the one-row-at-a-time pattern `sync_cards` uses). `search_cards` (`backend/app/ai/tools/cards.py`)
+  now checks that local cache first for plain name queries via a dedicated tool-side DB session
+  (`backend/app/ai/tools/db.py` — ADK tools have no FastAPI-style DI, so this can't reuse
+  `Depends(get_db)`), falling back to a live Scryfall call when the cache misses or the query uses
+  Scryfall's `key:value` operator syntax (`t:`, `c:`, `f:`, ...), which the local cache doesn't
+  replicate. **Still open**: the script is run by hand (`uv run python -m
+  app.ai.ingestion.scryfall_ingestion`), not on any schedule — deferred until there's a real
+  deployment target to schedule against (see Deferred in `PLAN.md`). Until it's run at least once,
+  or if a card isn't in the bulk snapshot yet, `search_cards` transparently falls back to live
+  Scryfall exactly as before.
