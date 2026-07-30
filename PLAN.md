@@ -661,9 +661,27 @@ here so it isn't forgotten, not because it's next:
   undetected indefinitely under this setup.
 - **Deployment target**: no `fly.toml`/`render.yaml`/Procfile/etc. anywhere — `docker-compose.yml`
   is local-dev only. Nothing to change until there's a decision on where this actually runs.
-- **`mtg-chromadb` container reporting `unhealthy`**: predates Phase 0's changes, unrelated to
-  anything done there, still unresolved. Worth a look before it's load-bearing for a public
-  feature.
+
+### Fixed: `mtg-chromadb` container reporting `unhealthy` (2026-07-30)
+
+Root cause, confirmed via `docker inspect mtg-chromadb`'s health-check log, not guessed: the
+`chromadb/chroma` image has no `curl` (or `wget`/`python`) in it at all — `docker-compose.yml`'s
+healthcheck (`CMD curl -f http://localhost:8000/api/v2/heartbeat`) failed at the exec step every
+time (`exec: "curl": executable file not found in $PATH`), regardless of whether Chroma itself was
+actually healthy. The container was serving requests fine the whole time (confirmed: RAG queries
+through `rules_agent` worked) — this was purely a broken health probe, not a broken service.
+
+**Fix**: replaced the `curl`-based check with a raw HTTP GET over bash's `/dev/tcp` (bash is
+present in the image; nothing else needed to be installed):
+```
+bash -c 'exec 3<>/dev/tcp/127.0.0.1/8000 && printf "GET /api/v2/heartbeat HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 && head -1 <&3 | grep -q 200'
+```
+Verified: `docker compose up -d chromadb` recreated the container, `docker inspect`'s
+`.State.Health.Status` went to `healthy` within one interval and stayed there (`FailingStreak: 0`
+after a minute), and the backend's own health endpoint plus a direct heartbeat call from inside the
+backend container to `chromadb:8000` both still succeed — the fix only touched the probe, not
+connectivity. Backend's own `curl`-based healthcheck (`backend` service, different image, one that
+actually has `curl` installed) was unaffected and left as-is.
 
 ---
 
