@@ -677,9 +677,15 @@ Production-readiness was considered and deliberately deprioritized behind featur
 here so it isn't forgotten, not because it's next:
 
 - **Real auth**: `POST /auth/login` is a placeholder; `get_current_user`
-  (`backend/app/api/deps.py`) auto-creates/returns a dev user for every request, no Google ID
-  token verification. `docs/auth_specs.md` has the design. Fine for local/dev use; would need to
-  happen before any real user ever hits this.
+  (`backend/app/api/deps.py`) ignores any bearer token entirely and always returns the first `User`
+  row in the DB (auto-creating one if none exists). The frontend's "Sign In" button
+  (`MainLayout.tsx`) calls `login("mock-jwt-token")` — a hardcoded string, no real Google OAuth
+  flow exists yet. Net effect: **the app is currently single-tenant** — every browser/session
+  shares the same one user's decks/collection/goldfish data, not just "auth is unverified."
+  `docs/auth_specs.md` has the unimplemented design. **Explicitly gated on the user's own
+  judgment**, confirmed 2026-08-04: release to friends/family happens whenever they personally deem
+  the app "complete and finished," not on a fixed date — real auth is a pre-release blocker at that
+  point, not something to build proactively before then.
 - **CI**: only Renovate (dependency bumps) runs in `.github/workflows/` — nothing runs
   `pytest`/`ruff`/`eslint` on PRs. The pytest-collection break fixed in Phase 0 could sit
   undetected indefinitely under this setup.
