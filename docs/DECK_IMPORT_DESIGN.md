@@ -1,5 +1,12 @@
 # Deck Import Feature Design
 
+> **Status: implemented (2026-07-08).** `POST /api/v1/decks/import` and `DeckImportModal` both
+> exist and match this design, with one refinement decided during implementation: partial
+> failures are best-effort (matching this doc's own suggested default) *and* each unresolved
+> line gets a "search for a replacement" path — reusing `DeckBuilderSearch` in `DeckBuilder.tsx`
+> rather than a new reconciliation screen. See `backend/app/services/deck_import.py` and
+> `backend/app/api/routes/decks.py`'s `/import` route for the actual implementation.
+
 This document outlines the design for importing decks via text paste (MTGA format).
 
 ## 1. Feature Overview

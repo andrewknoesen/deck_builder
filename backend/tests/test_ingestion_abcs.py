@@ -1,24 +1,19 @@
 from typing import Any, Dict, List, Optional
 
 import pytest
-from app.ai.ingestion.base import (
-    ContentSplitter,
-    IngestionDocument,
-    IngestionSource,
-    SectionParser,
-)
+from app.ai.ingestion.base import IngestionDocument, SectionParser
 from app.ai.types import PipelineContext, ProcessedChunk
 from app.ai.vector_store.base import EmbeddingModel, VectorStore
 
-# --- Mock Implementations for ABCs ---
+# --- Mocks ---
 
 
-class MockSource(IngestionSource):
+class MockSource:
     def load(self, context: PipelineContext) -> IngestionDocument:
         return IngestionDocument(content="test content", source_id="test_source")
 
 
-class MockSplitter(ContentSplitter):
+class MockSplitter:
     def split(
         self, document: IngestionDocument, context: PipelineContext
     ) -> List[IngestionDocument]:
@@ -111,8 +106,8 @@ def test_mock_implementations():
 
 def test_abc_enforcement():
     # Ensure standard ABC behavior: cannot instantiate without implementing abstract methods
-    class IncompleteSource(IngestionSource):
+    class IncompleteParser(SectionParser):
         pass
 
     with pytest.raises(TypeError):
-        IncompleteSource()
+        IncompleteParser()

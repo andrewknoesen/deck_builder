@@ -1,6 +1,10 @@
 
 # Implementation Guide: MTG Rules Ingestion Pipeline
 
+> **Status: directionally accurate, details drifted (2026-07-08).** See the status note in
+> `rules_ingestion_pipeline.md` — the standalone `rules_parser.py` module described below was
+> never split out; parsing lives inline in `backend/app/ai/ingestion/rules_ingestion.py`.
+
 This guide details how to build the rules ingestion pipeline designed in `rules_ingestion_pipeline.md`.
 
 ## Prerequisites

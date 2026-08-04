@@ -14,26 +14,6 @@ class IngestionDocument(BaseModel):
     source_id: str
 
 
-class IngestionSource(ABC):
-    """Abstract base class for data sources (e.g., file, URL, database)."""
-
-    @abstractmethod
-    def load(self, context: PipelineContext) -> IngestionDocument:
-        """Loads data from the source and returns an IngestionDocument."""
-        pass
-
-
-class ContentSplitter(ABC):
-    """Abstract base class for splitting documents into major sections (e.g., Rules vs Glossary)."""
-
-    @abstractmethod
-    def split(
-        self, document: IngestionDocument, context: PipelineContext
-    ) -> List[IngestionDocument]:
-        """Splits a single document into multiple logical sections."""
-        pass
-
-
 class SectionParser(ABC):
     """Abstract base class for parsing sections into granular chunks (e.g., individual rules)."""
 

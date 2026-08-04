@@ -1,99 +1,73 @@
-# MTG Deck Builder - Architecture Design
+# MTG Deck Builder - Architecture
 
-## 1. Architecture Overview
+Reflects the actual current implementation as of `feature/agent_factory` (2026-07-08). This
+replaces the earlier `ARCHITECTURE.md`/`AI_ARCHITECTURE.md`, which were pre-implementation
+planning docs describing features (a `DeckAdvisorAgent` chat widget with `search_cards`/
+`get_deck_stats` tools) that were never built as specified.
 
-The system is a containerized web application designed to help users build and manage Magic: The Gathering decks.
+## 1. Overview
 
-- **Frontend**: A React application (TypeScript) serving as the UI. It handles authentication state, deck building interactions, and stats visualization. It leverages `react-query` or similar for state management and caching Scryfall/local API responses.
-- **Backend API**: A Python FastAPI service acting as the single source of truth for user decks and user data. It proxies or orchestrates calls to Scryfall for card data to avoid direct heavy lifting on the client, or simply validates card IDs stored in decks.
-- **Database**: The backend is designed to be database-agnostic but will start with a persistent SQL store (SQLite/Postgres) to save User and Deck relationships.
-- **Data Source**: Scryfall API is the authority for Card data. Our backend only stores card identifiers (Scryfall IDs) and metadata (quantities, board location) within decks, fetching full card details on demand or caching them.
-- **Authentication**: Google OAuth via the Google SDK on the frontend. ID tokens are sent to the backend, which verifies them and manages the user session/user creation.
+- **Frontend**: React 18 + TypeScript + Vite, styled with Tailwind and MUI. Talks to the backend
+  REST API and renders deck-building UI, stats, and an agent chat page.
+- **Backend**: FastAPI service, the single source of truth for user/deck data. Proxies card data
+  from Scryfall rather than storing full card details.
+- **Database**: SQLModel (SQLAlchemy + Pydantic) ORM. Default `DATABASE_URL` is Postgres via
+  `asyncpg`; async SQLite is used in tests. Migrations via Alembic (`backend/alembic/`).
+- **Card data**: Scryfall API is the sole authority — see `backend/app/services/scryfall.py`
+  (`ScryfallService`, async `httpx` client). Never hallucinate card data.
+- **AI / Agent layer**: Google ADK. See `backend/app/ai/README.md` for the full breakdown. Two
+  agents exist — `rules_agent`, an L3-judge agent with rules/glossary/ruling-lookup tools backed
+  by a Chroma-indexed RAG over the MTG comprehensive rules; and `deck_advisor_agent`, which
+  suggests additions/cuts for a specific deck using a stateless `search_cards` Scryfall tool plus
+  deck stats/list folded into its prompt context (no DB-aware tools — see
+  `backend/app/ai/agents/deck_advisor/deck_advisor_agent.py`). Both are built via the shared
+  `make_agent` factory in `backend/app/ai/agents/factory.py`.
+- **Auth**: Google OAuth is the intended flow (ID token from the frontend, verified on the
+  backend), but `backend/app/api/deps.py:get_current_user` is currently a **dev-mode stub** — it
+  does not verify Google ID tokens yet; it returns/creates a placeholder dev user. Real ID token
+  verification is a TODO, not implemented.
 
 ## 2. Directory Structure
 
-```text
-/
-├── docker-compose.yml          # Orchestration for all services
-├── .env.example                # Template for environment variables
-├── /frontend                   # React Application
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── /src
-│   │   ├── /components         # Reusable UI components
-│   │   ├── /pages              # Page views
-│   │   ├── /api                # API client layer
-│   │   ├── /hooks              # Custom hooks (e.g. useAuth, useDeck)
-│   │   └── /types              # Shared TypeScript interfaces
-│   └── /public
-├── /backend                    # FastAPI Application
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── /app
-│   │   ├── main.py             # Entry point
-│   │   ├── /api                # Route handlers (v1/)
-│   │   ├── /core               # Config, security, database objects
-│   │   ├── /models             # Pydantic models & SQLAlchemy models
-│   │   ├── /services           # Business logic (Scryfall, Deck ops)
-│   │   └── /tests              # Pytest suite
-└── /infra                      # Infrastructure configurations (Nginx, etc. if needed)
-```
+See the root `CLAUDE.md` for the maintained directory tree — it's kept current there rather than
+duplicated here.
 
-## 3. API Design
+## 3. API
 
-Base URL: `/api/v1`
+Base URL: `/api/v1` (mounted in `backend/app/api/api.py`).
 
-### Authentication
-- `POST /api/v1/auth/login`: Accepts Google ID token. Returns access token (or sets session cookie) and user info.
-- `GET /api/v1/users/me`: Returns current user profile.
+| Router | Prefix | Notes |
+|---|---|---|
+| `auth` | `/auth` | `POST /login` |
+| `users` | `/users` | `POST /`, `GET /me` |
+| `cards` | `/cards` | `GET /search`, `GET /{card_id}` — Scryfall proxy |
+| `decks` | `/decks` | Full CRUD + `GET /{deck_id}/stats` + `POST /import` (paste-text import, best-effort — see `backend/app/services/deck_import.py`) |
+| `collection` | `/collection` | Full CRUD for a user's card collection |
+| `ai` | `/ai` | `POST /chat` (wired to `rules_agent`), `POST /suggest` (wired to `deck_advisor_agent`; takes `deck_id` + `query`, ownership-checked like every other deck route) |
+| `goldfish` | `/goldfish` | `POST /sessions` (auto-creates a shuffled "Game start" root node), `GET /sessions?deck_id=`, `GET /sessions/{id}` (flat node list, client builds the tree), `POST /sessions/{id}/nodes` (free-text label/trackers, or a structured `action` — draw/play_land/cast/move_zone/set_life — applied server-side against the parent's `state`), `DELETE /nodes/{id}` (cascades to descendants) — practice-mode branching action tree + assisted simulator, Phase 3a+3b |
 
-### Cards (Proxy/Cache Scryfall)
-- `GET /api/v1/cards/search?q={query}`: Proxy to Scryfall search or local cache.
-- `GET /api/v1/cards/{id}`: Get detailed card info.
+For exact request/response shapes, read the router file directly (`backend/app/api/routes/`) and
+its paired schema in `backend/app/schemas/` — they're the source of truth, not this doc.
 
-### Decks
-- `GET /api/v1/decks`: List user's decks.
-- `POST /api/v1/decks`: Create a new deck. Body: `{ name: string, format: string }`.
-- `GET /api/v1/decks/{id}`: Get full deck details including cards.
-- `PUT /api/v1/decks/{id}`: Update deck metadata.
-- `DELETE /api/v1/decks/{id}`: Delete a deck.
+## 4. What's not built yet
 
-### Deck Cards
-- `POST /api/v1/decks/{id}/cards`: Add card to deck. Body: `{ scryfall_id: string, quantity: int, board: 'main'|'side' }`.
-- `PUT /api/v1/decks/{id}/cards/{card_id}`: Update quantity/board.
-- `DELETE /api/v1/decks/{id}/cards/{card_id}`: Remove card.
+Kept here deliberately so this doc doesn't silently go stale again the way its predecessor did:
 
-### AI Assistant
-- `POST /api/v1/ai/suggest`: Get card suggestions. Body: `{ deck_context: [...], query: string }`.
-- `POST /api/v1/ai/chat`: Simple chat interface for deck building advice.
-
-## 4. Agent Task Allocation
-
-### 1. DevOps Agent (Priority: High)
-- [ ] Create root `docker-compose.yml`.
-- [ ] Create `frontend/Dockerfile` (React + Nginx/Node).
-- [ ] Create `backend/Dockerfile` (Python 3.11+).
-- [ ] Ensure hot-reloading works for local development.
-
-### 2. Backend Agent (Priority: High)
-- [ ] Initialize FastAPI project structure.
-- [ ] Implement `User` and `Deck` SQLAlchemy models.
-- [ ] Create Pydantic schemas for API requests/responses.
-- [ ] Implement Google ID Token verification middleware.
-- [ ] Build CRUD endpoints for Decks.
-- [ ] Implement Scryfall integration service.
-- [ ] Implement AI Service (LLM integration).
-
-### 3. Frontend Agent (Priority: Medium)
-- [ ] Initialize React + TypeScript + Vite project.
-- [ ] Setup API client (axios/fetch) with interceptors for auth.
-- [ ] Implement Google Login button and auth context.
-- [ ] Create Deck List view.
-- [ ] Create Deck Builder view (Search pane + Deck pane).
-- [ ] Implement Mana Curve visualization.
-
-### 4. Integrations Agent (Priority: Low)
-- [ ] Refine Scryfall search (filters, sorting).
-- [ ] Add Pricing API integration.
-- [ ] Enhance Auth flow (refresh tokens, profile pictures).
+- **Real Google ID token verification**: see the Auth note above.
+- **Practice Mode / goldfishing, 3c**: 3a (manual action log + branching tree) and 3b (real
+  library/hand/battlefield/graveyard/exile state, structured actions, mini-playmat UI) are both
+  built — see the `goldfish` router above. 3c (rules-aware legality/resolution) is not — see
+  `PLAN.md`'s Phase 3 for the staged design.
+- **Scryfall bulk-data ingestion — refresh script built, scheduling still open**:
+  `backend/app/ai/ingestion/scryfall_ingestion.py`'s `run_ingestion()` pulls Scryfall's
+  `default_cards` bulk file and upserts it into the local `Card` table (batched insert/update, not
+  the one-row-at-a-time pattern `sync_cards` uses). `search_cards` (`backend/app/ai/tools/cards.py`)
+  now checks that local cache first for plain name queries via a dedicated tool-side DB session
+  (`backend/app/ai/tools/db.py` — ADK tools have no FastAPI-style DI, so this can't reuse
+  `Depends(get_db)`), falling back to a live Scryfall call when the cache misses or the query uses
+  Scryfall's `key:value` operator syntax (`t:`, `c:`, `f:`, ...), which the local cache doesn't
+  replicate. **Still open**: the script is run by hand (`uv run python -m
+  app.ai.ingestion.scryfall_ingestion`), not on any schedule — deferred until there's a real
+  deployment target to schedule against (see Deferred in `PLAN.md`). Until it's run at least once,
+  or if a card isn't in the bulk snapshot yet, `search_cards` transparently falls back to live
+  Scryfall exactly as before.

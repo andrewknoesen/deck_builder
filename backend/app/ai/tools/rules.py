@@ -10,6 +10,8 @@ def query_comprehensive_rules(query: str) -> str:
     logger.info(f"Tool 'query_comprehensive_rules' called with query: '{query}'")
     # docs = get_rules_rag().query(query, k=5)
     docs = rules_rag.query(query, k=5)
+    logger.info(f"Found {len(docs)} rules for '{query}'.")
+    logger.info(f"Rules: {docs}")
     if not docs:
         return "No relevant rules found in the Comprehensive Rules."
 
@@ -22,6 +24,8 @@ def lookup_glossary_term(term: str) -> str:
     """
     logger.info(f"Tool 'lookup_glossary_term' called with term: '{term}'")
     docs = rules_rag.query_glossary(term, k=3)
+    logger.info(f"Found {len(docs)} glossary entries for '{term}'.")
+    logger.info(f"Entries: {docs}")
     if not docs:
         return f"No glossary entry found for '{term}'."
 

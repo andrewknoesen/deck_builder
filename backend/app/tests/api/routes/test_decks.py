@@ -1,8 +1,22 @@
+from unittest.mock import AsyncMock
+
 import pytest
+from app.api.deps import get_current_user
 from app.core.config import settings
+from app.main import app
 from app.models.user import User
+from app.services.scryfall import get_scryfall_service
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+
+
+@pytest.fixture(autouse=True)
+def mock_scryfall():
+    mock = AsyncMock()
+    mock.get_cards_by_ids.return_value = []
+    app.dependency_overrides[get_scryfall_service] = lambda: mock
+    yield mock
+    app.dependency_overrides.pop(get_scryfall_service, None)
 
 
 @pytest.mark.asyncio
@@ -89,3 +103,43 @@ async def test_get_deck_by_id(client: AsyncClient, db_session: AsyncSession) -> 
     data = response.json()
     assert data["title"] == "Solo Deck"
     assert data["id"] == deck_id
+
+
+@pytest.mark.asyncio
+async def test_cannot_access_another_users_deck(client: AsyncClient, db_session: AsyncSession) -> None:
+    owner = User(email="owner@example.com", google_sub="owner_sub", full_name="Owner")
+    other = User(email="other@example.com", google_sub="other_sub", full_name="Other")
+    db_session.add(owner)
+    db_session.add(other)
+    await db_session.commit()
+    await db_session.refresh(owner)
+    await db_session.refresh(other)
+
+    # Create a deck as the owner (get_current_user's dev stub returns the first
+    # user in the db, so it resolves to `owner` here since no override is set yet)
+    create_res = await client.post(
+        f"{settings.API_V1_STR}/decks/", json={"title": "Private Deck", "user_id": owner.id}
+    )
+    deck_id = create_res.json()["id"]
+
+    # Now act as `other`
+    app.dependency_overrides[get_current_user] = lambda: other
+    try:
+        read_res = await client.get(f"{settings.API_V1_STR}/decks/{deck_id}")
+        assert read_res.status_code == 403
+
+        update_res = await client.put(
+            f"{settings.API_V1_STR}/decks/{deck_id}", json={"title": "Hijacked"}
+        )
+        assert update_res.status_code == 403
+
+        delete_res = await client.delete(f"{settings.API_V1_STR}/decks/{deck_id}")
+        assert delete_res.status_code == 403
+
+        stats_res = await client.get(f"{settings.API_V1_STR}/decks/{deck_id}/stats")
+        assert stats_res.status_code == 403
+
+        list_res = await client.get(f"{settings.API_V1_STR}/decks/")
+        assert all(d["id"] != deck_id for d in list_res.json())
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)

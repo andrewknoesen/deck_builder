@@ -35,7 +35,6 @@ class ChromaVectorStore(VectorStore):
         if not chunks:
             return
 
-        ids = [c.id for c in chunks]
         # Ensure embeddings exist
         valid_chunks = [c for c in chunks if c.embedding is not None]
         if len(valid_chunks) != len(chunks):
@@ -46,6 +45,7 @@ class ChromaVectorStore(VectorStore):
         if not valid_chunks:
             return
 
+        ids = [c.id for c in valid_chunks]
         embeddings: Any = [c.embedding for c in valid_chunks]
         texts = [c.text for c in valid_chunks]
         metadatas: Any = [c.metadata for c in valid_chunks]

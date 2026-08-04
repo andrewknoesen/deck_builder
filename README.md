@@ -51,9 +51,10 @@ uv run pytest
 - `docker-compose.yml`: Orchestrates the backend, frontend, and database volumes.
 - `bin/`: Helper utility scripts for development and orchestration.
 - `docs/`: Architecture diagrams, technical specifications, and design documents.
-- `references/`: Essential reference materials, like the Magic: The Gathering comprehensive rules.
-- `.agent/`: Workflows and instructions for the Google Agent Development Kit framework.
-- `backups/`: Database backups and snapshot points.
+- `references/`: Local scratch space for reference materials (gitignored). The MTG comprehensive
+  rules text is fetched automatically at ingestion time by
+  `backend/app/ai/ingestion/rules_ingestion.py` — nothing here needs to be committed.
+- `.claude/commands/`: Claude Code slash commands (persona workflows, dev conventions).
 
 ## 🛠️ Utility Scripts
 

@@ -1,9 +1,10 @@
 import pytest
 from httpx import AsyncClient
-from app.models.deck import Deck
+from unittest.mock import AsyncMock
 from app.models.card import Card
 from app.models.user import User
 from app.main import app
+from app.services.scryfall import get_scryfall_service
 
 # Mock data for tests
 MOCK_DECK_WITH_STATS = {
@@ -25,9 +26,6 @@ MOCK_DECK_WITH_STATS = {
         {"card_id": "plains-1", "quantity": 5, "board": "side"},
     ]
 }
-
-from unittest.mock import AsyncMock
-from app.services.scryfall import get_scryfall_service
 
 @pytest.fixture
 def mock_scryfall():

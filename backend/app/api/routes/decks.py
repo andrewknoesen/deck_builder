@@ -1,5 +1,6 @@
 from typing import List
 
+from app.api.deps import get_current_user
 from app.core.db import get_db
 from app.models.card import Card
 from app.models.deck import (
@@ -9,7 +10,11 @@ from app.models.deck import (
     DeckPublic,
     DeckUpdate,
 )
+from app.models.user import User
+from app.schemas.deck_import import DeckImportRequest, DeckImportResponse
+from app.services.deck_import import parse_decklist, resolve_entries
 from app.services.scryfall import ScryfallService, get_scryfall_service
+from app.services.stats import calculate_stats
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -88,13 +93,16 @@ async def sync_cards(db: AsyncSession, card_ids: List[str], scryfall: ScryfallSe
 @router.get("/", response_model=List[DeckPublic])
 async def read_decks(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Retrieve decks (fast, from local DB).
     """
     # Eager load cards AND the nested card definition
     result = await db.execute(
-        select(Deck).options(
+        select(Deck)
+        .where(Deck.user_id == current_user.id)
+        .options(
             selectinload(Deck.cards).selectinload(DeckCard.card)  # type: ignore[arg-type]
         )
     )
@@ -107,6 +115,7 @@ async def create_deck(
     deck_in: DeckCreate,
     db: AsyncSession = Depends(get_db),
     scryfall: ScryfallService = Depends(get_scryfall_service),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Create new deck. Safely syncs cards to local DB first.
@@ -117,7 +126,9 @@ async def create_deck(
         await sync_cards(db, card_ids, scryfall)
 
     # 2. Create Deck
-    db_deck = Deck.model_validate(deck_in, update={"cards": []})
+    db_deck = Deck.model_validate(
+        deck_in, update={"cards": [], "user_id": current_user.id}
+    )
 
     # 3. Create DeckCards
     if deck_in.cards:
@@ -139,10 +150,50 @@ async def create_deck(
     return result.scalar_one()
 
 
+@router.post("/import", response_model=DeckImportResponse)
+async def import_deck(
+    import_in: DeckImportRequest,
+    db: AsyncSession = Depends(get_db),
+    scryfall: ScryfallService = Depends(get_scryfall_service),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Import a deck from pasted text (simple list or MTGA export format).
+    Best-effort: cards that can't be resolved are reported as warnings
+    instead of failing the whole import.
+    """
+    parsed = parse_decklist(import_in.text)
+    resolved, missing = await resolve_entries(parsed.entries, scryfall)
+
+    # Merge duplicate (card_id, board) pairs so a repeated line in the pasted
+    # text can't violate DeckCard's (deck_id, card_id, board) primary key.
+    merged: dict[tuple[str, str], int] = {}
+    for entry in resolved:
+        key = (entry.card_id, entry.board)
+        merged[key] = merged.get(key, 0) + entry.quantity
+
+    if merged:
+        await sync_cards(db, [card_id for card_id, _ in merged], scryfall)
+
+    title = import_in.name or parsed.name or "Imported Deck"
+    db_deck = Deck(title=title, user_id=current_user.id)
+    db_deck.cards = [
+        DeckCard(card_id=card_id, quantity=quantity, board=board)
+        for (card_id, board), quantity in merged.items()
+    ]
+
+    db.add(db_deck)
+    await db.commit()
+    await db.refresh(db_deck)
+
+    return DeckImportResponse(id=db_deck.id, title=db_deck.title, missing_cards=missing)
+
+
 @router.get("/{deck_id}", response_model=DeckPublic)
 async def read_deck(
     deck_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get deck by ID (fast).
@@ -155,6 +206,8 @@ async def read_deck(
     deck = result.scalar_one_or_none()
     if not deck:
         raise HTTPException(status_code=404, detail="Deck not found")
+    if deck.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     return deck
 
 
@@ -164,6 +217,7 @@ async def update_deck(
     deck_in: DeckUpdate,
     db: AsyncSession = Depends(get_db),
     scryfall: ScryfallService = Depends(get_scryfall_service),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Update deck. Syncs new cards if added.
@@ -174,6 +228,8 @@ async def update_deck(
     db_deck = result.scalar_one_or_none()
     if not db_deck:
         raise HTTPException(status_code=404, detail="Deck not found")
+    if db_deck.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
 
     # Sync any new cards in the update payload
     if deck_in.cards:
@@ -221,7 +277,11 @@ async def update_deck(
 
 
 @router.delete("/{deck_id}")
-async def delete_deck(deck_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_deck(
+    deck_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
     Delete deck.
     """
@@ -229,18 +289,18 @@ async def delete_deck(deck_id: int, db: AsyncSession = Depends(get_db)):
     deck = result.scalar_one_or_none()
     if not deck:
         raise HTTPException(status_code=404, detail="Deck not found")
+    if deck.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     await db.delete(deck)
     await db.commit()
     return {"status": "ok"}
-
-
-from app.services.stats import DeckStatsService
 
 
 @router.get("/{deck_id}/stats")
 async def get_deck_stats(
     deck_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get deck statistics.
@@ -253,6 +313,8 @@ async def get_deck_stats(
     deck = result.scalar_one_or_none()
     if not deck:
         raise HTTPException(status_code=404, detail="Deck not found")
-        
-    stats = DeckStatsService.calculate_stats(deck)
+    if deck.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    stats = calculate_stats(deck)
     return stats

@@ -1,5 +1,10 @@
 # Authentication Architecture & Implementation Guide
 
+> **Status: not implemented (2026-07-08).** `POST /api/v1/auth/login` is currently a placeholder
+> (`backend/app/api/routes/auth.py`) and `get_current_user`
+> (`backend/app/api/deps.py`) is a dev-mode stub that returns/creates a default user rather than
+> verifying a Google ID token. This doc describes the intended design, not current behavior.
+
 This document outlines the architecture for Google OAuth implementation and assigns tasks to specific agent workflows.
 
 ## Architecture Overview

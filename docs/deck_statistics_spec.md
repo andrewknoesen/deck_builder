@@ -1,5 +1,11 @@
 # MTG Deck Statistics Specification
 
+> **Status: implemented (2026-07-08).** The formulas here (mana curve, pip counts, Karsten's
+> heuristic for recommended sources, draw-probability odds) match
+> `backend/app/services/stats.py::calculate_stats`, exposed via `GET /api/v1/decks/{deck_id}/stats`.
+> Treat this doc as the math reference; the exact response envelope may have drifted slightly —
+> check the schema in `backend/app/schemas/` for the current contract.
+
 This document defines the mathematical formulas, algorithms, and data structures required to implement the "Deck Stats" feature. It is intended for the Backend Engineer (FastAPI) and Frontend Engineer (React).
 
 ## 1. Mana Curve

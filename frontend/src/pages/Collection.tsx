@@ -20,7 +20,7 @@ import { apiClient } from '../api/client';
 import type { ScryfallCard, CollectionCard } from '../types/mtg';
 import { DeckBuilderSearch } from '../components/DeckBuilderSearch';
 import { CollectionCardComponent } from '../components/CollectionCardComponent';
-import { useCardHover } from "../context/CardHoverContext";
+import { useCardHover } from "../context/useCardHover";
 
 // Helper to determine primary type for grouping (reused logic)
 const getCardType = (typeLine?: string): string => {

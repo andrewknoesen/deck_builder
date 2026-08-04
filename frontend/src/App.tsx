@@ -5,6 +5,8 @@ import { DeckBuilder } from "./pages/DeckBuilder";
 import { LandingPage } from "./pages/LandingPage";
 import { Collection } from "./pages/Collection";
 import { AgentChat } from "./pages/AgentChat";
+import { Goldfish } from "./pages/Goldfish";
+import { GoldfishSessionPage } from "./pages/GoldfishSessionPage";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 import { theme } from "./theme";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -37,6 +39,8 @@ function App() {
                   <Route path="/decks/:deckId" element={<DeckBuilder />} />
                   <Route path="/decks/new" element={<DeckBuilder />} />
                   <Route path="/agents" element={<AgentChat />} />
+                  <Route path="/goldfish" element={<Goldfish />} />
+                  <Route path="/goldfish/:sessionId" element={<GoldfishSessionPage />} />
                 </Routes>
                 <CardHoverPreview />
               </MainLayout>

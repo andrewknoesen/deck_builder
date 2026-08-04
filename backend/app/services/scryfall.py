@@ -1,5 +1,4 @@
 from app.core.logging import setup_logging
-from logging import getLogger
 from typing import Any, Dict, List
 
 import httpx
@@ -30,6 +29,16 @@ class ScryfallService:
         response.raise_for_status()
         data = response.json()
         return data.get("data", [])
+
+    async def get_collection(self, identifiers: List[Dict[str, str]]) -> Dict[str, Any]:
+        """
+        Batch lookup by arbitrary identifiers (name, or set+collector_number).
+        Scryfall accepts up to 75 identifiers per request and returns
+        {"data": [...found cards...], "not_found": [...unmatched identifiers...]}.
+        """
+        response = await self.client.post("/cards/collection", json={"identifiers": identifiers})
+        response.raise_for_status()
+        return response.json()
     async def get_card_rulings(self, card_id: str) -> List[Dict[str, Any]]:
         response = await self.client.get(f"/cards/{card_id}/rulings")
         response.raise_for_status()

@@ -3,7 +3,7 @@ import { Card, CardMedia, Box, Typography } from '@mui/material';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import type { ScryfallCard } from '../types/mtg';
 
-import { useCardHover } from "../context/CardHoverContext";
+import { useCardHover } from "../context/useCardHover";
 
 interface SearchCardProps {
     card: ScryfallCard;

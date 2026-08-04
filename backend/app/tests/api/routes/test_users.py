@@ -20,7 +20,10 @@ async def test_create_user(client: AsyncClient, db_session: AsyncSession) -> Non
 
 @pytest.mark.asyncio
 async def test_read_user_me(client: AsyncClient) -> None:
-    # Note: This is currently a placeholder in the API
+    # get_current_user is a dev-mode stub: with no users in the DB it creates
+    # and returns a default dev user.
     response = await client.get(f"{settings.API_V1_STR}/users/me")
     assert response.status_code == 200
-    assert response.json() == {"message": "User me endpoint placeholder"}
+    data = response.json()
+    assert data["email"] == "dev@example.com"
+    assert data["google_sub"] == "dev_sub_12345"

@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Typography, Paper, Grid, Stack, CircularProgress } from "@mui/material";
+import { Box, Typography, Paper, Grid, CircularProgress } from "@mui/material";
 import LightbulbIcon from "@mui/icons-material/Lightbulb";
 import type { DeckStatsResponse } from "../../types/mtg";
 

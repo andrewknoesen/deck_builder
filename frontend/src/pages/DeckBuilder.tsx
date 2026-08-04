@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import "../styles/DeckBuilder.css";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams, useNavigate, Link as RouterLink } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link as RouterLink } from "react-router-dom";
 import {
   Box,
   TextField,
@@ -15,6 +15,7 @@ import {
   Alert,
   Collapse,
   Snackbar,
+  Tooltip,
 } from "@mui/material";
 import {
   validateDeckSize,
@@ -24,16 +25,18 @@ import {
   isValidCommander,
 } from "../utils/deckValidation";
 import BarChartIcon from "@mui/icons-material/BarChart";
+import SmartToyIcon from "@mui/icons-material/SmartToy";
+import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import GridViewIcon from "@mui/icons-material/GridView";
 import { apiClient } from "../api/client";
 import type { ScryfallCard, Deck, DeckCard } from "../types/mtg";
-import { useAuth } from "../context/AuthContext";
 import { DeckCard as DeckCardComponent } from "../components/DeckCard";
 import { DeckStats } from "../components/DeckStats";
+import { DeckAdvisor } from "../components/DeckAdvisor";
 import { DeckBuilderSearch } from "../components/DeckBuilderSearch";
 import { useDebounce } from "../hooks/useDebounce";
-import { useCardHover } from "../context/CardHoverContext";
+import { useCardHover } from "../context/useCardHover";
 import { Card, CardMedia } from "@mui/material";
 
 // Helper to determine primary type for grouping
@@ -78,7 +81,7 @@ const FORMATS = [
 export const DeckBuilder: React.FC = () => {
   const { deckId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { hoveredCard } = useCardHover();
 
@@ -88,10 +91,14 @@ export const DeckBuilder: React.FC = () => {
   const [title, setTitle] = useState("New Deck");
   const [format, setFormat] = useState("Commander");
   const [deckCards, setDeckCards] = useState<DeckCard[]>([]);
+  const [rightPaneTab, setRightPaneTab] = useState<"stats" | "advisor">("stats");
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">(
     "saved",
   );
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [missingCards, setMissingCards] = useState<string[]>(
+    (location.state as { missingCards?: string[] } | null)?.missingCards ?? [],
+  );
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -122,10 +129,12 @@ export const DeckBuilder: React.FC = () => {
     enabled: !isNew,
   });
 
-  // Sync remote data to local state when loaded
-  // Sync remote data to local state ONLY on initial load
+  // Sync remote data to local state ONLY on initial load. Intentionally one-shot
+  // (guarded by isInitialLoad) rather than derived, since local state diverges
+  // from the query result the moment the user starts editing.
   useEffect(() => {
     if (deck && isInitialLoad) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTitle(deck.title);
       setFormat(deck.format || "Commander");
       setDeckCards(deck.cards || []);
@@ -135,11 +144,11 @@ export const DeckBuilder: React.FC = () => {
     }
   }, [deck, isNew, isInitialLoad]);
 
-  // Track if we have unsaved changes locally
+  // Mark dirty on any edit after initial load; the auto-save effect below reads
+  // saveStatus to decide whether to fire.
   useEffect(() => {
     if (!isInitialLoad) {
-      // Check if current state differs from debounced (roughly implies typing)
-      // Or simpler: just set to unsaved on any change, and let debounce effect handle save
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSaveStatus("unsaved");
     }
   }, [title, format, deckCards, isInitialLoad]);
@@ -155,7 +164,6 @@ export const DeckBuilder: React.FC = () => {
         const deckData = {
           title: debouncedTitle,
           format: debouncedFormat,
-          user_id: user?.id || 1,
           cards: debouncedCards.map(({ card_id, quantity, board }) => ({
             card_id,
             quantity,
@@ -184,6 +192,11 @@ export const DeckBuilder: React.FC = () => {
     if (saveStatus === "unsaved") {
       saveDeck();
     }
+    // Intentionally keyed only off the debounced values: this should fire once per
+    // settled edit, not on every saveStatus transition it causes, or on deckId/isNew
+    // changing as a result of the navigate() call inside saveDeck. navigate and
+    // queryClient are stable across renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedTitle, debouncedFormat, debouncedCards]);
 
   // Search State removed (now handled by DeckBuilderSearch)
@@ -210,7 +223,7 @@ export const DeckBuilder: React.FC = () => {
         ];
       });
     },
-    [format],
+    [],
   );
 
   const updateQuantity = useCallback((cardId: string, board: string, delta: number) => {
@@ -468,6 +481,26 @@ export const DeckBuilder: React.FC = () => {
                 ))}
               </TextField>
             </Box>
+
+            <Tooltip
+              title={
+                deck?.id
+                  ? "Practice with this deck"
+                  : "Save this deck first to practice with it"
+              }
+            >
+              <span>
+                <IconButton
+                  component={RouterLink}
+                  to={deck?.id ? `/goldfish?deckId=${deck.id}` : "#"}
+                  size="small"
+                  disabled={!deck?.id}
+                  className="deck-builder-practice-btn"
+                >
+                  <SportsEsportsIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
           </Box>
 
           {/* Search Row */}
@@ -484,6 +517,23 @@ export const DeckBuilder: React.FC = () => {
               {totalCards} Cards
             </Typography>
           </Box>
+
+          <Collapse in={missingCards.length > 0}>
+            <Alert
+              severity="warning"
+              className="deck-builder-alert"
+              onClose={() => setMissingCards([])}
+            >
+              {missingCards.length} card{missingCards.length === 1 ? "" : "s"}{" "}
+              from the import couldn't be found and {missingCards.length === 1 ? "was" : "were"}{" "}
+              left out — use the search above to add the right card for each:
+              <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2.5 }}>
+                {missingCards.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </Box>
+            </Alert>
+          </Collapse>
 
           <Collapse in={!validation.valid}>
             {validation.message && (
@@ -573,20 +623,37 @@ export const DeckBuilder: React.FC = () => {
         {/* Main Content (Stats) - active when NO hover */}
         <Box className={`deck-builder-stats ${hoveredCard ? "blurred" : ""}`}>
           <Box className="deck-builder-stats-header">
-            <BarChartIcon color="primary" />
+            <IconButton
+              size="small"
+              onClick={() => setRightPaneTab("stats")}
+              color={rightPaneTab === "stats" ? "primary" : "default"}
+            >
+              <BarChartIcon />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={() => setRightPaneTab("advisor")}
+              color={rightPaneTab === "advisor" ? "primary" : "default"}
+            >
+              <SmartToyIcon />
+            </IconButton>
             <Typography variant="h6" fontWeight="700">
-              Deck Statistics
+              {rightPaneTab === "stats" ? "Deck Statistics" : "Deck Advisor"}
             </Typography>
           </Box>
 
           <Box className="deck-builder-stats-content">
-            <DeckStats
-              cards={deckCards.filter(
-                (c) => c.board === "main" || c.board === "commander",
-              )}
-              deckId={deck ? deck.id : undefined}
-              format={format}
-            />
+            {rightPaneTab === "stats" ? (
+              <DeckStats
+                cards={deckCards.filter(
+                  (c) => c.board === "main" || c.board === "commander",
+                )}
+                deckId={deck ? deck.id : undefined}
+                format={format}
+              />
+            ) : (
+              <DeckAdvisor deckId={deck ? deck.id : undefined} />
+            )}
           </Box>
         </Box>
 

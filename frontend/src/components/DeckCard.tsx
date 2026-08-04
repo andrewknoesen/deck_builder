@@ -14,7 +14,7 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import DeleteIcon from "@mui/icons-material/Delete";
 import type { DeckCard as DeckCardType } from "../types/mtg";
 
-import { useCardHover } from "../context/CardHoverContext";
+import { useCardHover } from "../context/useCardHover";
 
 interface DeckCardProps {
   deckCard: DeckCardType;

@@ -2,7 +2,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from sqlalchemy import select, delete
+from sqlalchemy import select
 
 from app.core.db import get_db
 from app.models.user import User
@@ -54,7 +54,6 @@ async def add_to_collection(
             oracle_text=scryfall_card.get("oracle_text"),
             colors=scryfall_card.get("colors"),
             image_uris=scryfall_card.get("image_uris"),
-            scryfall_uri=scryfall_card.get("scryfall_uri"),
         )
         db.add(card)
         await db.commit()

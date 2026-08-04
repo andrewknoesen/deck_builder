@@ -1,6 +1,14 @@
 
 # MTG Rules Ingestion Pipeline Design
 
+> **Status: directionally accurate, details drifted (2026-07-08).** The real pipeline in
+> `backend/app/ai/ingestion/rules_ingestion.py` matches this design's core shape (ChromaDB +
+> SentenceTransformers + rule-ID regex parsing), but: parser classes (`MtgRuleParser`,
+> `MtgGlossaryParser`) live inline in `rules_ingestion.py` rather than a separate
+> `rules_parser.py`; the embedding model is `BAAI/bge-base-en-v1.5`, not `bge-large`; the Chroma
+> collection is named `mtg_rules`, not `mtg_rules_v2`. Treat this doc as the rationale/design
+> intent, and the source files as ground truth for exact names.
+
 This document outlines the design for the ingestion pipeline of the Magic: The Gathering Comprehensive Rules.
 
 ## Architecture Overview
