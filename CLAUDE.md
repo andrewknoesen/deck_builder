@@ -119,14 +119,19 @@ Rules:
 
 ## Skills
 
-Custom slash commands live in `.claude/commands/`:
+- `/ponytail` (`.claude/commands/`) — Lazy senior dev mode. Enforces YAGNI, stdlib-first, shortest working diff. Use by default unless the task explicitly needs complexity.
 
-- `/ponytail` — Lazy senior dev mode. Enforces YAGNI, stdlib-first, shortest working diff. Use by default unless the task explicitly needs complexity.
-- `/bootstrap` — Coordinator that walks through the other MTG persona workflows in order.
-- `/mtg-architect` — Lead architect persona for high-level design/task breakdown.
-- `/mtg-backend` — Backend FastAPI engineer persona.
-- `/mtg-frontend` — Frontend React engineer persona.
-- `/mtg-devops` — Docker/infra engineer persona.
-- `/mtg-integrations` — Google auth & Scryfall integrations persona.
-- `/mtg-ai-engineer` — ADK agent engineer persona.
-- `/mtg-maths` — MTG deck-stats/math persona (mana curve, draw odds, land counts).
+## Subagent roster
+
+`.claude/agents/` defines a project-specific "team" of subagents — Claude dispatches to the right one(s) automatically based on the task, matched against each agent's `description`. No manual invocation needed; this replaced an earlier set of manually-run `/mtg-*` slash commands and a `/bootstrap` coordinator for exactly that reason. Each agent reads `CLAUDE.md`/`PLAN.md` itself before acting, so this list stays short — see the agent file for the actual grounding and standards.
+
+- `mtg-architect` — cross-cutting design/blueprint (module placement, API/data-model shape, phasing). Read-only; hands off implementation.
+- `mtg-backend` — FastAPI routes, SQLModel models, schemas, services, Alembic migrations.
+- `mtg-frontend` — React/TS pages, components, hooks, API client wiring.
+- `mtg-devops` — Docker Compose, Dockerfiles, health checks, local dev environment.
+- `mtg-integrations` — Scryfall API + the (deliberately stubbed) Google auth integration.
+- `mtg-ai-engineer` — the ADK agent layer (`backend/app/ai/`): agents, tools, RAG, ingestion.
+- `mtg-maths` — deck-statistics domain math (mana curve, draw odds, land counts, color balance).
+- `mtg-em` — task breakdown, role routing, and status/priority audits against `PLAN.md`. Read-only; doesn't write code.
+- `mtg-ux` — visual/interaction design and critique for the frontend, distinct from `mtg-frontend`'s implementation focus.
+- `mtg-qa` — dedicated test coverage, edge-case hunting, and full-suite verification.
