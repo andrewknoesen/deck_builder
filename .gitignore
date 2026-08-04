@@ -4,6 +4,8 @@ graphify-out/graph.json
 graphify-out/graph.html
 graphify-out/manifest.json
 graphify-out/.graphify_labels.json
+graphify-out/.graphify_python
+graphify-out/cost.json
 
 # Large reference files fetched at runtime by the rules ingestion pipeline —
 # see backend/app/ai/ingestion/rules_ingestion.py
