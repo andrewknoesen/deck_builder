@@ -1,4 +1,6 @@
 import asyncio
+import gzip
+import json
 from typing import Any, Dict, List
 
 import httpx
@@ -19,23 +21,27 @@ async def fetch_bulk_data_uri(
     """
     Looks up the current download URL for a Scryfall bulk-data file. Scryfall
     regenerates these daily and rotates the URL, so it always has to be
-    looked up fresh rather than hardcoded.
+    looked up fresh rather than hardcoded. The field is `jsonl_download_uri`
+    (a gzipped JSONL file) — confirmed against Scryfall's live API response,
+    not assumed, after a first real run KeyError'd on a plain `download_uri`
+    field that doesn't actually exist in the current API shape.
     """
     response = await client.get(BULK_DATA_URL)
     response.raise_for_status()
     for entry in response.json().get("data", []):
         if entry.get("type") == bulk_type:
-            return entry["download_uri"]
+            return entry["jsonl_download_uri"]
     raise ValueError(f"No {bulk_type!r} bulk-data entry found")
 
 
 async def download_bulk_cards(
     client: httpx.AsyncClient, download_uri: str
 ) -> List[Dict[str, Any]]:
-    """Downloads and parses a Scryfall bulk-data file (one entry per print)."""
+    """Downloads and parses a gzipped-JSONL Scryfall bulk-data file (one print per line)."""
     response = await client.get(download_uri)
     response.raise_for_status()
-    return response.json()
+    decompressed = gzip.decompress(response.content)
+    return [json.loads(line) for line in decompressed.splitlines() if line]
 
 
 def _card_row(card_data: Dict[str, Any]) -> Dict[str, Any]:

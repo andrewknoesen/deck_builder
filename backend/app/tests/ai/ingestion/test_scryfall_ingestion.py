@@ -1,3 +1,5 @@
+import gzip
+import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -17,6 +19,14 @@ def _mock_response(json_data):
     return response
 
 
+def _mock_gzip_jsonl_response(rows):
+    body = b"\n".join(json.dumps(row).encode() for row in rows)
+    response = MagicMock()
+    response.content = gzip.compress(body)
+    response.raise_for_status = MagicMock()
+    return response
+
+
 @pytest.mark.asyncio
 async def test_fetch_bulk_data_uri_finds_default_cards() -> None:
     client = AsyncMock()
@@ -25,11 +35,11 @@ async def test_fetch_bulk_data_uri_finds_default_cards() -> None:
             "data": [
                 {
                     "type": "oracle_cards",
-                    "download_uri": "https://example.com/oracle.json",
+                    "jsonl_download_uri": "https://example.com/oracle.jsonl.gz",
                 },
                 {
                     "type": "default_cards",
-                    "download_uri": "https://example.com/default.json",
+                    "jsonl_download_uri": "https://example.com/default.jsonl.gz",
                 },
             ]
         }
@@ -37,7 +47,7 @@ async def test_fetch_bulk_data_uri_finds_default_cards() -> None:
 
     uri = await fetch_bulk_data_uri(client)
 
-    assert uri == "https://example.com/default.json"
+    assert uri == "https://example.com/default.jsonl.gz"
 
 
 @pytest.mark.asyncio
@@ -50,13 +60,18 @@ async def test_fetch_bulk_data_uri_raises_when_missing() -> None:
 
 
 @pytest.mark.asyncio
-async def test_download_bulk_cards_returns_parsed_json() -> None:
+async def test_download_bulk_cards_returns_parsed_jsonl() -> None:
     client = AsyncMock()
-    client.get.return_value = _mock_response([{"id": "abc", "name": "Test Card"}])
+    client.get.return_value = _mock_gzip_jsonl_response(
+        [{"id": "abc", "name": "Test Card"}, {"id": "def", "name": "Other Card"}]
+    )
 
-    result = await download_bulk_cards(client, "https://example.com/default.json")
+    result = await download_bulk_cards(client, "https://example.com/default.jsonl.gz")
 
-    assert result == [{"id": "abc", "name": "Test Card"}]
+    assert result == [
+        {"id": "abc", "name": "Test Card"},
+        {"id": "def", "name": "Other Card"},
+    ]
 
 
 @pytest.mark.asyncio

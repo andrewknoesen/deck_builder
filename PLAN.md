@@ -645,6 +645,30 @@ automatically — by design, per the interview decision, until there's a real de
 Also not done: Docker Compose service shape was never decided because there's no new service to
 place — the "manual script" decision made that whole sub-question moot for now.
 
+### Live-verified against the real stack (2026-08-04): one real bug caught, since fixed
+
+The above was only unit-tested (mocked `httpx`/SQLite) until this pass — actually running
+`run_ingestion()` against live Scryfall + the docker-stack Postgres surfaced a real bug the mocks
+couldn't catch: `fetch_bulk_data_uri()` assumed the bulk-data listing had a `download_uri` field
+pointing at a plain JSON array. It doesn't — Scryfall's current API only returns
+`jsonl_download_uri`, pointing at a **gzipped JSONL** file (one JSON object per line, gzip-
+compressed), not a plain JSON array. First real run `KeyError`'d immediately. Confirmed the actual
+shape with a live `GET /bulk-data` call rather than guessing from docs, then fixed both
+`fetch_bulk_data_uri()` (read `jsonl_download_uri`) and `download_bulk_cards()` (`gzip.decompress`
++ parse line-by-line) to match. Updated the two unit tests that encoded the wrong assumption
+(`test_fetch_bulk_data_uri_finds_default_cards`, `test_download_bulk_cards_returns_parsed_jsonl`)
+so this can't silently regress back to the wrong shape.
+
+Re-ran end-to-end after the fix, against `deck_builder-backend-1`/`deck_builder-db-1` (docker
+stack): downloaded and parsed 116,568 real card entries, upserted cleanly (`SELECT count(*) FROM
+card` → 116568). Ran it a **second** time immediately after (PLAN's own Verify criteria: "re-run
+twice, confirm safe upsert") — same 116,568 rows, `count(*) = count(DISTINCT id)`, no duplicates,
+44s second run. Also called `search_cards` directly against this live data: a plain-name query
+("lightning bolt") returned correct local results (multiple printings, correct modern legality) in
+~190ms including Python startup; an operator-syntax query ("t:creature c:red pow>=5") correctly
+skipped the local cache and returned live Scryfall results — confirming both branches of the
+scope-narrowing decision actually work against real data, not just mocks.
+
 ---
 
 ## Deferred (explicit choice, not an oversight)
