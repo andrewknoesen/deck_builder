@@ -91,9 +91,9 @@ const GoldfishTreeInner: React.FC<GoldfishTreeProps> = ({
         position: positions.get(n.id) || { x: 0, y: 0 },
         data: { label },
         style: {
-          border: `2px solid ${n.id === selectedNodeId ? "#6366f1" : "#1e293b"}`,
-          background: n.id === selectedNodeId ? "#312e81" : "#0f172a",
-          color: "#f1f5f9",
+          border: `2px solid ${n.id === selectedNodeId ? "#ecaa0b" : "#2f271e"}`,
+          background: n.id === selectedNodeId ? "#462600" : "#1b150e",
+          color: "#f3ede7",
           borderRadius: 12,
           padding: 8,
           width: NODE_WIDTH - 20,
@@ -125,7 +125,7 @@ const GoldfishTreeInner: React.FC<GoldfishTreeProps> = ({
         fitViewOptions={{ padding: 0.3, maxZoom: 1.1 }}
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#1e293b" gap={24} />
+        <Background color="#2f271e" gap={24} />
         <Controls showInteractive={false} />
       </ReactFlow>
     </div>

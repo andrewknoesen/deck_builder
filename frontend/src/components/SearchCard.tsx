@@ -94,7 +94,7 @@ export const SearchCard = React.memo<SearchCardProps>(({ card, onAdd }) => {
             sx={{
               position: "absolute",
               inset: 0,
-              bgcolor: "rgba(99, 102, 241, 0.4)", // Indigo overlay
+              bgcolor: "rgba(236, 170, 11, 0.4)", // Indigo overlay
               display: "flex",
               alignItems: "center",
               justifyContent: "center",

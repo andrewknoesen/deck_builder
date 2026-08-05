@@ -108,7 +108,7 @@ export const CollectionCardComponent = React.memo<CollectionCardProps>(({ collec
                             <IconButton 
                                 size="small" 
                                 onClick={(e) => { e.stopPropagation(); onUpdateQuantity(collectionCard.id, 1); }}
-                                sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: '#10b981', color: 'white' } }}
+                                sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: '#61bd67', color: 'white' } }}
                             >
                                 <AddIcon fontSize="small" />
                             </IconButton>

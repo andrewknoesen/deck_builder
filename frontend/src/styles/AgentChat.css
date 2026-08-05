@@ -13,16 +13,16 @@
   flex-direction: column;
   overflow: hidden;
   border-radius: 16px; /* Matches theme.shape.borderRadius */
-  border: 1px solid #1e293b; /* Slate-800 divider color */
-  background-color: #0f172a; /* Slate-900 paper background */
+  border: 1px solid #2f271e; /* Slate-800 divider color */
+  background-color: #1b150e; /* Slate-900 paper background */
 }
 
 /* Header */
 .agent-chat-header {
   padding: 16px;
-  background-color: #0f172a;
-  color: #f1f5f9;
-  border-bottom: 1px solid #1e293b;
+  background-color: #1b150e;
+  color: #f3ede7;
+  border-bottom: 1px solid #2f271e;
 }
 
 .agent-chat-title {
@@ -37,16 +37,16 @@
   flex-grow: 1;
   overflow-y: auto;
   padding: 16px;
-  background-color: #020617; /* Darker Slate-950 for contrast/depth */
+  background-color: #110c07; /* Darker Slate-950 for contrast/depth */
 }
 
 /* Chat Input Area */
 .agent-chat-input-area {
   padding: 16px;
-  background-color: #0f172a;
+  background-color: #1b150e;
   display: flex;
   gap: 8px;
-  border-top: 1px solid #1e293b;
+  border-top: 1px solid #2f271e;
 }
 
 .agent-chat-send-btn {
@@ -74,15 +74,15 @@
 
 /* User Bubble Styles */
 .chat-bubble-paper.user {
-  background-color: #6366f1; /* Indigo-500 primary */
+  background-color: #ecaa0b; /* Indigo-500 primary */
   color: #ffffff;
   border-top-right-radius: 4px; /* Sharp tail */
 }
 
 /* Agent Bubble Styles */
 .chat-bubble-paper.agent {
-  background-color: #1e293b; /* Slate-800 for agent bubble in dark mode */
-  color: #f1f5f9; /* Slate-100 text */
+  background-color: #2f271e; /* Slate-800 for agent bubble in dark mode */
+  color: #f3ede7; /* Slate-100 text */
   border-top-left-radius: 4px; /* Sharp tail */
 }
 

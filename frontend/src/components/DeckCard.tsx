@@ -235,7 +235,7 @@ export const DeckCard = React.memo<DeckCardProps>(
                   }}
                   sx={{
                     bgcolor: "background.paper",
-                    "&:hover": { bgcolor: "#10b981", color: "white" },
+                    "&:hover": { bgcolor: "#61bd67", color: "white" },
                   }} // Emerald-500 equivalent
                 >
                   <AddIcon fontSize="small" />

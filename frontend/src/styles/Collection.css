@@ -3,24 +3,24 @@
   display: flex;
   height: calc(100vh - 64px);
   overflow: hidden;
-  background-color: #020617;
+  background-color: #110c07;
 }
 
 /* Left Pane: Inventory */
 .collection-pane-left {
   width: 65%; /* Expanded to match DeckBuilder */
-  border-right: 1px solid #1e293b; /* divider */
+  border-right: 1px solid #2f271e; /* divider */
   display: flex;
   flex-direction: column;
-  background-color: #0f172a; /* background.paper */
+  background-color: #1b150e; /* background.paper */
   z-index: 10;
   overflow: hidden; /* Ensure pane itself doesn't scroll, only content */
 }
 
 .collection-header {
   padding: 16px 24px;
-  border-bottom: 1px solid #1e293b; /* divider */
-  background-color: rgba(15, 23, 42, 0.8);
+  border-bottom: 1px solid #2f271e; /* divider */
+  background-color: rgba(27, 21, 14, 0.8);
   backdrop-filter: blur(12px);
   z-index: 20;
   flex-shrink: 0;
@@ -40,7 +40,7 @@
 
 .collection-count-badge {
   padding: 4px 16px;
-  background-color: #6366f1; /* primary.main */
+  background-color: #ecaa0b; /* primary.main */
   color: #ffffff; /* primary.contrastText */
   border-radius: 16px;
   font-weight: bold;
@@ -85,11 +85,11 @@
 
 .collection-group-count {
   padding: 4px 8px;
-  background-color: rgba(99, 102, 241, 0.16); /* action.selected approximation */
+  background-color: rgba(236, 170, 11, 0.16); /* action.selected approximation */
   border-radius: 4px;
   font-size: 0.7rem;
   font-weight: 700;
-  color: #f1f5f9; /* text.primary */
+  color: #f3ede7; /* text.primary */
 }
 
 /* Right Pane: Search */
@@ -97,9 +97,9 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: #020617; /* background.default */
+  background-color: #110c07; /* background.default */
   min-width: 0;
-  border-left: 1px solid #1e293b; /* divider */
+  border-left: 1px solid #2f271e; /* divider */
   position: relative;
   overflow: hidden; /* Prevent pane from scrolling */
 }
@@ -107,8 +107,8 @@
 .collection-search-header {
   padding: 32px;
   z-index: 10;
-  background-color: #020617; /* background.default */
-  border-bottom: 1px solid #1e293b; /* divider */
+  background-color: #110c07; /* background.default */
+  border-bottom: 1px solid #2f271e; /* divider */
   flex-shrink: 0;
 }
 
@@ -173,9 +173,9 @@
   max-width: 400px;
   padding: 16px;
   border-radius: 8px;
-  background-color: #0f172a; /* background.paper */
+  background-color: #1b150e; /* background.paper */
   backdrop-filter: blur(20px);
-  border: 1px solid #1e293b; /* divider */
+  border: 1px solid #2f271e; /* divider */
   display: flex;
   flex-direction: column;
   max-height: 40%;
