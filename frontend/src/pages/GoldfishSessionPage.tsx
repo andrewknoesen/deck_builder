@@ -11,6 +11,9 @@ import {
   ListItemButton,
   ListItemText,
   Divider,
+  Drawer,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/DeleteOutline";
@@ -34,11 +37,31 @@ export const GoldfishSessionPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { setHoveredCard } = useCardHover();
+  const theme = useTheme();
+  // Below `md` the deck list + playmat + tree can't all fit side by side -
+  // three fixed-width columns squeeze the playmat (the part you're actually
+  // playing on) down to nothing. Start with both side panels closed there;
+  // the header toggles still open them, as overlay drawers instead of
+  // pushing the playmat out of view.
+  const isNarrow = useMediaQuery(theme.breakpoints.down("md"));
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
   const [actionText, setActionText] = useState("");
-  const [showDeckList, setShowDeckList] = useState(true);
-  const [showTree, setShowTree] = useState(true);
+  const [showDeckList, setShowDeckList] = useState(!isNarrow);
+  const [showTree, setShowTree] = useState(!isNarrow);
   const [trackerDraft, setTrackerDraft] = useState<Record<string, number>>({});
+
+  // The useState initializers above only run once, at mount. If the layout
+  // crosses the isNarrow breakpoint afterwards (resizing an already-open
+  // desktop window, rotating a tablet), showDeckList/showTree don't follow —
+  // stale "true" values from a wide mount mean both panels render as
+  // simultaneously-open overlay Drawers on a now-narrow screen, hiding the
+  // playmat underneath both of them. Re-sync whenever the breakpoint itself
+  // changes.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowDeckList(!isNarrow);
+    setShowTree(!isNarrow);
+  }, [isNarrow]);
 
   const queryKey = ["goldfishTree", sessionId];
 
@@ -71,15 +94,19 @@ export const GoldfishSessionPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedNodeId, data]);
 
-  // Auto-select the session's root node once it loads, so a fresh 3b
-  // session is immediately ready to draw/act on without an extra click.
+  // Auto-select once the tree loads: for a session that already has nodes
+  // (reopening a session you were mid-goldfish on), land on the most
+  // recently created node so you pick up where you left off, instead of
+  // always the empty "Game start" root - which was confusing on reopen,
+  // since the tree panel doesn't make it obvious a later node exists.
+  // A brand-new session only has its root, so this still resolves to it.
   useEffect(() => {
-    if (data && selectedNodeId === null) {
-      const root = data.nodes.find((n) => n.parent_id === null);
-      if (root) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setSelectedNodeId(root.id);
-      }
+    if (data && selectedNodeId === null && data.nodes.length > 0) {
+      const latest = data.nodes.reduce((a, b) =>
+        new Date(b.created_at) > new Date(a.created_at) ? b : a,
+      );
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedNodeId(latest.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
@@ -135,6 +162,54 @@ export const GoldfishSessionPage: React.FC = () => {
     setActionText((prev) => (prev ? `${prev}, ${name}` : name));
   };
 
+  const deckListContent = (
+    <>
+      <Typography variant="overline" color="text.secondary" sx={{ pl: 1 }}>
+        Deck List ({deckCards.reduce((acc, dc) => acc + dc.quantity, 0)})
+      </Typography>
+      <List dense disablePadding>
+        {deckCards.map((dc) => (
+          <ListItemButton
+            key={`${dc.card_id}-${dc.board}`}
+            onClick={() => dc.card && addCardToActionText(dc.card.name)}
+            onMouseEnter={() => dc.card && setHoveredCard(dc.card)}
+            onMouseLeave={() => setHoveredCard(null)}
+            sx={{ borderRadius: 1, gap: 1, py: 0.5 }}
+          >
+            <Box
+              component="img"
+              src={dc.card?.image_uris?.small}
+              alt={dc.card?.name}
+              sx={{
+                width: 32,
+                height: 44,
+                objectFit: "cover",
+                borderRadius: 0.5,
+                flexShrink: 0,
+                bgcolor: "action.hover",
+              }}
+            />
+            <ListItemText
+              primary={`${dc.quantity}x ${dc.card?.name ?? dc.card_id}`}
+              slotProps={{ primary: { fontSize: 13 } }}
+            />
+          </ListItemButton>
+        ))}
+      </List>
+    </>
+  );
+
+  const treeContent = (
+    <GoldfishTree
+      nodes={data.nodes}
+      selectedNodeId={selectedNodeId}
+      onSelectNode={(id) => {
+        setSelectedNodeId(id);
+        if (isNarrow) setShowTree(false);
+      }}
+    />
+  );
+
   return (
     <Box
       sx={{
@@ -179,57 +254,30 @@ export const GoldfishSessionPage: React.FC = () => {
       </Box>
 
       <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
-        {showDeckList && (
-          <Box
-            sx={{
-              width: 260,
-              flexShrink: 0,
-              borderRight: 1,
-              borderColor: "divider",
-              overflowY: "auto",
-              p: 1.5,
-            }}
+        {isNarrow ? (
+          <Drawer
+            anchor="left"
+            open={showDeckList}
+            onClose={() => setShowDeckList(false)}
+            sx={{ "& .MuiDrawer-paper": { width: 280, boxSizing: "border-box", p: 1.5 } }}
           >
-            <Typography
-              variant="overline"
-              color="text.secondary"
-              sx={{ pl: 1 }}
+            {deckListContent}
+          </Drawer>
+        ) : (
+          showDeckList && (
+            <Box
+              sx={{
+                width: 260,
+                flexShrink: 0,
+                borderRight: 1,
+                borderColor: "divider",
+                overflowY: "auto",
+                p: 1.5,
+              }}
             >
-              Deck List (
-              {deckCards.reduce((acc, dc) => acc + dc.quantity, 0)})
-            </Typography>
-            <List dense disablePadding>
-              {deckCards.map((dc) => (
-                <ListItemButton
-                  key={`${dc.card_id}-${dc.board}`}
-                  onClick={() =>
-                    dc.card && addCardToActionText(dc.card.name)
-                  }
-                  onMouseEnter={() => dc.card && setHoveredCard(dc.card)}
-                  onMouseLeave={() => setHoveredCard(null)}
-                  sx={{ borderRadius: 1, gap: 1, py: 0.5 }}
-                >
-                  <Box
-                    component="img"
-                    src={dc.card?.image_uris?.small}
-                    alt={dc.card?.name}
-                    sx={{
-                      width: 32,
-                      height: 44,
-                      objectFit: "cover",
-                      borderRadius: 0.5,
-                      flexShrink: 0,
-                      bgcolor: "action.hover",
-                    }}
-                  />
-                  <ListItemText
-                    primary={`${dc.quantity}x ${dc.card?.name ?? dc.card_id}`}
-                    slotProps={{ primary: { fontSize: 13 } }}
-                  />
-                </ListItemButton>
-              ))}
-            </List>
-          </Box>
+              {deckListContent}
+            </Box>
+          )
         )}
 
         {/* Main view: the playmat is what you look at while goldfishing, so
@@ -298,21 +346,28 @@ export const GoldfishSessionPage: React.FC = () => {
           </Box>
         </Box>
 
-        {showTree && (
-          <Box
-            sx={{
-              width: 380,
-              flexShrink: 0,
-              borderLeft: 1,
-              borderColor: "divider",
-            }}
+        {isNarrow ? (
+          <Drawer
+            anchor="right"
+            open={showTree}
+            onClose={() => setShowTree(false)}
+            sx={{ "& .MuiDrawer-paper": { width: "85vw", maxWidth: 380, boxSizing: "border-box" } }}
           >
-            <GoldfishTree
-              nodes={data.nodes}
-              selectedNodeId={selectedNodeId}
-              onSelectNode={setSelectedNodeId}
-            />
-          </Box>
+            {treeContent}
+          </Drawer>
+        ) : (
+          showTree && (
+            <Box
+              sx={{
+                width: 380,
+                flexShrink: 0,
+                borderLeft: 1,
+                borderColor: "divider",
+              }}
+            >
+              {treeContent}
+            </Box>
+          )
         )}
       </Box>
     </Box>

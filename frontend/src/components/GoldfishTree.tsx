@@ -1,8 +1,10 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   ReactFlow,
+  ReactFlowProvider,
   Background,
   Controls,
+  useReactFlow,
   type Node,
   type Edge,
 } from "@xyflow/react";
@@ -50,11 +52,22 @@ interface GoldfishTreeProps {
   onSelectNode: (id: number) => void;
 }
 
-export const GoldfishTree: React.FC<GoldfishTreeProps> = ({
+const GoldfishTreeInner: React.FC<GoldfishTreeProps> = ({
   nodes,
   selectedNodeId,
   onSelectNode,
 }) => {
+  const { fitView } = useReactFlow();
+
+  // ReactFlow's `fitView` prop only frames the graph on first mount. Every
+  // action you take while goldfishing adds a node, so without this the tree
+  // panel freezes on whatever the first one or two nodes looked like and
+  // never shows where you actually are - the whole point of a branch tree
+  // you navigate by clicking nodes. Re-fit whenever the node count changes.
+  useEffect(() => {
+    fitView({ padding: 0.3, duration: 300, maxZoom: 1.1 });
+  }, [nodes.length, fitView]);
+
   const { flowNodes, flowEdges } = useMemo(() => {
     const positions = layoutTree(nodes);
 
@@ -109,6 +122,7 @@ export const GoldfishTree: React.FC<GoldfishTreeProps> = ({
         edges={flowEdges}
         onNodeClick={(_, node) => onSelectNode(Number(node.id))}
         fitView
+        fitViewOptions={{ padding: 0.3, maxZoom: 1.1 }}
         proOptions={{ hideAttribution: true }}
       >
         <Background color="#1e293b" gap={24} />
@@ -117,3 +131,9 @@ export const GoldfishTree: React.FC<GoldfishTreeProps> = ({
     </div>
   );
 };
+
+export const GoldfishTree: React.FC<GoldfishTreeProps> = (props) => (
+  <ReactFlowProvider>
+    <GoldfishTreeInner {...props} />
+  </ReactFlowProvider>
+);
