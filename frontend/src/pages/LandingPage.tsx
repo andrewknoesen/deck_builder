@@ -22,11 +22,10 @@ const secondaryLinks = [
     description: "Organize and refine your library across every format.",
   },
   {
-    to: "/decks",
+    to: "/collection",
     icon: CollectionsIcon,
     title: "Collection",
     description: "Track every card you own, filtered by set and rarity.",
-    soon: true,
   },
   {
     to: "/goldfish",
@@ -91,7 +90,7 @@ export const LandingPage = () => {
         </Box>
 
         <Stack className="landing-secondary-list" divider={<Box className="landing-secondary-divider" />}>
-          {secondaryLinks.map(({ to, icon: Icon, title, description, soon }) => (
+          {secondaryLinks.map(({ to, icon: Icon, title, description }) => (
             <Box
               key={title}
               component={RouterLink}
@@ -102,16 +101,6 @@ export const LandingPage = () => {
               <Box>
                 <Typography variant="subtitle1" fontWeight={700}>
                   {title}
-                  {soon && (
-                    <Typography
-                      component="span"
-                      variant="caption"
-                      color="text.secondary"
-                      className="landing-soon-tag"
-                    >
-                      Coming soon
-                    </Typography>
-                  )}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {description}

@@ -91,11 +91,3 @@
   margin-top: 2px;
   flex-shrink: 0;
 }
-
-.landing-soon-tag {
-  margin-left: 8px;
-  border: 1px solid #2f271e;
-  border-radius: 4px;
-  padding: 1px 6px;
-  vertical-align: middle;
-}
