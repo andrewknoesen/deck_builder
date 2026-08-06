@@ -8,16 +8,16 @@
 /* Left Pane: Deck Inventory */
 .deck-builder-pane-left {
   width: 65%;
-  border-right: 1px solid #2f271e; /* divider */
+  border-right: 1px solid #2a2f37; /* divider */
   display: flex;
   flex-direction: column;
-  background-color: #1b150e; /* background.paper */
+  background-color: #1a1e25; /* background.paper */
   z-index: 10;
 }
 
 .deck-builder-header {
   padding: 12px 16px;
-  border-bottom: 1px solid #2f271e; /* divider */
+  border-bottom: 1px solid #2a2f37; /* divider */
   background-color: rgba(27, 21, 14, 0.8);
   backdrop-filter: blur(12px);
   position: sticky;
@@ -32,7 +32,7 @@
 }
 
 .deck-builder-back-btn {
-  border: 1px solid #2f271e; /* divider */
+  border: 1px solid #2a2f37; /* divider */
   border-radius: 8px;
 }
 
@@ -125,11 +125,11 @@
 
 .deck-builder-group-count {
   padding: 4px 8px;
-  background-color: rgba(236, 170, 11, 0.16); /* action.selected approximation */
+  background-color: rgba(91, 127, 163, 0.16); /* action.selected approximation */
   border-radius: 4px;
   font-size: 0.7rem;
   font-weight: 700;
-  color: #f3ede7; /* text.primary */
+  color: #e7e9ec; /* text.primary */
 }
 
 /* Right Pane: Stats & Preview */
@@ -137,9 +137,9 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: #110c07; /* background.default */
+  background-color: #12151a; /* background.default */
   min-width: 0;
-  border-left: 1px solid #2f271e; /* divider */
+  border-left: 1px solid #2a2f37; /* divider */
   position: relative;
 }
 
@@ -159,7 +159,7 @@
 
 .deck-builder-stats-header {
   padding: 16px;
-  border-bottom: 1px solid #2f271e; /* divider */
+  border-bottom: 1px solid #2a2f37; /* divider */
   display: flex;
   align-items: center;
   gap: 8px;
@@ -202,9 +202,9 @@
   max-width: 400px;
   padding: 16px;
   border-radius: 8px; /* Reduced radius from 16 to 8 per inline style */
-  background-color: #1b150e; /* background.paper */
+  background-color: #1a1e25; /* background.paper */
   backdrop-filter: blur(20px);
-  border: 1px solid #2f271e; /* divider */
+  border: 1px solid #2a2f37; /* divider */
   display: flex;
   flex-direction: column;
   max-height: 40%;

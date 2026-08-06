@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, CardMedia, Box, Typography } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import type { ScryfallCard } from '../types/mtg';
 
@@ -94,7 +95,11 @@ export const SearchCard = React.memo<SearchCardProps>(({ card, onAdd }) => {
             sx={{
               position: "absolute",
               inset: 0,
-              bgcolor: "rgba(236, 170, 11, 0.4)", // Indigo overlay
+              // Theme primary at 40% alpha, resolved from the live palette
+              // instead of a hardcoded hex, so this doesn't silently drift
+              // back to a retired accent color the next time the palette
+              // changes (this literal used to be the old gold accent).
+              bgcolor: (theme) => alpha(theme.palette.primary.main, 0.4),
               display: "flex",
               alignItems: "center",
               justifyContent: "center",

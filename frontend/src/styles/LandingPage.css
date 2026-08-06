@@ -1,6 +1,6 @@
 /* Landing Page Container */
 .landing-container {
-  background-color: #110c07; /* background.default */
+  background-color: #12151a; /* background.default */
   min-height: 100%;
   padding-bottom: 96px;
 }
@@ -8,25 +8,76 @@
 /* Hero Section */
 .landing-hero {
   padding-top: 96px;
-  padding-bottom: 64px;
-  border-bottom: 1px solid #2f271e; /* divider */
+  padding-bottom: 80px;
+  border-bottom: 1px solid #2a2f37; /* divider */
+  overflow: hidden; /* the tilted card art is allowed to bleed slightly */
+}
+
+/* Asymmetric two-column hero: copy left, real card art right, instead of a
+   centered headline over a flat panel (the "any B2B SaaS landing page" tell
+   named in docs/UI_DEGENERIC_DESIGN.md item 2). Collapses to a single column
+   with the card demoted below the copy on narrow viewports, since the art is
+   decorative there and the CTA should win the scroll fold, not the image. */
+.landing-hero-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  align-items: center;
+  gap: 32px;
+}
+
+@media (max-width: 900px) {
+  .landing-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
 }
 
 .landing-hero-title {
-  font-size: clamp(2.25rem, 4vw + 1rem, 3.5rem);
-  max-width: 14ch;
+  font-size: clamp(2.25rem, 4vw + 1rem, 3.25rem);
+  max-width: 16ch;
   text-wrap: balance;
 }
 
 .landing-hero-highlight {
-  color: #ecaa0b; /* primary.main */
+  color: #5b7fa3; /* primary.main */
 }
 
 .landing-hero-subtitle {
-  max-width: 52ch;
+  max-width: 48ch;
   margin-top: 20px;
   line-height: 1.6;
   font-size: 1.125rem;
+}
+
+.landing-hero-card-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.landing-hero-card-img,
+.landing-hero-card-placeholder {
+  width: min(280px, 70vw);
+  aspect-ratio: 2.5 / 3.5;
+  border-radius: 4.5% / 3.5%; /* matches the real card corner radius used in SearchCard/CardHoverPreview */
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.6);
+  transform: rotate(4deg);
+  object-fit: cover;
+}
+
+.landing-hero-card-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2a2f37; /* divider */
+  border: 1px solid #2a2f37;
+  background: #1a1e25; /* background.paper */
+}
+
+@media (max-width: 900px) {
+  .landing-hero-card-img,
+  .landing-hero-card-placeholder {
+    width: min(200px, 55vw);
+  }
 }
 
 /* Feature composition */
@@ -44,7 +95,7 @@
 }
 
 .landing-primary-feature {
-  border: 1px solid #2f271e;
+  border: 1px solid #2a2f37;
   padding: 40px;
   display: flex;
   flex-direction: column;
@@ -54,7 +105,7 @@
 
 .landing-primary-feature-icon {
   font-size: 28px;
-  color: #ecaa0b;
+  color: #5b7fa3;
   margin-bottom: 8px;
 }
 
@@ -62,32 +113,77 @@
   margin-top: 16px;
 }
 
-.landing-secondary-list {
+/* Two different shapes, not two more copies of the same row: a compact
+   side-by-side pair (Decks/Collection) and a wider illustrated row
+   (Practice Mode) below it. */
+.landing-secondary {
   display: flex;
   flex-direction: column;
+  gap: 20px;
+  height: 100%;
 }
 
-.landing-secondary-divider {
-  border-bottom: 1px solid #2f271e;
+.landing-secondary-pair {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 20px;
+  border: 1px solid #2a2f37;
+  padding: 24px 20px;
 }
 
-.landing-secondary-item {
+.landing-secondary-pair-item {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
-  gap: 16px;
-  padding: 20px 4px;
+  gap: 6px;
   text-decoration: none;
   color: inherit;
   transition: opacity 150ms ease-out;
 }
 
-.landing-secondary-item:hover {
+.landing-secondary-pair-item:hover {
   opacity: 0.75;
 }
 
-.landing-secondary-item-icon {
+.landing-secondary-pair-icon {
   font-size: 22px;
-  color: #ada397;
-  margin-top: 2px;
+  color: #98a1ac;
+  margin-bottom: 2px;
+}
+
+.landing-secondary-pair-divider {
+  width: 1px;
+  background: #2a2f37;
+}
+
+.landing-secondary-tree {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+  border: 1px solid #2a2f37;
+  padding: 24px;
+  text-decoration: none;
+  color: inherit;
+  transition: opacity 150ms ease-out;
+}
+
+.landing-secondary-tree:hover {
+  opacity: 0.75;
+}
+
+.landing-secondary-tree-icon {
+  font-size: 48px;
+  color: #5b7fa3; /* primary.main — the one illustrated feature gets the accent, matching the primary block's icon weight */
   flex-shrink: 0;
+}
+
+@media (max-width: 500px) {
+  .landing-secondary-pair {
+    grid-template-columns: 1fr;
+  }
+  .landing-secondary-pair-divider {
+    width: 100%;
+    height: 1px;
+  }
 }

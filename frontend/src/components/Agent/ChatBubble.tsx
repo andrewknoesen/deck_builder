@@ -32,12 +32,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
     >
       <ListItemAvatar sx={{ minWidth: 40, mt: 0 }}>
         <Avatar sx={{ bgcolor: isUser ? "primary.main" : "secondary.main" }}> 
-          {/* Note: Inverted logic in previous code? User was secondary? Theme says Primary is Indigo (User), Secondary is Rose (Agent/Bot?)? 
-             Checked AgentChat.tsx, it had user=secondary/agent=primary in one place, and user=primary/agent=white in another.
-             Let's standardize: User = Primary (Indigo), Agent = Secondary (Rose) or Slate. 
-             Theme: Primary=Indigo, Secondary=Rose. 
-             Let's use Primary for User, Slate (default/grey) or Secondary for Agent.
-          */}
+          {/* User = Primary (steel-blue), Agent = Secondary (muted red). */}
           {isUser ? <PersonIcon /> : <SmartToyIcon />}
         </Avatar>
       </ListItemAvatar>

@@ -105,7 +105,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
               color: "text.primary",
               "&:hover": {
                 borderColor: "primary.main",
-                bgcolor: "rgba(236, 170, 11, 0.05)",
+                bgcolor: "rgba(91, 127, 163, 0.05)",
               },
             }}
           >

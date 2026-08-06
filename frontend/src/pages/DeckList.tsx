@@ -139,8 +139,8 @@ export const DeckList: React.FC = () => {
             color="text.secondary"
             className="deck-list-empty-text"
           >
-            Your collection is waiting to be built. Start your first journey
-            today.
+            Nothing on the stack yet — search Scryfall, pick a format, and the
+            legality and curve checks start running as soon as you add a card.
           </Typography>
           <Button
             component={RouterLink}

@@ -4,7 +4,7 @@ body {
     margin: 0;
     padding: 0;
     /* Font family and background are handled by MUI Theme and CssBaseline */
-    background-color: #110c07;
+    background-color: #12151a;
     /* Fallback to Slate-950 matches theme */
 }
 
@@ -15,7 +15,7 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: #1b150e;
+    background: #1a1e25;
     /* Slate 900 */
 }
 

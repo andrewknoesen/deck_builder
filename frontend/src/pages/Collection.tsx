@@ -14,12 +14,12 @@ import {
     Card,
     CardMedia
 } from '@mui/material';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CollectionsIcon from '@mui/icons-material/Collections';
 import { apiClient } from '../api/client';
 import type { ScryfallCard, CollectionCard } from '../types/mtg';
 import { DeckBuilderSearch } from '../components/DeckBuilderSearch';
 import { CollectionCardComponent } from '../components/CollectionCardComponent';
+import { CardGlyphIcon } from '../components/icons/CardGlyphIcon';
 import { useCardHover } from "../context/useCardHover";
 
 // Helper to determine primary type for grouping (reused logic)
@@ -203,9 +203,9 @@ export const Collection: React.FC = () => {
                 <Box className={`collection-right-content ${hoveredCard ? "blurred" : ""}`}>
                      {/* Default Content when no hover - Placeholder */}
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', opacity: 0.3, textAlign: 'center', gap: 2 }}>
-                        <AutoAwesomeIcon sx={{ fontSize: 60 }} />
-                        <Typography variant="h6" fontWeight="700">Hover over a card to view details</Typography>
-                        <Typography variant="body2">Or search for cards above to add them.</Typography>
+                        <CardGlyphIcon sx={{ fontSize: 60 }} />
+                        <Typography variant="h6" fontWeight="700">Hover a card for oracle text and mana cost</Typography>
+                        <Typography variant="body2">Or search above to add one to your collection.</Typography>
                     </Box>
                 </Box>
 

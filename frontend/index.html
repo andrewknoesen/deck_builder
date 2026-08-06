@@ -5,6 +5,26 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>frontend</title>
+    <!-- Besley: display serif for headlines only (theme.ts h1-h4). Spurred slab
+         serif with real weight/contrast at large sizes, closer to card-frame
+         titling than a generic sans headline, without tracing Magic's own
+         Beleren/Matrix branding. Deliberately not Fraunces/Playfair/Georgia —
+         those (plus Inter/Roboto/Geist/Space Grotesk/Plus Jakarta Sans) are
+         common enough in AI-generated UI to be their own tell.
+         Inter is loaded explicitly alongside it for body/UI chrome so the
+         pairing is real (distinct display vs. body face) instead of one
+         family with a hopeful fallback stack. Inter itself is a deliberate
+         keep, not an oversight: the "overused font" tell this redesign is
+         fixing is Inter carrying *headlines* with zero differentiation
+         (see docs/UI_DEGENERIC_DESIGN.md item 1) — using it for body copy,
+         where legibility at small sizes matters more than character, is the
+         doc's own recommendation, not a miss. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Besley:wght@400..900&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
     <div id="root"></div>
