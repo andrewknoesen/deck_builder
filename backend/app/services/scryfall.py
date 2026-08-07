@@ -2,10 +2,20 @@ from app.core.logging import setup_logging
 from typing import Any, Dict, List
 
 import httpx
+from fastapi import Request
 
 from app.core.config import settings
 
 logger = setup_logging()
+
+# Card data by ID is immutable (a given Scryfall printing never changes), so
+# it's safe to cache for the life of the process. Unbounded is fine here:
+# the working set is whatever small number of specific cards the app looks
+# up by ID (e.g. the landing page's hero card, hit on every visit) rather
+# than the full ~90k-card catalog.
+_card_by_id_cache: Dict[str, Dict[str, Any]] = {}
+
+
 class ScryfallService:
     def __init__(self, client: httpx.AsyncClient):
         self.client = client
@@ -17,9 +27,13 @@ class ScryfallService:
         return response.json()
 
     async def get_card_by_id(self, card_id: str) -> Dict[str, Any]:
+        if card_id in _card_by_id_cache:
+            return _card_by_id_cache[card_id]
         response = await self.client.get(f"/cards/{card_id}")
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        _card_by_id_cache[card_id] = data
+        return data
 
     async def get_cards_by_ids(self, card_ids: List[str]) -> List[Dict[str, Any]]:
         # Scryfall collection API takes up to 75 IDs
@@ -47,6 +61,8 @@ class ScryfallService:
 
 
 
-async def get_scryfall_service():
-    async with httpx.AsyncClient(base_url=settings.SCRYFALL_BASE_URL, timeout=30.0) as client:
-        yield ScryfallService(client)
+async def get_scryfall_service(request: Request) -> ScryfallService:
+    # Reuses the single AsyncClient created once at app startup (see
+    # app/main.py's lifespan) instead of opening a new connection per
+    # request.
+    return ScryfallService(request.app.state.scryfall_client)

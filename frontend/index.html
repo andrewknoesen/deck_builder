@@ -21,6 +21,11 @@
          doc's own recommendation, not a miss. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Card art (e.g. the landing-page hero) is served from Scryfall's CDN;
+         preconnecting overlaps the DNS/TLS handshake with the API call that
+         returns the image URL, instead of paying it only once the <img> tag
+         exists. -->
+    <link rel="preconnect" href="https://cards.scryfall.io" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Besley:wght@400..900&family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"

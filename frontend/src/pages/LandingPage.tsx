@@ -16,19 +16,24 @@ import "../styles/LandingPage.css";
 // already sits close to the theme's steel-blue accent, and the card itself
 // is the default Commander staple (the app defaults new decks to Commander),
 // so the "which card" choice isn't arbitrary. Fetched live via the app's own
-// Scryfall-backed endpoint rather than hardcoding a CDN URL, so it fails soft
-// (falls back to the card-back placeholder below) instead of hotlinking
-// something that can 404.
-const HERO_CARD_QUERY = '!"Command Tower"';
+// Scryfall-backed endpoint rather than hardcoding a CDN image URL, so it
+// fails soft (falls back to the card-back placeholder below) instead of
+// hotlinking something that can 404.
+//
+// Looked up by its stable Scryfall card ID (pinned to one specific printing)
+// rather than by a `!"Command Tower"` name search: search is Scryfall's
+// slowest endpoint (full-text query across the whole catalog) versus a
+// direct by-ID lookup, and pinning the ID also means the hero always shows
+// the same art instead of whatever Scryfall's "default printing" for the
+// name happens to resolve to.
+const HERO_CARD_ID = "0548fb60-c843-4f8f-a029-6f10efc63a41"; // Command Tower
 
 export const LandingPage = () => {
   const { data: heroCard, isError: heroArtFailed } = useQuery({
-    queryKey: ["landing-hero-card"],
+    queryKey: ["landing-hero-card", HERO_CARD_ID],
     queryFn: async () => {
-      const res = await apiClient.get("/cards/search", {
-        params: { q: HERO_CARD_QUERY },
-      });
-      return res.data?.data?.[0] as ScryfallCard | undefined;
+      const res = await apiClient.get(`/cards/${HERO_CARD_ID}`);
+      return res.data as ScryfallCard;
     },
     staleTime: Infinity,
     retry: 1,
@@ -72,6 +77,7 @@ export const LandingPage = () => {
                 image={heroCard.image_uris.normal}
                 alt={heroCard.name}
                 className="landing-hero-card-img"
+                fetchPriority="high"
               />
             ) : (
               <Box className="landing-hero-card-placeholder">

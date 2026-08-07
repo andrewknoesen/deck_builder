@@ -45,8 +45,13 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
         yield db_session
 
     app.dependency_overrides[get_db] = _get_test_db
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
-        yield ac
+    # ASGITransport doesn't fire FastAPI's startup/shutdown lifespan on its
+    # own, unlike a real server — run it manually so app.state (e.g. the
+    # shared Scryfall httpx client set up in app/main.py) is populated the
+    # same way it is for a real request.
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            yield ac
     app.dependency_overrides.clear()
