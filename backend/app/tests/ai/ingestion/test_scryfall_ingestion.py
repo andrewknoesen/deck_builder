@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from app.ai.ingestion.scryfall_ingestion import (
+    _card_row,
     download_bulk_cards,
     fetch_bulk_data_uri,
     upsert_cards,
@@ -120,3 +121,75 @@ async def test_upsert_cards_skips_entries_without_id(db_session) -> None:
     count = await upsert_cards(db_session, [{"name": "No ID Card"}])
 
     assert count == 0
+
+
+def test_card_row_falls_back_to_card_faces_image_uris_for_transform_card() -> None:
+    # Shaped like a real Scryfall bulk-data transform card: no top-level
+    # `image_uris` (per-face images live under `card_faces` instead), but a
+    # genuinely correct top-level "Front // Back" name/type_line that should
+    # be kept as-is -- confirmed against the live API (Delver of Secrets //
+    # Insectile Aberration) before writing this test.
+    card_data = {
+        "id": "delver-id",
+        "name": "Delver of Secrets // Insectile Aberration",
+        "mana_cost": "{U}",
+        "type_line": "Creature — Human Wizard // Creature — Human Insect",
+        "oracle_text": None,
+        "colors": ["U"],
+        "produced_mana": None,
+        "legalities": {"modern": "legal"},
+        "card_faces": [
+            {
+                "name": "Delver of Secrets",
+                "type_line": "Creature — Human Wizard",
+                "image_uris": {"normal": "https://example.com/front.jpg"},
+            },
+            {
+                "name": "Insectile Aberration",
+                "type_line": "Creature — Human Insect",
+                "image_uris": {"normal": "https://example.com/back.jpg"},
+            },
+        ],
+    }
+
+    row = _card_row(card_data)
+
+    assert row["name"] == "Delver of Secrets // Insectile Aberration"
+    assert row["type_line"] == "Creature — Human Wizard // Creature — Human Insect"
+    assert row["image_uris"] == {"normal": "https://example.com/front.jpg"}
+
+
+def test_card_row_prefers_front_face_name_for_reversible_card() -> None:
+    # Shaped like a real Scryfall "reversible_card" print (e.g. Command
+    # Tower's alternate-frame Secret Lair reversible printing), where both
+    # faces are literally the same card. Confirmed against the live API:
+    # for this layout Scryfall's own top-level `name` is already the
+    # doubled "X // X" form and `type_line` is missing entirely -- neither
+    # is what should display, so both should fall back to the front face.
+    card_data = {
+        "id": "reversible-command-tower",
+        "name": "Command Tower // Command Tower",
+        "mana_cost": "",
+        "oracle_text": None,
+        "colors": [],
+        "produced_mana": ["B", "G", "R", "U", "W"],
+        "legalities": {"commander": "legal"},
+        "card_faces": [
+            {
+                "name": "Command Tower",
+                "type_line": "Land",
+                "image_uris": {"normal": "https://example.com/front.jpg"},
+            },
+            {
+                "name": "Command Tower",
+                "type_line": "Land",
+                "image_uris": {"normal": "https://example.com/back.jpg"},
+            },
+        ],
+    }
+
+    row = _card_row(card_data)
+
+    assert row["name"] == "Command Tower"
+    assert row["type_line"] == "Land"
+    assert row["image_uris"] == {"normal": "https://example.com/front.jpg"}

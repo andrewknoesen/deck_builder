@@ -13,7 +13,11 @@ from app.models.deck import (
 from app.models.user import User
 from app.schemas.deck_import import DeckImportRequest, DeckImportResponse
 from app.services.deck_import import parse_decklist, resolve_entries
-from app.services.scryfall import ScryfallService, get_scryfall_service
+from app.services.scryfall import (
+    ScryfallService,
+    get_scryfall_service,
+    resolve_card_fields,
+)
 from app.services.stats import calculate_stats
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,29 +64,33 @@ async def sync_cards(db: AsyncSession, card_ids: List[str], scryfall: ScryfallSe
         existing_card = existing_check.scalar_one_or_none()
 
         produced_mana = card_data.get("produced_mana", [])
+        # Multi-faced cards (transform/modal-DFC/reversible/art-series) don't
+        # always carry top-level name/type_line/image_uris — see
+        # `resolve_card_fields`'s docstring for the live-API-confirmed cases.
+        fields = resolve_card_fields(card_data)
 
         if existing_card:
             # Update existing
-            existing_card.name = card_data["name"]
+            existing_card.name = fields["name"]
             existing_card.mana_cost = card_data.get("mana_cost")
-            existing_card.type_line = card_data.get("type_line")
+            existing_card.type_line = fields["type_line"]
             existing_card.oracle_text = card_data.get("oracle_text")
             existing_card.colors = card_data.get("colors")
             existing_card.produced_mana = produced_mana
-            existing_card.image_uris = card_data.get("image_uris")
+            existing_card.image_uris = fields["image_uris"]
             existing_card.legalities = card_data.get("legalities")
             db.add(existing_card)
         else:
             # Create new
             card = Card(
                 id=card_data["id"],
-                name=card_data["name"],
+                name=fields["name"],
                 mana_cost=card_data.get("mana_cost"),
-                type_line=card_data.get("type_line"),
+                type_line=fields["type_line"],
                 oracle_text=card_data.get("oracle_text"),
                 colors=card_data.get("colors"),
                 produced_mana=produced_mana,
-                image_uris=card_data.get("image_uris"),
+                image_uris=fields["image_uris"],
                 legalities=card_data.get("legalities"),
             )
             db.add(card)
