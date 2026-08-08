@@ -11,6 +11,7 @@ from sqlmodel import col
 from app.core.db import SessionLocal
 from app.core.logging import logger
 from app.models.card import Card
+from app.services.scryfall import resolve_card_fields
 
 BULK_DATA_URL = "https://api.scryfall.com/bulk-data"
 
@@ -45,15 +46,19 @@ async def download_bulk_cards(
 
 
 def _card_row(card_data: Dict[str, Any]) -> Dict[str, Any]:
+    # Multi-faced cards (transform/modal-DFC/reversible/art-series) don't
+    # always carry top-level name/type_line/image_uris — see
+    # `resolve_card_fields`'s docstring for the live-API-confirmed cases.
+    fields = resolve_card_fields(card_data)
     return {
         "id": card_data["id"],
-        "name": card_data.get("name", ""),
+        "name": fields["name"],
         "mana_cost": card_data.get("mana_cost"),
-        "type_line": card_data.get("type_line"),
+        "type_line": fields["type_line"],
         "oracle_text": card_data.get("oracle_text"),
         "colors": card_data.get("colors"),
         "produced_mana": card_data.get("produced_mana"),
-        "image_uris": card_data.get("image_uris"),
+        "image_uris": fields["image_uris"],
         "legalities": card_data.get("legalities"),
     }
 
