@@ -4,10 +4,12 @@ import pytest
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.main import app
+from app.models.card import Card
 from app.models.user import User
 from app.services.scryfall import get_scryfall_service
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
 
 @pytest.fixture(autouse=True)
@@ -20,21 +22,27 @@ def mock_scryfall():
 
 
 @pytest.mark.asyncio
-async def test_create_deck_with_cards(client: AsyncClient, db_session: AsyncSession) -> None:
+async def test_create_deck_with_cards(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
     # First create a user because deck has a foreign key to user
-    user = User(email="test_cards@example.com", google_sub="abc123_cards", full_name="Test User Cards")
+    user = User(
+        email="test_cards@example.com",
+        google_sub="abc123_cards",
+        full_name="Test User Cards",
+    )
     db_session.add(user)
     await db_session.commit()
     await db_session.refresh(user)
 
     deck_data = {
-        "title": "Test Deck with Cards", 
-        "format": "Standard", 
+        "title": "Test Deck with Cards",
+        "format": "Standard",
         "user_id": user.id,
         "cards": [
             {"card_id": "card-1", "quantity": 4, "board": "main"},
-            {"card_id": "card-2", "quantity": 1, "board": "side"}
-        ]
+            {"card_id": "card-2", "quantity": 1, "board": "side"},
+        ],
     }
     response = await client.post(f"{settings.API_V1_STR}/decks/", json=deck_data)
     assert response.status_code == 200, response.json()
@@ -44,30 +52,101 @@ async def test_create_deck_with_cards(client: AsyncClient, db_session: AsyncSess
     assert data["cards"][0]["card_id"] == "card-1"
     assert data["cards"][1]["quantity"] == 1
 
+
+@pytest.mark.asyncio
+async def test_create_deck_syncs_reversible_card_using_front_face_fields(
+    client: AsyncClient, db_session: AsyncSession, mock_scryfall
+) -> None:
+    # Regression test for sync_cards' own top-level-only assumption (same bug
+    # as `_card_row` in scryfall_ingestion.py) -- a card fetched live via
+    # get_cards_by_ids and synced through this route must also fall back to
+    # card_faces for a reversible-layout card's name/type_line/image_uris.
+    user = User(
+        email="test_reversible@example.com",
+        google_sub="rev123",
+        full_name="Reversible User",
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    mock_scryfall.get_cards_by_ids.return_value = [
+        {
+            "id": "reversible-command-tower",
+            "name": "Command Tower // Command Tower",
+            "mana_cost": "",
+            "oracle_text": None,
+            "colors": [],
+            "produced_mana": ["B", "G", "R", "U", "W"],
+            "legalities": {"commander": "legal"},
+            "card_faces": [
+                {
+                    "name": "Command Tower",
+                    "type_line": "Land",
+                    "image_uris": {"normal": "https://example.com/front.jpg"},
+                },
+                {
+                    "name": "Command Tower",
+                    "type_line": "Land",
+                    "image_uris": {"normal": "https://example.com/back.jpg"},
+                },
+            ],
+        }
+    ]
+
+    deck_data = {
+        "title": "Reversible Card Deck",
+        "user_id": user.id,
+        "cards": [
+            {"card_id": "reversible-command-tower", "quantity": 1, "board": "main"}
+        ],
+    }
+    response = await client.post(f"{settings.API_V1_STR}/decks/", json=deck_data)
+    assert response.status_code == 200, response.json()
+
+    result = await db_session.execute(
+        select(Card).where(Card.id == "reversible-command-tower")
+    )
+    card = result.scalar_one()
+    assert card.name == "Command Tower"
+    assert card.type_line == "Land"
+    assert card.image_uris == {"normal": "https://example.com/front.jpg"}
+
+
 @pytest.mark.asyncio
 async def test_update_deck_cards(client: AsyncClient, db_session: AsyncSession) -> None:
-    user = User(email="test_update@example.com", google_sub="upd123", full_name="Update User")
+    user = User(
+        email="test_update@example.com", google_sub="upd123", full_name="Update User"
+    )
     db_session.add(user)
     await db_session.commit()
     await db_session.refresh(user)
 
     # 1. Create deck
-    create_res = await client.post(f"{settings.API_V1_STR}/decks/", json={
-        "title": "Initial Deck", "user_id": user.id, "cards": [{"card_id": "old-card", "quantity": 1, "board": "main"}]
-    })
+    create_res = await client.post(
+        f"{settings.API_V1_STR}/decks/",
+        json={
+            "title": "Initial Deck",
+            "user_id": user.id,
+            "cards": [{"card_id": "old-card", "quantity": 1, "board": "main"}],
+        },
+    )
     deck_id = create_res.json()["id"]
 
     # 2. Update deck (replace cards)
     update_data = {
         "title": "Updated Deck",
-        "cards": [{"card_id": "new-card", "quantity": 4, "board": "main"}]
+        "cards": [{"card_id": "new-card", "quantity": 4, "board": "main"}],
     }
-    response = await client.put(f"{settings.API_V1_STR}/decks/{deck_id}", json=update_data)
+    response = await client.put(
+        f"{settings.API_V1_STR}/decks/{deck_id}", json=update_data
+    )
     assert response.status_code == 200, response.json()
     data = response.json()
     assert data["title"] == "Updated Deck"
     assert len(data["cards"]) == 1
     assert data["cards"][0]["card_id"] == "new-card"
+
 
 @pytest.mark.asyncio
 async def test_read_decks(client: AsyncClient, db_session: AsyncSession) -> None:
@@ -106,7 +185,9 @@ async def test_get_deck_by_id(client: AsyncClient, db_session: AsyncSession) -> 
 
 
 @pytest.mark.asyncio
-async def test_cannot_access_another_users_deck(client: AsyncClient, db_session: AsyncSession) -> None:
+async def test_cannot_access_another_users_deck(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
     owner = User(email="owner@example.com", google_sub="owner_sub", full_name="Owner")
     other = User(email="other@example.com", google_sub="other_sub", full_name="Other")
     db_session.add(owner)
@@ -118,7 +199,8 @@ async def test_cannot_access_another_users_deck(client: AsyncClient, db_session:
     # Create a deck as the owner (get_current_user's dev stub returns the first
     # user in the db, so it resolves to `owner` here since no override is set yet)
     create_res = await client.post(
-        f"{settings.API_V1_STR}/decks/", json={"title": "Private Deck", "user_id": owner.id}
+        f"{settings.API_V1_STR}/decks/",
+        json={"title": "Private Deck", "user_id": owner.id},
     )
     deck_id = create_res.json()["id"]
 
