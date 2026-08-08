@@ -39,11 +39,14 @@ export const DeckBuilderSearch: React.FC<DeckBuilderSearchProps> = ({
 
     const fetchCards = async () => {
       try {
-        const res = await apiClient.get("/cards/search", {
+        // Local-DB-backed (see backend app/api/routes/cards.py
+        // local_search_cards) instead of /cards/search, which proxies live
+        // to Scryfall's full-text search on every keystroke.
+        const res = await apiClient.get("/cards/local-search", {
           params: { q: debouncedInput },
         });
         if (active) {
-          setOptions(res.data.data || []);
+          setOptions(res.data || []);
         }
       } catch (err) {
         console.error("Search failed", err);
