@@ -10,7 +10,7 @@ from app.models.collection import CollectionCard
 from app.models.card import Card
 from app.schemas.collection import CollectionCardCreate, CollectionCardRead, CollectionCardUpdate
 from app.api.deps import get_current_user
-from app.services.scryfall import ScryfallService, get_scryfall_service
+from app.services.scryfall import ScryfallService, get_scryfall_service, resolve_card_fields
 
 router = APIRouter()
 
@@ -44,16 +44,19 @@ async def add_to_collection(
     if not card:
         # Fetch from Scryfall
         scryfall_card = await scryfall.get_card_by_id(item_in.card_id)
-        # Create local Card
-        # Map scryfall_card dict to Card model
+        # Multi-faced cards (transform/modal-DFC/reversible/art-series) don't
+        # always carry top-level name/type_line/image_uris — see
+        # `resolve_card_fields`'s docstring for the live-API-confirmed cases.
+        fields = resolve_card_fields(scryfall_card)
         card = Card(
             id=scryfall_card["id"],
-            name=scryfall_card["name"],
+            name=fields["name"],
             mana_cost=scryfall_card.get("mana_cost"),
-            type_line=scryfall_card.get("type_line"),
+            type_line=fields["type_line"],
             oracle_text=scryfall_card.get("oracle_text"),
             colors=scryfall_card.get("colors"),
-            image_uris=scryfall_card.get("image_uris"),
+            image_uris=fields["image_uris"],
+            card_faces=fields["card_faces"],
         )
         db.add(card)
         await db.commit()

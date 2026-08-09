@@ -60,6 +60,7 @@ def _card_row(card_data: Dict[str, Any]) -> Dict[str, Any]:
         "produced_mana": card_data.get("produced_mana"),
         "image_uris": fields["image_uris"],
         "legalities": card_data.get("legalities"),
+        "card_faces": fields["card_faces"],
     }
 
 

@@ -79,6 +79,7 @@ async def sync_cards(db: AsyncSession, card_ids: List[str], scryfall: ScryfallSe
             existing_card.produced_mana = produced_mana
             existing_card.image_uris = fields["image_uris"]
             existing_card.legalities = card_data.get("legalities")
+            existing_card.card_faces = fields["card_faces"]
             db.add(existing_card)
         else:
             # Create new
@@ -92,6 +93,7 @@ async def sync_cards(db: AsyncSession, card_ids: List[str], scryfall: ScryfallSe
                 produced_mana=produced_mana,
                 image_uris=fields["image_uris"],
                 legalities=card_data.get("legalities"),
+                card_faces=fields["card_faces"],
             )
             db.add(card)
 

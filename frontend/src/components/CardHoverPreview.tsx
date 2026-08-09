@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Card, CardMedia, Fade, Typography, Stack, Divider } from "@mui/material";
 import { useCardHover } from "../context/useCardHover";
 import { useLocation } from "react-router-dom";
+import { getFlippableFaces } from "../utils/cardFaces";
 
 export const CardHoverPreview: React.FC = () => {
   const { hoveredCard } = useCardHover();
@@ -11,6 +12,12 @@ export const CardHoverPreview: React.FC = () => {
   if ((location.pathname.startsWith("/decks/") && location.pathname !== "/decks") || location.pathname === "/collection") {
       return null;
   }
+
+  // Double-faced/split cards: show both faces at once rather than a
+  // click-to-flip control -- this panel only exists while the mouse stays
+  // over the *source* row, so a button inside it would vanish the moment
+  // the pointer moved toward it (mouseleave on the source fires first).
+  const faces = getFlippableFaces(hoveredCard);
 
   return (
     <Fade in={!!hoveredCard} timeout={200}>
@@ -38,53 +45,107 @@ export const CardHoverPreview: React.FC = () => {
             borderColor: "divider",
           }}
         >
-          <Stack spacing={1}>
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <Typography variant="subtitle1" fontWeight="700" lineHeight={1.2}>
-                {hoveredCard?.name}
+          {faces ? (
+            <Stack divider={<Divider />} spacing={1.5}>
+              {faces.map((face) => (
+                <Stack key={face.name} spacing={1}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <Typography variant="subtitle1" fontWeight="700" lineHeight={1.2}>
+                      {face.name}
+                    </Typography>
+                    <Typography variant="caption" sx={{ bgcolor: "action.hover", px: 0.5, borderRadius: 0.5 }}>
+                      {face.mana_cost}
+                    </Typography>
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" fontWeight="700">
+                    {face.type_line}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ whiteSpace: "pre-wrap", fontSize: "0.8rem", color: "text.primary" }}
+                  >
+                    {face.oracle_text}
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
+          ) : (
+            <Stack spacing={1}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <Typography variant="subtitle1" fontWeight="700" lineHeight={1.2}>
+                  {hoveredCard?.name}
+                </Typography>
+                <Typography variant="caption" sx={{ bgcolor: "action.hover", px: 0.5, borderRadius: 0.5 }}>
+                  {hoveredCard?.mana_cost}
+                </Typography>
+              </Box>
+              <Typography variant="caption" color="text.secondary" fontWeight="700">
+                {hoveredCard?.type_line}
               </Typography>
-              <Typography variant="caption" sx={{ bgcolor: "action.hover", px: 0.5, borderRadius: 0.5 }}>
-                {hoveredCard?.mana_cost}
+              <Divider />
+              <Typography
+                variant="body2"
+                sx={{
+                  whiteSpace: "pre-wrap",
+                  fontSize: "0.8rem",
+                  color: "text.primary",
+                  py: 0.5,
+                }}
+              >
+                {hoveredCard?.oracle_text}
               </Typography>
-            </Box>
-            <Typography variant="caption" color="text.secondary" fontWeight="700">
-              {hoveredCard?.type_line}
-            </Typography>
-            <Divider />
-            <Typography
-              variant="body2"
-              sx={{
-                whiteSpace: "pre-wrap",
-                fontSize: "0.8rem",
-                color: "text.primary",
-                py: 0.5,
-              }}
-            >
-              {hoveredCard?.oracle_text}
-            </Typography>
-          </Stack>
-        </Card>
-
-        {/* Card Image */}
-        <Card
-          sx={{
-            width: 300,
-            aspectRatio: "2.5/3.5",
-            bgcolor: "transparent",
-            borderRadius: "4.5% / 3.5%",
-            overflow: "hidden",
-            boxShadow: 12,
-          }}
-        >
-          {hoveredCard?.image_uris?.normal && (
-            <CardMedia
-              component="img"
-              image={hoveredCard.image_uris.normal}
-              alt={hoveredCard.name}
-              sx={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
+            </Stack>
           )}
         </Card>
+
+        {/* Card Image(s) -- split into two narrower faces side by side for a
+            DFC, so both are visible without any click/hover interaction. */}
+        {faces ? (
+          <Box sx={{ display: "flex", gap: 1 }}>
+            {faces.map((face) => (
+              <Card
+                key={face.name}
+                sx={{
+                  width: 150,
+                  aspectRatio: "2.5/3.5",
+                  bgcolor: "transparent",
+                  borderRadius: "4.5% / 3.5%",
+                  overflow: "hidden",
+                  boxShadow: 12,
+                }}
+              >
+                {face.image_uris?.normal && (
+                  <CardMedia
+                    component="img"
+                    image={face.image_uris.normal}
+                    alt={face.name}
+                    sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                )}
+              </Card>
+            ))}
+          </Box>
+        ) : (
+          <Card
+            sx={{
+              width: 300,
+              aspectRatio: "2.5/3.5",
+              bgcolor: "transparent",
+              borderRadius: "4.5% / 3.5%",
+              overflow: "hidden",
+              boxShadow: 12,
+            }}
+          >
+            {hoveredCard?.image_uris?.normal && (
+              <CardMedia
+                component="img"
+                image={hoveredCard.image_uris.normal}
+                alt={hoveredCard.name}
+                sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            )}
+          </Card>
+        )}
       </Box>
     </Fade>
   );

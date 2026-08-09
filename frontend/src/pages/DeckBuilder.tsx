@@ -31,6 +31,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import GridViewIcon from "@mui/icons-material/GridView";
 import { apiClient } from "../api/client";
 import type { ScryfallCard, Deck, DeckCard } from "../types/mtg";
+import { getFlippableFaces } from "../utils/cardFaces";
 import { DeckCard as DeckCardComponent } from "../components/DeckCard";
 import { DeckStats } from "../components/DeckStats";
 import { DeckAdvisor } from "../components/DeckAdvisor";
@@ -658,88 +659,161 @@ export const DeckBuilder: React.FC = () => {
         </Box>
 
         {/* Hover Overlay */}
-        {hoveredCard && (
+        {hoveredCard && (() => {
+          // Double-faced/split cards: show both faces at once, side by side,
+          // rather than a click-to-flip control -- this overlay only exists
+          // while the mouse stays over the source card, so a button inside
+          // it would vanish the instant the pointer moved toward it.
+          const faces = getFlippableFaces(hoveredCard);
+          return (
           <Box className="deck-builder-overlay">
-            <Card className="deck-builder-overlay-card">
-              {hoveredCard.image_uris?.normal ? (
-                <CardMedia
-                  component="img"
-                  image={hoveredCard.image_uris.normal}
-                  alt={hoveredCard.name}
-                  sx={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                <Box
-                  sx={{
-                    width: "100%",
-                    height: "100%",
-                    bgcolor: "background.paper",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    p: 4,
-                    textAlign: "center",
-                  }}
-                >
-                  <Typography variant="h5" fontWeight="700">
-                    {hoveredCard.name}
-                  </Typography>
-                </Box>
-              )}
-            </Card>
+            {faces ? (
+              <Box sx={{ display: "flex", gap: 1.5, maxHeight: "55%", flexShrink: 1 }}>
+                {faces.map((face) => (
+                  <Card
+                    key={face.name}
+                    className="deck-builder-overlay-card"
+                    sx={{ maxHeight: "100%" }}
+                  >
+                    {face.image_uris?.normal ? (
+                      <CardMedia
+                        component="img"
+                        image={face.image_uris.normal}
+                        alt={face.name}
+                        sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    ) : (
+                      <Box
+                        sx={{
+                          width: "100%",
+                          height: "100%",
+                          bgcolor: "background.paper",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          p: 2,
+                          textAlign: "center",
+                        }}
+                      >
+                        <Typography variant="body1" fontWeight="700">
+                          {face.name}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Card>
+                ))}
+              </Box>
+            ) : (
+              <Card className="deck-builder-overlay-card">
+                {hoveredCard.image_uris?.normal ? (
+                  <CardMedia
+                    component="img"
+                    image={hoveredCard.image_uris.normal}
+                    alt={hoveredCard.name}
+                    sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <Box
+                    sx={{
+                      width: "100%",
+                      height: "100%",
+                      bgcolor: "background.paper",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      p: 4,
+                      textAlign: "center",
+                    }}
+                  >
+                    <Typography variant="h5" fontWeight="700">
+                      {hoveredCard.name}
+                    </Typography>
+                  </Box>
+                )}
+              </Card>
+            )}
 
             {/* Info Panel */}
             <Paper className="deck-builder-overlay-info">
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  mb: 1,
-                  flexShrink: 0,
-                }}
-              >
-                <Typography variant="h6" fontWeight="900" lineHeight={1.1}>
-                  {hoveredCard.name}
-                </Typography>
-                <Typography
-                  variant="subtitle2"
-                  sx={{
-                    bgcolor: "action.hover",
-                    px: 1,
-                    py: 0.5,
+              {faces ? (
+                <Stack divider={<Divider sx={{ my: 1 }} />} spacing={1} sx={{ overflow: "auto" }}>
+                  {faces.map((face) => (
+                    <Box key={face.name}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 0.5 }}>
+                        <Typography variant="subtitle1" fontWeight="900" lineHeight={1.1}>
+                          {face.name}
+                        </Typography>
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ bgcolor: "action.hover", px: 1, py: 0.5, borderRadius: 1, fontFamily: "monospace", flexShrink: 0 }}
+                        >
+                          {face.mana_cost}
+                        </Typography>
+                      </Box>
+                      <Typography variant="subtitle2" color="primary.main" fontWeight="700" gutterBottom>
+                        {face.type_line}
+                      </Typography>
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6, color: "text.primary" }}>
+                        {face.oracle_text}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              ) : (
+                <>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      mb: 1,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Typography variant="h6" fontWeight="900" lineHeight={1.1}>
+                      {hoveredCard.name}
+                    </Typography>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{
+                        bgcolor: "action.hover",
+                        px: 1,
+                        py: 0.5,
 
-                    borderRadius: 1,
-                    fontFamily: "monospace",
-                    flexShrink: 0,
-                  }}
-                >
-                  {hoveredCard.mana_cost}
-                </Typography>
-              </Box>
-              <Typography
-                variant="subtitle2"
-                color="primary.main"
-                fontWeight="700"
-                gutterBottom
-                sx={{ flexShrink: 0 }}
-              >
-                {hoveredCard.type_line}
-              </Typography>
-              <Divider sx={{ my: 1.5, flexShrink: 0 }} />
-              <Typography
-                variant="body2"
-                sx={{
-                  whiteSpace: "pre-wrap",
-                  lineHeight: 1.6,
-                  color: "text.primary",
-                }}
-              >
-                {hoveredCard.oracle_text}
-              </Typography>
+                        borderRadius: 1,
+                        fontFamily: "monospace",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {hoveredCard.mana_cost}
+                    </Typography>
+                  </Box>
+                  <Typography
+                    variant="subtitle2"
+                    color="primary.main"
+                    fontWeight="700"
+                    gutterBottom
+                    sx={{ flexShrink: 0 }}
+                  >
+                    {hoveredCard.type_line}
+                  </Typography>
+                  <Divider sx={{ my: 1.5, flexShrink: 0 }} />
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      whiteSpace: "pre-wrap",
+                      lineHeight: 1.6,
+                      color: "text.primary",
+                    }}
+                  >
+                    {hoveredCard.oracle_text}
+                  </Typography>
+                </>
+              )}
             </Paper>
           </Box>
-        )}
+          );
+        })()}
       </Box>
       <Snackbar
         open={snackbar.open}

@@ -110,4 +110,14 @@ def resolve_card_fields(card_data: Dict[str, Any]) -> Dict[str, Any]:
             name = face_names[0]
             type_line = faces[0].get("type_line") or type_line
 
-    return {"name": name, "type_line": type_line, "image_uris": image_uris}
+    return {
+        "name": name,
+        "type_line": type_line,
+        "image_uris": image_uris,
+        # Raw, unfiltered -- lets the frontend show the back face (name,
+        # mana_cost, type_line, oracle_text, image_uris are all per-face on
+        # Scryfall's side for these layouts). None rather than [] when there
+        # aren't multiple faces, so callers can treat it as "nothing to flip
+        # to" with a plain truthiness check.
+        "card_faces": faces or None,
+    }

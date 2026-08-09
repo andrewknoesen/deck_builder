@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.models.card import Card
@@ -61,6 +61,7 @@ class ScryfallCardPublic(SQLModel):
     produced_mana: Optional[List[str]] = None
     image_uris: Optional[Dict[str, str]] = None
     legalities: Optional[Dict[str, str]] = None
+    card_faces: Optional[List[Dict[str, Any]]] = None
 
 
 class DeckCardPublic(DeckCardBase):
