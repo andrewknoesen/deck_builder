@@ -15,9 +15,10 @@ import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
 import ShuffleIcon from "@mui/icons-material/Shuffle";
 import SkipNextIcon from "@mui/icons-material/SkipNext";
-import type { GameState, GoldfishAction, GoldfishZone } from "../types/goldfish";
+import type { GameState, GoldfishAction, GoldfishZone, Zones } from "../types/goldfish";
 import type { ScryfallCard } from "../types/mtg";
 import { useCardHover } from "../context/useCardHover";
+import { opponentOwnerLabel } from "../utils/goldfishLabels";
 
 interface GoldfishPlaymatProps {
   state: GameState;
@@ -25,6 +26,10 @@ interface GoldfishPlaymatProps {
   turnNumber: number | null;
   onAction: (action: GoldfishAction) => void;
   disabled?: boolean;
+  // Opponent deck's title (untrimmed), used to derive the opponent board's
+  // ownerLabel when `state.opponent_zones` is present. See
+  // GoldfishSessionPage.tsx for where this comes from.
+  opponentDeckTitle?: string;
 }
 
 const CardThumb: React.FC<{
@@ -179,39 +184,53 @@ const ZoneCountChip: React.FC<{
   );
 };
 
-export const GoldfishPlaymat: React.FC<GoldfishPlaymatProps> = ({
-  state,
+interface GoldfishPlayerBoardProps {
+  zones: Zones;
+  cardById: Record<string, ScryfallCard>;
+  lifeTotal: number;
+  onLifeChange: (newValue: number) => void;
+  // Callback already carries whichever `target` ("self"/"opponent") this
+  // board's owner corresponds to — this component stays agnostic to that.
+  onAction: (action: GoldfishAction) => void;
+  ownerLabel: string;
+  // Self board always uses the hardcoded adjective-form labels ("Your Hand
+  // (N)") regardless of `ownerLabel`'s literal value; the opponent board
+  // uses the possessive-noun form ("{ownerLabel}'s Hand (N)"). These are two
+  // distinct templates, not one applied to both sides.
+  isSelf: boolean;
+  disabled?: boolean;
+}
+
+const GoldfishPlayerBoard: React.FC<GoldfishPlayerBoardProps> = ({
+  zones,
   cardById,
-  turnNumber,
+  lifeTotal,
+  onLifeChange,
   onAction,
+  ownerLabel,
+  isSelf,
   disabled,
 }) => {
   const isLand = (cardId: string) =>
     (cardById[cardId]?.type_line ?? "").includes("Land");
 
+  const handLabel = isSelf ? `Your Hand (${zones.hand.length})` : `${ownerLabel}'s Hand (${zones.hand.length})`;
+  const battlefieldLabel = isSelf
+    ? `Your Battlefield (${zones.battlefield.length})`
+    : `${ownerLabel}'s Battlefield (${zones.battlefield.length})`;
+
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, p: 1.5 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+      <Typography variant="overline" color="text.secondary" fontWeight="700">
+        {ownerLabel}
+      </Typography>
+
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-        <Chip
-          label={turnNumber ? `Turn ${turnNumber}` : "Pre-game"}
-          size="small"
-          color="primary"
-          variant="outlined"
-        />
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<SkipNextIcon />}
-          disabled={disabled}
-          onClick={() => onAction({ type: "next_turn" })}
-        >
-          Next Turn
-        </Button>
         <Button
           size="small"
           variant="outlined"
           startIcon={<ShuffleIcon />}
-          disabled={disabled || state.library.length < 2}
+          disabled={disabled || zones.library.length < 2}
           onClick={() => onAction({ type: "shuffle" })}
         >
           Shuffle
@@ -219,7 +238,7 @@ export const GoldfishPlaymat: React.FC<GoldfishPlaymatProps> = ({
 
         <ZoneCountChip
           label="Library"
-          cardIds={state.library}
+          cardIds={zones.library}
           cardById={cardById}
           zone="library"
           onRetrieve={(cardId) =>
@@ -233,7 +252,7 @@ export const GoldfishPlaymat: React.FC<GoldfishPlaymatProps> = ({
         />
         <ZoneCountChip
           label="Graveyard"
-          cardIds={state.graveyard}
+          cardIds={zones.graveyard}
           cardById={cardById}
           zone="graveyard"
           onRetrieve={(cardId) =>
@@ -247,7 +266,7 @@ export const GoldfishPlaymat: React.FC<GoldfishPlaymatProps> = ({
         />
         <ZoneCountChip
           label="Exile"
-          cardIds={state.exile}
+          cardIds={zones.exile}
           cardById={cardById}
           zone="exile"
           onRetrieve={(cardId) =>
@@ -264,38 +283,23 @@ export const GoldfishPlaymat: React.FC<GoldfishPlaymatProps> = ({
           size="small"
           variant="contained"
           startIcon={<AddIcon />}
-          disabled={disabled || state.library.length === 0}
+          disabled={disabled || zones.library.length === 0}
           onClick={() => onAction({ type: "draw" })}
         >
           Draw
         </Button>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, ml: "auto" }}>
-          <LifeCounter
-            label="Life"
-            value={state.life_total}
-            disabled={disabled}
-            onChange={(newValue) =>
-              onAction({ type: "set_life", life_total: newValue, target: "self" })
-            }
-          />
-          <LifeCounter
-            label="Opp"
-            value={state.opponent_life_total}
-            disabled={disabled}
-            onChange={(newValue) =>
-              onAction({ type: "set_life", life_total: newValue, target: "opponent" })
-            }
-          />
+          <LifeCounter label="Life" value={lifeTotal} disabled={disabled} onChange={onLifeChange} />
         </Box>
       </Box>
 
       <Box>
         <Typography variant="overline" color="text.secondary">
-          Hand ({state.hand.length})
+          {handLabel}
         </Typography>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 0.5 }}>
-          {state.hand.map((cardId, i) => (
+          {zones.hand.map((cardId, i) => (
             <Box
               key={`${cardId}-${i}`}
               sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}
@@ -322,10 +326,10 @@ export const GoldfishPlaymat: React.FC<GoldfishPlaymatProps> = ({
 
       <Box>
         <Typography variant="overline" color="text.secondary">
-          Battlefield ({state.battlefield.length})
+          {battlefieldLabel}
         </Typography>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 0.5 }}>
-          {state.battlefield.map((cardId, i) => (
+          {zones.battlefield.map((cardId, i) => (
             <Box
               key={`${cardId}-${i}`}
               sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}
@@ -382,6 +386,82 @@ export const GoldfishPlaymat: React.FC<GoldfishPlaymatProps> = ({
           ))}
         </Box>
       </Box>
+    </Box>
+  );
+};
+
+export const GoldfishPlaymat: React.FC<GoldfishPlaymatProps> = ({
+  state,
+  cardById,
+  turnNumber,
+  onAction,
+  disabled,
+  opponentDeckTitle,
+}) => {
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, p: 1.5 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+        <Chip
+          label={turnNumber ? `Turn ${turnNumber}` : "Pre-game"}
+          size="small"
+          color="primary"
+          variant="outlined"
+        />
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<SkipNextIcon />}
+          disabled={disabled}
+          onClick={() => onAction({ type: "next_turn" })}
+        >
+          Next Turn
+        </Button>
+
+        {/* Preserved standalone "Opp" life counter (the plain 3b feature —
+            an opponent life total tracked with no opponent deck at all).
+            Only stops rendering once a real opponent board exists to carry
+            it instead. */}
+        {!state.opponent_zones && (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, ml: "auto" }}>
+            <LifeCounter
+              label="Opp"
+              value={state.opponent_life_total}
+              disabled={disabled}
+              onChange={(newValue) =>
+                onAction({ type: "set_life", life_total: newValue, target: "opponent" })
+              }
+            />
+          </Box>
+        )}
+      </Box>
+
+      <GoldfishPlayerBoard
+        zones={state}
+        cardById={cardById}
+        lifeTotal={state.life_total}
+        onLifeChange={(newValue) =>
+          onAction({ type: "set_life", life_total: newValue, target: "self" })
+        }
+        onAction={(action) => onAction({ ...action, target: "self" })}
+        ownerLabel="You"
+        isSelf
+        disabled={disabled}
+      />
+
+      {state.opponent_zones && (
+        <GoldfishPlayerBoard
+          zones={state.opponent_zones}
+          cardById={cardById}
+          lifeTotal={state.opponent_life_total}
+          onLifeChange={(newValue) =>
+            onAction({ type: "set_life", life_total: newValue, target: "opponent" })
+          }
+          onAction={(action) => onAction({ ...action, target: "opponent" })}
+          ownerLabel={opponentOwnerLabel(opponentDeckTitle)}
+          isSelf={false}
+          disabled={disabled}
+        />
+      )}
     </Box>
   );
 };

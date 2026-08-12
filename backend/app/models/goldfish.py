@@ -14,12 +14,12 @@ def _utcnow_naive() -> datetime:
 ZONES = ("library", "hand", "battlefield", "graveyard", "exile")
 
 
-class GameState(BaseModel):
+class Zones(BaseModel):
     """
-    A full snapshot of the goldfish game state at one node — library/hand/
-    battlefield/graveyard/exile as ordered card_id lists, plus life totals for
-    both players. Stored whole on every node (not a diff), same reasoning as
-    `trackers`: reading a node's state should never require replaying history.
+    One player's zones — library/hand/battlefield/graveyard/exile as ordered
+    card_id lists. Split out of `GameState` in Phase 3d so a second player's
+    zones can be nested as `GameState.opponent_zones` without duplicating
+    this shape.
     """
 
     library: List[str] = []
@@ -27,13 +27,26 @@ class GameState(BaseModel):
     battlefield: List[str] = []
     graveyard: List[str] = []
     exile: List[str] = []
-    life_total: int = 20
-    opponent_life_total: int = 20
 
     def zone(self, name: str) -> List[str]:
         if name not in ZONES:
             raise ValueError(f"Unknown zone: {name}")
         return getattr(self, name)
+
+
+class GameState(Zones):
+    """
+    A full snapshot of the goldfish game state at one node — the player's own
+    zones (inherited flat from `Zones`, so every pre-3d stored state parses
+    unchanged), plus life totals for both players and an optional second
+    player's zones. Stored whole on every node (not a diff), same reasoning
+    as `trackers`: reading a node's state should never require replaying
+    history.
+    """
+
+    life_total: int = 20
+    opponent_life_total: int = 20
+    opponent_zones: Optional[Zones] = None
 
 
 class GoldfishActionIn(BaseModel):
@@ -51,6 +64,9 @@ class GoldfishSessionBase(SQLModel):
     deck_id: int = Field(foreign_key="deck.id", index=True)
     user_id: int = Field(foreign_key="user.id", index=True)
     name: str
+    opponent_deck_id: Optional[int] = Field(
+        default=None, foreign_key="deck.id", index=True
+    )
 
 
 class GoldfishSession(GoldfishSessionBase, table=True):
@@ -61,6 +77,7 @@ class GoldfishSession(GoldfishSessionBase, table=True):
 class GoldfishSessionCreate(SQLModel):
     deck_id: int
     name: Optional[str] = None
+    opponent_deck_id: Optional[int] = None
 
 
 class GoldfishSessionPublic(GoldfishSessionBase):

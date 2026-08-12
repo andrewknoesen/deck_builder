@@ -49,8 +49,65 @@ was already independent and had a concrete design sketched. `run_ingestion()` re
 `Card` table from Scryfall's bulk `default_cards` file; `search_cards` now checks that cache first
 for plain-name queries via a new tool-side DB session, falling back to live Scryfall on a cache
 miss or Scryfall operator syntax. **Scheduling deliberately left manual** — no cron/loop/new
-container, run by hand until there's a real deployment target. **Phase 3c is still next** after
-this, whenever picked up.
+container, run by hand until there's a real deployment target.
+
+**Phase 3d (Two-deck goldfishing) — planned, not started, 2026-08-09.** Picked up next, ahead of
+Phase 3c — user-requested, small/well-scoped extension of already-shipped 3b infrastructure
+(manual dual-piloting of a second deck, still no rules checking), versus 3c's still-unscoped
+multi-month "rules-aware simulator" undertaking. Independent of whether 3c ever gets built. Both
+opening hands auto-deal at session start (product owner decision, 2026-08-09). See Phase 3d below
+for the full design.
+
+Under review, per the product owner's explicit "any gate finding sends the whole plan through
+every agent again, no exceptions" process: all five specialists (`mtg-architect`, `mtg-backend`,
+`mtg-frontend`, `mtg-qa`, `mtg-ux`) review their own portion, `mtg-em` gates last, any gate finding
+restarts the full cycle. Multiple rounds completed; fixes are cited inline where they landed in the
+section body below, most tagged with round and/or reviewer — that inline record is authoritative
+over anything this paragraph might claim about it, and round 8's `mtg-architect` pass caught this
+sentence itself overclaiming "every fix... tagged with which round" when several inline citations
+name only a reviewer, no round number. Not backfilling those individually here for the same reason
+the round-summary attempt below was abandoned: chasing completeness in prose invites the next
+overclaim rather than fixing the actual problem. **This paragraph deliberately does not summarize
+or categorize the rounds** (e.g.
+"rounds X-Y were only textual" / "round Z had more substance than round W") — every attempt at that
+kind of characterization has itself been a source of gate findings (an inaccurate summary is just
+another thing that can go stale or overclaim), so the fix is to stop attempting it here rather than
+keep re-deriving a correct version. If you want to know what a given round found, read that round's
+inline citations in the body, not a paraphrase of them.
+
+**Review complete, 2026-08-10.** Round 10's `mtg-em` gate pass found nothing, across all five
+specialists plus the gate itself, the first fully clean round of the ten this plan went through.
+Ten rounds caught real, fixed issues throughout — not just in the early rounds: the last
+substantive (non-textual) finding landed in round 10 itself (`mtg-qa`'s untested opponent-side
+empty-library `draw` case), so "converging" held all the way to the actual end rather than tailing
+off earlier than it looked.
+
+**Post-review interview held, 2026-08-10, per this file's per-phase convention.** One item the
+review process had settled by agent judgment rather than actually asking the product owner:
+mixed-format life totals. Resolved by actually asking — **opponent deck selection is now
+restricted to the same format as the primary deck**, a real new requirement (400 on mismatch), not
+just documentation of the prior behavior; see the "Same-format restriction" note under Design
+below for the full reasoning and the explicitly-deferred future relaxation. Folded into Design,
+Concrete Steps, and Verify.
+
+**Phase 3d shipped, 2026-08-11.** Routed to `mtg-backend` (Concrete Steps 1-2) then `mtg-frontend`
+(Steps 3-4), in that order since the frontend's opponent board renders against the backend's real
+response shape. See "Shipped" under Phase 3d below for the full record, including the one
+deviation from the plan (a synchronous double-submit guard, needed to actually satisfy the plan's
+own rapid-double-click Verify requirement) and the live verification actually performed.
+
+**Phase 3c parked, 2026-08-12 (user decision).** Not deleted from this file, not "revisit after
+3a/3b" anymore either — explicitly on hold with no next-pick-up trigger, superseded by Phase 5
+below as the thing actually being worked on next. Revisit only if the user brings it back up.
+
+**Phase 5 (AI-assisted card search for deck building) — picked up next, 2026-08-12.** User-
+requested: a conversational agent on the deck-building page for synergy-style card discovery
+("cards that benefit from artifacts leaving the battlefield," "cards that deal damage when an
+artifact enters") — a fundamentally different query shape than Scryfall's keyword/operator search
+or `deck_advisor_agent`'s existing `search_cards` tool, closer to semantic/vector search over card
+oracle text. User's own opening framing: a SQL + vector-DB hybrid. Routed to `mtg-architect` first
+for a design pass before any interview or implementation, per this file's own convention for
+anything crossing backend AI layer + data pipeline + frontend. See Phase 5 below once that lands.
 
 **Every phase gets an interview before implementation** — a short round of clarifying questions
 on the genuinely open design decisions, resolved and recorded before any code is written. Applied
@@ -521,6 +578,614 @@ undertaking on its own and should get its own dedicated planning pass once 3a/3b
 it's clear the tree/session infrastructure they build is actually being used and is the right
 foundation. Revisit this section then, don't try to design it in advance.
 
+### Phase 3d — Two-deck goldfishing (planned, not started)
+
+**Not a step toward 3c.** 3c is about rules automation (legality/stack/targeting) on top of one
+player's state. This is a different, smaller extension of 3b: a second player's board, still
+fully manual, still no rules checking. Independent of whether 3c ever gets built.
+
+#### Why this one, and why now
+
+Raised directly by the user: goldfishing today only tests a deck against itself (draws, curve,
+own lines). "Test the specific lines I would play against other decks" needs an actual opponent
+board — real cards they might have, not an abstract life counter — so the user can manually pilot
+*both* decks and see how a line holds up against real answers/threats, not just an empty board.
+
+**Interview outcome (resolved via conversation before writing this section, per-phase process):**
+manual dual-piloting, not an AI opponent. The user drives every action on both sides, same as
+today's single-deck philosophy (no legality checking, no automation) just doubled. `next_turn`
+stays a single shared counter and does **not** auto-draw for the opponent — auto-drawing would
+mean guessing when the opponent-side "would" draw, which is exactly the kind of implicit rules
+logic this system has deliberately avoided everywhere else. The opponent's hand is fully visible
+in the UI (not hidden) — there's no real hidden information here, one user is piloting both sides.
+
+**Resolved (product owner, 2026-08-09): auto-deal both opening hands.** Session creation deals 7
+cards to the opponent's `opponent_zones.hand` the same way it already does for the player's own —
+consistent with 3b's existing framing of the opening draw as pre-game setup, not "automation."
+Implementation-wise: this is **one** combined node, not two — drawing both starting hands is
+simultaneous pre-game setup, not a turn exchange, so it doesn't fit this system's "every
+meaningful *action*" node-per-event convention the way an actual turn does.
+
+`draw_opening_hand` does **not** take a second `Zones` argument — a second-round `mtg-architect`
+pass caught that the Actions section below already establishes the convention of reading
+`state.opponent_zones` directly rather than passing it around separately, and by the time
+`draw_opening_hand` runs in `create_session`, `build_initial_state` has already populated
+`state.opponent_zones` (it runs first). So `draw_opening_hand(state)` should internally check
+`if state.opponent_zones is not None:` and draw up to 7 into it in place, matching how every other
+zone-mutating function in this section already resolves the target. Producing a second, separately
+sourced `Zones` object would be redundant with data already on `state` and a real drift risk if a
+future call site ever passed something that wasn't actually `state.opponent_zones`.
+
+The resulting single node's label generalizes today's `"Drew opening hand (N cards)"` to also name
+the opponent's draw when present — see "Opening-hand label wording, pinned down" under Design
+below for the exact strings (round 6's `mtg-architect` pass caught this pointer saying "Concrete
+Steps" when the paragraph actually lives in Design — fixed), the single canonical statement of
+this wording (an earlier draft
+of this paragraph restated a vaguer version inline, which `mtg-em`'s gate review caught as drift
+between two parts of the same document — don't reintroduce a second copy here). Unchanged wording
+for single-deck sessions, where `state.opponent_zones` is `None` and the second draw never happens.
+
+`create_session`'s existing opening-hand node-creation guard (`if opening_state.hand:`,
+`backend/app/api/routes/goldfish.py:91`) also needs updating — this was independently caught in
+round 2 by both the `mtg-architect` and `mtg-backend` review passes, a strong signal it's real
+(round tag added in round 7, per `mtg-architect`'s pass flagging this citation as missing one). As
+written
+today the guard is self-hand-only: for a two-deck session where the primary deck's library is
+empty (or too small to draw anything) but the opponent's deck has cards, a literal port would
+silently skip creating the combined node entirely, dropping the opponent's dealt hand along with
+it even though it was computed. Needs to become something like `if opening_state.hand or
+(opening_state.opponent_zones and opening_state.opponent_zones.hand):`.
+
+#### Ground truth this plan is built on
+
+Verified directly against the current code (not just described) by two `mtg-architect` review
+passes plus dedicated `mtg-backend`/`mtg-frontend`/`mtg-qa`/`mtg-ux` review passes on their
+respective portions, all before any implementation — corrections from all of them are folded in
+below and throughout this section, not left as separate review notes, since this section should
+reflect what's actually true, not what the first draft assumed. `mtg-backend` additionally
+confirmed the core `Zones`/`GameState` split empirically (built and round-tripped the exact model
+below), not just by reading it.
+
+- `GoldfishSession` (`backend/app/models/goldfish.py:50-68`) has a single `deck_id`. No opponent
+  concept at all beyond `GameState.opponent_life_total` (a bare int, added in 3b's usability
+  follow-up) — no opponent library/hand/battlefield.
+- `GameState` (`goldfish.py:17-36`) is a flat pydantic model: `library`/`hand`/`battlefield`/
+  `graveyard`/`exile`/`life_total`/`opponent_life_total`, stored whole as JSON on
+  `GoldfishNode.state` (no per-node diffing, established in 3b and still the right call here —
+  doubling the state size for a ~60-100 card deck across ~10-20 turn branches is still
+  negligible). Critically: `GoldfishNodePublic.state` (`backend/app/models/goldfish.py:91`, via
+  `GoldfishNodeBase`) is typed `Optional[Dict]`, **not** `GameState` — FastAPI's `response_model`
+  never re-validates or
+  reshapes it, so the only place `GameState`'s exact shape matters at all is
+  `GameState(**parent_node.state)` in the route (`backend/app/api/routes/goldfish.py:187`). This is why
+  the "zero migration" claim below is actually true, not just hoped-for — confirmed by grepping
+  the whole repo for other `GoldfishNode.state` consumers; there are none outside the goldfish
+  model/service/route/tests.
+- `GoldfishActionIn` (`goldfish.py:39-47`) **already has** a `target: Literal["self","opponent"] =
+  "self"` field — added in 3b for `set_life` specifically. This plan generalizes it to every
+  zone-mutating action type instead of adding a parallel field, since it's already the exact right
+  shape. `next_turn` is handled in the route, not `apply_action`, and per the interview outcome
+  doesn't touch the opponent at all — `target` is simply inert for it.
+- `apply_action`/`draw_card`/`draw_opening_hand` (`backend/app/services/goldfish.py`) are all
+  written directly against a flat `GameState`'s top-level zone fields — every zone-mutating
+  function needs to become target-aware, not just `set_life`.
+- `build_initial_state(deck)` (`goldfish.py:10-26`) builds one player's shuffled library from one
+  `Deck`. Needs an optional second `Deck` argument.
+- `create_session` (`backend/app/api/routes/goldfish.py:66-67`) already 403s if the primary
+  deck's `user_id` doesn't match the current user. No equivalent check exists for a second deck
+  yet, since there is no second deck yet — this needs to be added new, not "extended," for
+  whichever deck ends up in the `opponent_deck_id` slot.
+- Card-name lookup for auto-labels (`backend/app/api/routes/goldfish.py:203-215`) is **already
+  deck-agnostic** — one query against the deck-independent `Card` table over whatever `card_id`s
+  appear in `all_card_ids`, built from the current state's zones. It does not build a per-deck map
+  today and doesn't need to; it just needs `opponent_zones`' five lists folded into the same
+  `all_card_ids` set before that one query runs. That fold must be null-guarded
+  (`{*state.opponent_zones.library, ...} if state.opponent_zones else set()`) — `mtg-backend`
+  flagged that a plain single-deck session issuing `set_life(target=opponent)` still reaches this
+  code path (it's excluded only from the zone-mutation dispatch, not from label generation), and an
+  unconditional `state.opponent_zones.library` access there would `AttributeError` on exactly the
+  regression case this plan is most worried about protecting.
+- The existing test helpers `_make_deck_with_cards`/`_make_deck_with_many_cards`
+  (`backend/app/tests/api/routes/test_goldfish_actions.py`) each create a **new** `User` bundled
+  with every deck (unique `email`/`google_sub`, enforced at the DB level —
+  `backend/app/models/user.py`). `mtg-backend` confirmed calling either twice to get "two decks,
+  one owner" fails on that unique constraint — a new helper taking an existing `User` and creating
+  only the deck is needed before Step 1's test list is actually writable, not just reworded.
+- The two prior goldfish migrations (`2040f7f42c18`, `97dfa370d0ca`) were each a single
+  `op.add_column(..., sa.JSON())` with no constraint. The original table-creation migration
+  (`957916eed363`) already has four foreign keys, so `opponent_deck_id` isn't "the first
+  foreign-key-adding migration" outright (round 5's `mtg-architect` pass caught that overclaim) —
+  it's the **first FK added via `ALTER TABLE` to an already-existing table**, since
+  `957916eed363`'s four FKs were all inline `sa.ForeignKeyConstraint`s on `op.create_table(...)`.
+  On Postgres that's `op.add_column(...)` plus a separate `op.create_foreign_key(...)` (and the
+  matching `downgrade()` needs `op.drop_constraint(...)` before `op.drop_column(...)`), not the
+  one-line shape either prior migration used. `mtg-backend` flagged this as worth being explicit
+  about since it's a new pattern for this file, on top of the already-noted Alembic-autogenerate
+  caution below.
+- Frontend: `GoldfishPlaymat.tsx` renders one `GameState` directly. Today's single shared row
+  (`GoldfishPlaymat.tsx:194-291`) mixes concepts that the interview outcome splits apart: the Turn
+  chip and Next Turn button are genuinely shared (one turn counter, confirmed by the interview),
+  but Draw, Shuffle, the library/graveyard/exile zone chips, and both `LifeCounter`s ("Life" and
+  "Opp") are all **self-scoped** today, not shared — under dual-piloting, the opponent side needs
+  its own Draw/Shuffle/zone-chips/life-counter too, not just its own hand/battlefield. `LifeCounter`
+  (`GoldfishPlaymat.tsx:61`) is a module-private sub-component, not exported.
+  `GoldfishSessionPage.tsx` fetches exactly one `deck` for the whole page and builds one
+  `cardById` map from it, used by both the deck-list sidebar and the playmat.
+- `Goldfish.tsx`'s new-session dialog takes only a name; deck is chosen on the page before that.
+
+#### Design
+
+**Data model — additive, not restructured, specifically to avoid migrating existing sessions'
+JSON:**
+
+```python
+class Zones(BaseModel):
+    library: List[str] = []
+    hand: List[str] = []
+    battlefield: List[str] = []
+    graveyard: List[str] = []
+    exile: List[str] = []
+
+    def zone(self, name: str) -> List[str]: ...  # unchanged from today's GameState.zone
+
+class GameState(Zones):
+    life_total: int = 20
+    opponent_life_total: int = 20
+    opponent_zones: Optional[Zones] = None   # NEW — None for every existing session
+```
+
+`GameState` inherits `Zones` rather than composing it, so the top-level JSON shape for a
+single-deck session's own state is byte-for-byte unchanged (`library`, `hand`, etc. stay at the
+top level) — every existing stored `GoldfishNode.state` blob parses into this exactly as before,
+`opponent_zones` just defaults to `None` on load. Zero Alembic migration for the JSON itself (it's
+already an untyped JSON column, and — per the Ground Truth note above — nothing outside the
+`GameState(**parent_node.state)` call site depends on its exact shape). This is a deliberate asymmetry —
+self stays flattened on `GameState`, opponent is nested under `opponent_zones` — traded for
+genuinely zero migration risk on every session created before this phase, matching this file's own
+precedent (e.g. 3b's `opponent_life_total` addition needing no migration either, same reasoning).
+`mtg-architect` reviewed this specific tradeoff against the real code and confirmed it holds.
+
+`GoldfishSession` gets one new nullable column: `opponent_deck_id: Optional[int] =
+Field(default=None, foreign_key="deck.id", index=True)` — `index=True` per round 5's `mtg-backend`
+pass, matching every other FK field on this model (`deck_id`/`user_id` on `GoldfishSessionBase`,
+`session_id`/`parent_id` on `GoldfishNodeBase` all declare it; nothing currently queries by
+`opponent_deck_id` directly, so this is a convention-consistency fix, not a correctness one).
+Three schema classes end up with the field, but it only needs to be **written in two places** —
+`GoldfishSessionBase` (from which
+`GoldfishSession`/`GoldfishSessionPublic` both inherit it automatically) *and*
+`GoldfishSessionCreate`, which does not inherit `GoldfishSessionBase` and redeclares its own
+fields fresh (`goldfish.py:61-64`). Missing `GoldfishSessionCreate` means the field would silently
+never reach the DB from the request — an easy miss, called out explicitly so it isn't. Nullable
+throughout, so every existing session (and every new single-deck session) is completely
+unaffected — this phase is opt-in per session.
+
+**Actions** — `GoldfishActionIn.target` already exists; extend `apply_action` (and `draw_card`,
+which currently takes a `GameState` and needs to instead take a `Zones`) to resolve which `Zones`
+object a **zone-mutating** action mutates (`draw`, `play_land`, `cast`, `move_zone`, `shuffle`):
+
+```python
+next_state = state.model_copy(deep=True)  # apply_action already does this today
+target_zones = next_state if action.target == "self" else next_state.opponent_zones
+if target_zones is None:
+    raise ValueError("This session has no opponent deck")
+```
+
+then mutate `target_zones` and reassign: `next_state` (self case, same as today, valid Liskov
+substitution since `GameState` *is* a `Zones`) or `next_state.opponent_zones = <mutated copy>`
+(opponent case, a genuinely new `Zones` object that must be explicitly reassigned back).
+
+`set_life` is explicitly **excluded** from the "no opponent deck → error" behavior above — it's
+already target-aware today via the separate `opponent_life_total` field (outside `Zones` on both
+sides, no duplication with a nested `opponent_zones.life_total`), and a single-deck session's
+`set_life(target=opponent)` is existing, shipped behavior (the bare opponent-life-counter feature
+from 3b's follow-up) that must keep working with no `opponent_deck_id` at all. Getting this wrong
+would be a real regression, not just a missed edge case — worth double-checking directly in
+review, not just in the plan.
+
+**Session creation**: `build_initial_state(deck, opponent_deck=None)` — shuffles the opponent's
+mainboard into `opponent_zones` when given, exactly like the player's own. The route needs to
+fetch both decks (`selectinload` on each) before calling it, **and must 403 if the opponent
+deck's `user_id` doesn't match the current user**, mirroring the existing check on the primary
+deck (`goldfish.py:66-67`) — without this, a user could pass another user's `opponent_deck_id` and
+read that deck's card list into their own session. No change needed to card-name lookup for
+labels beyond folding `opponent_zones`' five lists into the existing `all_card_ids` set (see
+Ground Truth above) — it's already one deck-agnostic query, not something that needs a second
+per-deck map.
+
+One deliberate non-restriction worth recording rather than leaving ambiguous, per `mtg-backend`'s
+review: `opponent_deck_id == deck_id` (piloting a deck against a copy of itself) is not blocked —
+legitimate mirror-match use case, and mechanically safe since `build_initial_state` independently
+shuffles two separate `list[str]` copies of the same card pool with no shared mutable state.
+
+**Same-format restriction (product owner decision, 2026-08-10, resolved at interview — not an
+agent judgment call like the item above).** The review process's original framing of the
+mixed-format life-total question ("not worth the complexity, both sides just use the primary
+deck's total") was an engineering judgment call made without actually asking the product owner.
+Asked directly: **opponent deck selection must be restricted to the same format as the primary
+deck.** `create_session` needs a new check alongside the existing ownership check — reject with a
+400 if `opponent_deck.format != deck.format` (plain equality; two decks with no format set, i.e.
+both `None`, are treated as matching, same as any other equal-value case — no special-casing
+needed). This makes the life-total question moot rather than solved: `build_initial_state`'s
+existing Commander-like-format heuristic, unchanged, now always agrees with itself on both sides
+since the formats are guaranteed equal by the time it runs. **Explicitly deferred, not forgotten**:
+relaxing this to support genuinely mixed-format pairing (each side computing its own life total
+independently) is a real future enhancement, not implemented now — if it's ever wanted, it needs
+its own design pass (at minimum: does `GameState.life_total`/`opponent_life_total`'s shared
+Commander-format-derived-from-one-deck assumption need to become two independently-derived values,
+and what should Practice Mode's UI say about starting life differing between two boards).
+
+**Node labels**: keep today's unprefixed labels for `target == "self"` (zero diff for the common
+case). Add an `"Opponent: "` prefix only for the **zone-mutating** action labels
+(`draw`/`play_land`/`cast`/`move_zone`/`shuffle`) when `target == "opponent"` — e.g.
+`"Opponent: Cast Counterspell"`. `set_life` must **not** get this generic prefix: it already
+produces its own self-describing wording (`"Opponent life: 20 → 17"`,
+`goldfish.py:112`) — applying the generic prefix on top would double up into `"Opponent: Opponent
+life: 20 → 17"`. `next_turn`'s label is unaffected either way since `target` doesn't apply to it.
+
+**Frontend**:
+- `Goldfish.tsx`: new-session dialog gets an optional second deck picker ("Playing against",
+  defaulting to none — today's single-deck flow unchanged when left empty).
+- `GoldfishSessionPage.tsx`: fetch `opponentDeck` alongside `deck` when
+  `data.session.opponent_deck_id` is set. Build **one** merged `cardById` map from both decks'
+  cards (card identity doesn't depend on which deck it came from, no meaningful collision risk) —
+  used by both boards in the playmat. Keep the two decks' card *lists* separate only for the
+  deck-list sidebar, which shows both as two collapsible sections (not a mode toggle — you want to
+  reference either deck while planning a line without losing your place).
+- `GoldfishPlaymat.tsx`: extract a `GoldfishPlayerBoard` sub-component covering everything that's
+  actually self-scoped today — hand, battlefield, zone chips, Draw, Shuffle, and the life counter
+  (not just hand/battlefield) — parameterized by `zones: Zones`, `cardById`, `lifeTotal`,
+  `onLifeChange`, an `onAction` that already carries the right `target`, an `ownerLabel: string`
+  prop (see below), and **`disabled: boolean`** (round 9's `mtg-frontend` pass caught this was
+  missing from an otherwise-presented-as-exhaustive list — today's single shared row threads
+  `disabled={addNode.isPending}` through Shuffle, Draw, every hand card's Cast/Play button, every
+  battlefield card's GY/Hand/Exile buttons, and both `LifeCounter`s, guarding against double-
+  submitting while a mutation is in flight; dropping it silently regresses that guard on both
+  boards, which is exactly what Step 3's own "behaves identically" bar exists to catch). Only the
+  Turn chip and Next Turn button stay outside it, genuinely shared. Keep
+  `GoldfishPlayerBoard` **in the same file** as the existing private helpers (`LifeCounter`,
+  `ZoneCountChip`, `CardThumb`) rather than a new file — `LifeCounter` isn't exported today, and
+  moving it would mean either exporting it or duplicating it for no reason. `GoldfishPlaymat` itself
+  becomes a thin wrapper: the existing single-board case becomes the *one* `GoldfishPlayerBoard`
+  call (not a separate old code path kept alongside a new component — that would just be two
+  implementations to drift apart), with a second conditional call when `state.opponent_zones` is
+  present.
+  - **Regression risk caught by `mtg-frontend` in round 2, fixed here**: today's bare "Opp" `LifeCounter`
+    (tracking `opponent_life_total` with no opponent deck at all — the shipped 3b follow-up
+    feature) must **not** get swallowed into a `GoldfishPlayerBoard` that only renders when
+    `opponent_zones` exists. The wrapper keeps rendering a standalone `LifeCounter` for
+    `opponent_life_total` outside any board whenever `!state.opponent_zones` (today's exact single-
+    counter-row behavior, unchanged), and only stops once a real second `GoldfishPlayerBoard`
+    exists to carry it instead.
+  - **Board-identification gap, independently caught by both `mtg-ux` and `mtg-frontend` in round
+    2, extended in rounds 6 and 7 (see below)**: with
+    identical MUI styling on both boards and no distinguishing label, a user can't reliably tell
+    which board is theirs — and because this feature has zero rules enforcement by design, acting
+    on the wrong board fails silently rather than erroring, directly undermining the point of
+    testing a specific line. This is functional, not cosmetic, so it's in initial scope (unlike the
+    deferred visual-polish pass in Step 5 below): `GoldfishPlayerBoard` takes an `ownerLabel: string`
+    prop, rendered as a small heading consistent with the existing `overline` zone headers — `"You"`
+    for the self board, the opponent deck's title, **trimmed, falling back to `"Opponent"` when
+    that trimmed result is empty** (round 9's `mtg-ux` pass caught that a whitespace-only title,
+    e.g. `"   "`, is truthy pre-trim so a naive falsy-check fallback wouldn't catch it — `deck.title`
+    has no length/non-empty validation anywhere in the backend model or the `DeckBuilder.tsx` title
+    field, confirmed reachable via ordinary use: backspace the title to nothing or a single space
+    and wait for autosave. A blank `ownerLabel` reproduces the exact "fails silently" failure mode
+    this whole fix exists to prevent, just via an unguarded edge case instead of the pronoun one
+    below — trimming before the emptiness check, not just before the pronoun check, closes both
+    with the one `.trim()` call rather than two separate guards) for the second — **also falling
+    back to `"Opponent"` whenever that same trimmed, case-insensitive title matches any of
+    `{"you", "your", "yours"}`** (round 7's `mtg-em` gate caught that a deck
+    genuinely titled "You" would otherwise reproduce the exact "You's Hand (N)" bug the two-template
+    fix below exists to eliminate, just via user-supplied deck-naming instead of the self-board
+    hardcoding that originally caused it — deck titles are free text everywhere else in this
+    codebase, nothing stops it, and `Deck.title` has no whitespace-stripping anywhere in the model.
+    Round 8's `mtg-architect` pass then caught that a single-string `"you"` comparison didn't close
+    the class it claimed to: a deck titled **"Your"** would pass that narrower guard unchanged and
+    render `"Your's Hand (N)"` — worse than the original bug, since it's now one apostrophe away
+    from the self board's actual `"Your Hand (N)"` text, the exact confusability this whole fix
+    exists to prevent. The three-string, case-insensitive, trimmed match is the closed set of
+    second-person-pronoun forms that actually violates the "always a proper noun" invariant this
+    template depends on — not deliberately narrowed further, since first/third-person pronouns like
+    "my"/"our"/"their" produce odd-but-not-confusable-with-anything-else possessives, a lesser,
+    purely cosmetic version of the same issue that doesn't carry the same board-identification risk).
+    **A single heading at the top of the board isn't enough on its own** — round 6's `mtg-ux` pass
+    pointed out each board can grow well past a screen's height once hand/battlefield card grids
+    wrap onto multiple rows (`GoldfishPlaymat.tsx:293-384`), so a user scrolled into the middle of a
+    board would lose the one identifying label while still looking at unlabeled action buttons —
+    exactly the "fails silently" failure mode this fix exists to prevent, not merely a polish gap.
+    Fold `ownerLabel` into the `Hand (N)`/`Battlefield (N)` `overline` sub-headers too, so the
+    identification signal reappears at every point a user is actually clicking, not just once above
+    the fold — **two explicit templates, not one possessive template applied to both** (round 7's
+    `mtg-ux` and `mtg-frontend` passes independently caught the same bug: a single `` "{ownerLabel}'s
+    Hand (N)" `` template renders as the self board's literal `ownerLabel` value, `"You"`, producing
+    ungrammatical `"You's Hand (N)"` — this ships immediately in Step 3, not deferred, since Step 3
+    hardcodes `ownerLabel` to `"You"` from the start). Self board: hardcoded `"Your Hand (N)"` /
+    `"Your Battlefield (N)"` (the adjective form, independent of `ownerLabel`'s literal string value
+    — not derived from it). Opponent board: `` "{ownerLabel}'s Hand (N)" `` / `` "{ownerLabel}'s
+    Battlefield (N)" `` (the possessive-noun form, correct as originally written for that case, since
+    `ownerLabel` there is always a proper noun — a deck name or the literal `"Opponent"` — never a
+    pronoun).
+- `types/goldfish.ts`: needs more than originally scoped, per `mtg-frontend`'s review —
+  - `GoldfishSession` (`types/goldfish.ts:1-7`) is missing `opponent_deck_id` entirely; add
+    `opponent_deck_id: number | null` — **not** `opponent_deck_id?:`. Round 5's `mtg-frontend` pass
+    caught that this is the `parent_id`/`turn_number`-style case (a real, always-present, typed
+    pydantic field with a default — FastAPI always includes it in the response, just `null` when
+    unset), not the `opponent_zones`-style case two bullets below (a genuinely-absent key on
+    pre-existing rows, because `state` bypasses model validation). Every other nullable field in
+    this file already uses `| null` on an always-present key, never `?:`; this should match.
+  - There is **no `Zones` type in this file today** — `GameState` declares the five zone fields
+    inline (`types/goldfish.ts:9-17`). `Zones` needs to actually be extracted as its own interface
+    that `GameState` extends (mirroring the backend split), not assumed to already exist.
+  - `opponent_zones: Zones | null` (not `Zones | undefined`/`opponent_zones?:`) — for any node
+    *created from this phase onward*, `.model_dump()` always includes an explicit `opponent_zones:
+    null`, so the stricter type reflects the common case accurately. Correction from round 4
+    (`mtg-frontend` caught this overclaiming the general case): a session's *pre-existing, untouched*
+    nodes (root, opening-hand, anything never followed by a post-3d action) genuinely have the key
+    **absent**, not `null`, on read — `GET /sessions/{id}` returns each node's `state` verbatim from
+    the DB with no re-validation through `GameState` (see the `GoldfishNodePublic.state: Optional[
+    Dict]` note in Ground Truth above), which is exactly the shape the backward-compat test further
+    below is built to simulate. Doesn't change the chosen type or any code in Steps 3/4 — `Zones |
+    null` still handles both cases fine since nothing does a strict `=== null`/`=== undefined`
+    check — it was purely the justifying sentence that overclaimed.
+
+**Opening-hand label wording, pinned down** (was left vague as "or naming an uneven count" before
+`mtg-qa`'s review pointed out that's not something a test can assert against): both sides drawing
+exactly 7 keeps the shorthand `"Drew opening hands (7 cards each)"`; any other combination
+(opponent's library ran out early, or vice versa) uses `"Drew opening hands ({self} card{s};
+opponent drew {opp} card{s})"` — e.g. self=7/opponent=4 renders `"Drew opening hands (7 cards;
+opponent drew 4 cards)"` (the template's own `{opp} card{s}` clause always keeps the noun — an
+earlier draft's worked example dropped it, "opponent drew 4", which `mtg-architect`'s round-3 pass
+caught as the template and its own example disagreeing; this is the one corrected, literal string,
+not a second competing version). A single-deck session (`state.opponent_zones is None`) keeps
+today's exact `"Drew opening hand (N cards)"` wording, untouched.
+
+#### Concrete steps
+
+1. **Test scaffolding first.** Add a `_make_deck_for_user(client, db_session, user, title, cards)`
+   helper to `test_goldfish_actions.py` that takes an existing `User` and creates only a deck —
+   `mtg-backend` confirmed the existing `_make_deck_with_cards`/`_make_deck_with_many_cards`
+   helpers each create a *new* `User` with a unique email/sub, so getting "two decks, one owner" or
+   "two decks, different owners" for this phase's tests isn't possible without it. This blocks
+   writing any of Step 2's tests, so it comes first.
+2. **Backend foundation.** `Zones`/`GameState` split; `opponent_deck_id` added to
+   `GoldfishSessionBase` **and** `GoldfishSessionCreate` (see Design above, `index=True` included)
+   plus its migration (first FK added via `ALTER TABLE` to an already-existing table in this
+   model's history — `add_column` + a separate `create_foreign_key`, see Ground Truth above for
+   why that's the precise framing, not "first FK-adding migration" outright; not the
+   single-`add_column` shape its predecessors used); `build_initial_state` opponent support;
+   session-creation route update including the opponent-deck ownership check, **the same-format
+   restriction (product owner decision — see Design above)**, and the combined
+   opening-hand deal (one node, both
+   players, updated node-creation guard, pinned-down label wording — all per the resolved decision
+   above); target-aware `apply_action`/`draw_card` for zone-mutating actions only (`set_life`
+   explicitly unaffected); `all_card_ids` extended for labels with the required null-guard on
+   `opponent_zones`.
+
+   New tests, incorporating specific gaps `mtg-backend`/`mtg-qa` both caught in the original test
+   list rather than the vaguer "opponent-target draw/cast/move_zone/shuffle" it started as:
+   - Creating a 2-deck session: the ownership-check rejection case (403); the **format-mismatch
+     rejection case (400)** — primary deck and opponent deck with different `format` values,
+     confirm the session is *not* created (product owner decision at interview, see Design above —
+     new requirement, not present in earlier rounds' review); a same-format pair with both formats
+     `None` succeeds (confirms the plain-equality check doesn't special-case unset formats out of
+     matching); both hands land with 7 cards each *and* the opponent's library composition matches
+     `sorted(deck.cards)` (not just a count — mirrors the existing
+     `test_session_auto_shuffles_mainboard_only` pattern, catches a self/opponent deck mix-up
+     specifically) *and* the node's label is the exact happy-path string `"Drew opening hands (7
+     cards each)"` (round 3's `mtg-qa` pass caught that only the asymmetric cases below had an
+     explicit label assertion — the common case needs one too);
+     `opponent_deck_id == deck_id` (mirror-match, deliberately unrestricted per the Design note
+     above) is covered by **one** test, not the two rounds 4-5 iterated toward — round 6's
+     `mtg-backend` pass found that round 5's proposed unit test
+     (`assert initial_state.library is not initial_state.opponent_zones.library`) is itself vacuous:
+     Pydantic v2 always allocates a fresh list when validating a `List[str]` field, so that
+     assertion is `True` unconditionally, for *any* implementation of `build_initial_state`
+     — including a hypothetical buggy one that deliberately reused one already-shuffled list for
+     both sides before constructing the two `Zones`. By the time you have a constructed `GameState`,
+     Pydantic has already decoupled the two lists regardless of what happened before validation, so
+     no test at the `GameState`/`Zones` object boundary can actually distinguish a correct
+     implementation from an aliased one. The underlying conclusion, once traced this far: the "no
+     shared mutable state" risk the Design note originally worried about isn't a risk `build_
+     initial_state` could introduce in the first place — it's structurally prevented by Pydantic's
+     own validation semantics, not by anything the implementation needs to get right. There's
+     nothing to regression-test here, so there's no test for it. What *is* real and worth testing is
+     the separate, correctly-scoped claim from round 5: that `target: "self"` action dispatch never
+     touches `opponent_zones`, even in the mirror-match case — create the session, `target: "self"`
+     draw/shuffle, assert `opponent_zones.library` unchanged from a pre-action snapshot. That's the
+     one test this bullet keeps.
+   - Opponent-target **draw, play_land, cast, move_zone, shuffle** (all five zone-mutating types,
+     not a subset) each asserting the **exact label string**, not just the resulting state — e.g.
+     `"Opponent: Cast Card A"` with the real card name resolved, not a raw `card_id` leaking
+     through a missed `all_card_ids` fold. For at least one of the five (round 7's `mtg-qa` pass
+     caught this was missing, mirroring the same bug class the mirror-match and `next_turn` tests
+     already guard against): also confirm the **self side's own zones** (`library`/`hand`/
+     `battlefield`/`graveyard`/`exile`) are unchanged from a pre-action snapshot — checking only
+     that the opponent side gained the change isn't enough to catch a bug that builds `target_zones`
+     from `next_state` instead of `next_state.opponent_zones` (see the reassignment note in Design
+     above), which could still produce a correct-looking label while mutating the wrong side. One
+     matching self-target assertion *in a session that has `opponent_zones` set* proving the label
+     stays unprefixed (the existing suite can't exercise this today since no existing session has
+     `opponent_zones`).
+   - Opponent-target `draw` against an **empty** `opponent_zones.library` — round 10's `mtg-qa` pass
+     caught this was the one edge case with dedicated self-side coverage
+     (`test_draw_with_empty_library_does_not_crash`) but no opponent-side equivalent, even though
+     `draw_card`'s signature is changing in this exact phase (`GameState` → `Zones`, see Design
+     above) and its empty-input path is a distinct success case, not generic validation shared
+     across all five action types the way the others' failure paths are. Confirm no crash,
+     `opponent_zones.hand` unchanged, and the label reads `"Opponent: Tried to draw with an empty
+     library"` (prefixed, not a raw crash).
+   - `set_life(target=opponent)` on a plain single-deck session (no `opponent_deck_id` at all)
+     still works exactly as today, wording included (`"Opponent life: 20 → 17"`, proving no
+     double-prefix).
+   - A zone-mutating opponent-target action against a session with no `opponent_deck_id` returns
+     400 with the exact `detail` (`"This session has no opponent deck"`), explicitly *not* tested
+     for `set_life`.
+   - Opening-hand asymmetry, three cases, each asserting the exact pinned-down label wording above
+     (`draw_opening_hand` draws each side independently and isn't symmetric by construction):
+     opponent deck with an empty mainboard (0 cards — confirm no crash, `opponent_zones.hand ==
+     []`); **both** decks' libraries at exactly 1 card, not just the opponent's — round 8's `mtg-qa`
+     pass caught that the pinned label template has two independent singular/plural branches
+     (`{self} card{s}` and `{opp} card{s}`), picked 1 for the opponent side only, and round 8's
+     `mtg-em` gate then caught that self never hits exactly 1 across any of the three cases (7 in
+     cases 1-2, 0 in case 3) — a template that always rendered the plural form on the self side
+     specifically would still pass every test undetected, same bug class as the self/opponent
+     zone-mutation asymmetry already fixed in rounds 6-7, just for a string-formatting branch
+     instead. One case with both sides at exactly 1 forces both singular branches at once
+     (`"Drew opening hands (1 card; opponent drew 1 card)"`), tighter than a fourth case per this
+     doc's own YAGNI convention; and — pinned specifically, not just "the
+     player's library small," per round 3's `mtg-qa` pass — the **primary deck's library empty
+     (0 cards) with the opponent's full**, since that's the exact scenario the updated
+     node-creation guard (`if opening_state.hand or (opening_state.opponent_zones and
+     opening_state.opponent_zones.hand):`, see "Why this one, and why now" above — round 6's
+     `mtg-architect` pass caught this pointer saying "Design" when the guard is actually defined
+     there, not in Design) exists to handle: under the old
+     self-hand-only guard this would have produced zero nodes and silently dropped the opponent's
+     dealt hand entirely, same failure mode as `test_get_session_tree_starts_with_auto_created_root`
+     documents for the pre-3d single-deck empty-library case.
+   - A single-deck session's opening-hand node label is unchanged character-for-character from
+     today's wording.
+   - **Backward-compatibility proof, not just inference**: one test manually constructs a
+     `GoldfishNode` with a hand-built `state` dict that's missing the `opponent_zones` key
+     entirely (simulating a genuinely pre-3d row, which no test creating a fresh session can
+     produce) and confirms an action against it still succeeds and stores `opponent_zones: null`.
+     Also one test asserting `set(root["state"].keys())` for a plain single-deck session equals
+     exactly `{"library", "hand", "battlefield", "graveyard", "exile", "life_total",
+     "opponent_life_total", "opponent_zones"}` — **eight** keys, including `opponent_zones` itself
+     (round 6's `mtg-qa` pass caught that leaving this unpinned invited writing the test against the
+     old seven-key set instead: `.model_dump()` has no `exclude_none` anywhere in `goldfish.py`, so
+     it always includes `opponent_zones: None` for any node created post-3d, single-deck or not —
+     same fact the backward-compat bullet just above already states correctly). "Byte-for-byte
+     unchanged" describes the *seven pre-existing* fields staying flat and identically shaped, not
+     the total key count staying at seven — this is the one assertion that actually operationalizes
+     that claim, rather than leaving it as an inference from unrelated field checks continuing to
+     pass.
+   - **`next_turn` never touches the opponent side in a 2-deck session** — round 6's `mtg-qa` pass
+     caught that this is a headline, explicitly-resolved interview decision (see "Why this one, and
+     why now" above: "`next_turn` stays a single shared counter and does **not** auto-draw for the
+     opponent") with no test locking it in, unlike nearly every other stated behavioral guarantee in
+     this list. True "for free" today since the route's `next_turn` branch only ever calls
+     `draw_card` on the self side — but exactly the kind of implicit guarantee a later "helpful"
+     symmetry-driven change could silently break without a test to catch it. One test: in a 2-deck
+     session, `next_turn`, assert `opponent_zones` is byte-for-byte unchanged from before the action.
+   - Full existing suite must stay green with zero changes.
+
+   Per Phase 3a's own recorded experience, Alembic autogenerate hasn't worked directly against this
+   environment's real Postgres — expect to hand-write the migration and verify via `alembic
+   upgrade head` / `downgrade -1` inside the running backend container, not autogenerate-and-trust.
+3. **Frontend, part one — refactor only, one deliberate visible exception.** Extract
+   `GoldfishPlayerBoard` out of `GoldfishPlaymat.tsx` as described above (including the
+   standalone-opponent-`LifeCounter` preservation for the no-opponent-deck case) and confirm the
+   existing single-deck goldfish UI behaves identically before adding anything new — isolates "did
+   the extraction break the working case" from "does the new case work," rather than shipping both
+   changes at once. Round 6's `mtg-ux` pass caught that "renders... identically" overstated this:
+   the always-on `"You"`/`"Your Hand (N)"`/`"Your Battlefield (N)"` labels (grammar corrected per
+   round 7, see Design above) are a real, new, user-visible addition to every existing single-deck
+   session's playmat, not a no-diff refactor — correct as the wording now stands ("behaves
+   identically," not "renders"), and it's fine for this one labeling change to ship alongside the
+   refactor rather than waiting for Step 4, since it's static
+   text with no interactive/functional difference to isolate a regression in. Extract the `Zones`
+   type in `types/goldfish.ts` as part of this step (needed by `GoldfishPlayerBoard`'s props
+   regardless of whether an opponent exists yet); `GoldfishPlayerBoard` takes its `ownerLabel` prop
+   from the start, hardcoded to `"You"` on the only board that exists at
+   this point.
+4. **Frontend, part two — new feature.** Add `opponent_deck_id` to the `GoldfishSession` type
+   **and `opponent_zones: Zones | null` to `GameState`** (round 10's `mtg-frontend` pass caught that
+   Design lists three `types/goldfish.ts` changes but only two — the `Zones` extraction in Step 3,
+   `opponent_deck_id` here — were ever assigned to a specific step; this one was never explicitly
+   placed anywhere despite this same step's next clause requiring `state.opponent_zones` to already
+   exist as a typed field); opponent deck picker on session creation; `GoldfishSessionPage.tsx`
+   fetching/merging both decks into one `cardById`; second `GoldfishPlayerBoard` render when
+   `opponent_zones` is present, with
+   its real `ownerLabel` (the opponent deck's title, falling back to `"Opponent"`, and to the
+   pronoun-collision fallback per the Design section above — round 8's `mtg-frontend` pass noted
+   Step 3's cross-references its own round-7 fix inline and this step should do the same for the
+   guard, since it's the step that actually wires in a real deck-derived `ownerLabel` value for the
+   first time); two-section deck list sidebar.
+5. **Polish.** Verify tree labels read cleanly with both sides acting, specifically eyeballing a
+   long opponent label alongside a tracker summary in `GoldfishTree.tsx` — `mtg-frontend` noted its
+   `LEVEL_HEIGHT` row spacing is a fixed constant independent of actual rendered text height, so a
+   long wrapped label could visually crowd the row below it; not a code change unless it's actually
+   a problem in practice. Beyond the `ownerLabel` fix already folded into Steps 3-4, a dedicated
+   `mtg-ux` visual-design pass on the two-board layout (spacing, dividers, responsive stacking) is
+   deliberately *not* in this step's initial scope — `mtg-ux`'s review confirmed the deferral holds
+   for everything except the board-identification gap already addressed above. Every prior
+   sub-phase here (3a, 3b) shipped a plain first cut and iterated on real friction from actually
+   using it; revisit only if real usage surfaces an actual layout problem.
+
+#### Verify (once built)
+
+Live against the docker stack: attempt creating a 2-deck session with mismatched-format decks and
+confirm it's rejected (product owner requirement, added at interview), then create a real
+same-format 2-deck session, confirm both opening hands deal per the
+pinned-down wording above, draw/cast/move/shuffle on both sides, confirm the board-identification
+labels ("You" / opponent's deck title) actually make it obvious which board is which — including
+one run where the opponent deck is named/renamed to `"You"` (or `"your"`/`"yours"`), confirming the
+header and `Hand (N)`/`Battlefield (N)` sub-headers fall back to `"Opponent"` rather than rendering
+the confusable `"You's Hand (N)"`/`"Your's Hand (N)"` (round 8's `mtg-ux` pass caught this case had
+no automated coverage possible — no frontend test infra exists for this phase per the note below —
+and no manual check called for it either, the only safety net that could have caught the guard
+being silently dropped during implementation), and a second run where the opponent deck's title is
+renamed to whitespace-only (e.g. a single space), confirming the header **and** `Hand (N)`/
+`Battlefield (N)` sub-headers all fall back to `"Opponent"` rather than a blank heading/sub-header
+at any of the three (round 10's `mtg-ux` pass caught that this sentence had quietly dropped the
+explicit three-site enumeration its pronoun-case sibling above uses, in favor of a vaguer "a blank
+heading/sub-header" that a check could satisfy by looking at only one of the three sites — same
+underlying rationale as the pronoun case though: no automated coverage, so a missed implementation
+of the trim-then-check fix would otherwise ship unnoticed) —
+confirm `set_life(target=opponent)` still works on an existing plain single-deck session, confirm
+tree labels distinguish self vs. `"Opponent: "` actions without double-prefixing `set_life`,
+confirm an existing single-deck session (created before this phase) still opens and plays exactly
+as before, prune a node in a 2-deck session and confirm cascade-delete still works (`mtg-qa`
+confirmed this needs no new backend logic — `delete_node` only walks `parent_id`/`id`, never
+inspects `state` JSON content — but worth one live click-through since it's new UI surface), and —
+round 10's `mtg-architect` pass caught this was the one Design-flagged, automated-coverage-
+impossible risk that hadn't gotten a matching Verify bullet yet, the same category as the two
+`ownerLabel` fixes above — rapidly double-click Draw (or Shuffle, or a hand card's Cast button) on
+the **opponent** board specifically while a request is in flight, confirming the controls disable
+on both boards during the pending window and only one node gets created, not just that the action
+eventually succeeds (the `disabled` prop is wired via a separate `GoldfishPlayerBoard` call site
+for the opponent board, Step 4, distinct from the self board's — exactly where dropping the prop on
+only one of the two instantiations would be easy to miss and impossible to catch without a live
+check, per the same reasoning as the two fixes above it).
+
+No frontend automated test coverage is planned for this phase (`mtg-qa` noted this is a
+pre-existing gap across the whole frontend, not something newly introduced here) — Steps 3-4 are
+verified by this manual pass, same as every prior frontend change in this codebase.
+
+### Shipped, 2026-08-11: as designed, one scope expansion found during Verify
+
+Built exactly as designed above, routed `mtg-backend` (Steps 1-2) then `mtg-frontend` (Steps 3-4),
+sequenced that way since the frontend's opponent board needs the backend's real response shape to
+verify against live, not just to compile against a written-down type. `cd backend && uv run pytest`
+(104 passed, zero regressions) and `uv run ruff check .` clean; `npx tsc -b` and `npx eslint .`
+clean on the frontend. Migration (`1d1448d72c58`) verified against the running
+`deck_builder-backend-1`/`deck_builder-db-1` containers — `\d goldfishsession` confirmed the
+nullable `opponent_deck_id` column, its index, and `fk_goldfishsession_opponent_deck_id_deck`, all
+matching the hand-written `add_column` + `create_foreign_key` shape the Ground Truth section called
+for (not autogenerate, per Phase 3a's own precedent).
+
+**One deviation, a real scope expansion, not a plan miss**: the plan's own Verify section requires
+rapid-double-click-while-pending to produce exactly one node. Testing that live surfaced a genuine
+pre-existing race — `disabled={addNode.isPending}` only takes effect once React re-renders with the
+mutation's updated `isPending`, and a fast enough double-click fires both POSTs before that commits.
+Confirmed via network logs this reproduces identically on the untouched single-board case, so it
+predates this phase and isn't something the `GoldfishPlayerBoard` split introduced. Since the plan's
+own Verify bar named this scenario explicitly, fixed it rather than shipping a phase that fails its
+own stated check: `GoldfishSessionPage.tsx` gained a synchronous `submittingRef` guard around
+`addNode.mutate`, checked at the moment of submission rather than relying on render timing. Re-
+verified after the fix: exactly one POST per double-click on both the self and opponent boards.
+
+**Live-verified against the docker stack** (`deck_builder-frontend-1`/`-backend-1`/`-db-1`,
+confirmed separately from the implementing agent's own report): opened a real 2-deck session
+(`lathril` vs. a same-format second deck) — both boards render (`YOU` / the opponent deck's actual
+title), the tree shows `"Opponent: Cast Sol Ring"` correctly prefixed alongside unprefixed self-side
+labels, and the asymmetric opening-hand node reads the exact pinned wording,
+`"Drew opening hands (7 cards; opponent drew 1 card)"`. Mismatched-format creation, the `"You"`/
+whitespace-only opponent-title fallback (all three label sites), an untouched pre-3d single-deck
+session, and cascade-delete pruning were all exercised by the implementing agent and are recorded in
+its own report; the render/label/tree checks above were independently re-confirmed rather than taken
+on trust.
+
 ---
 
 ## Phase 4 — Scryfall bulk-data ingestion pipeline (partially done, 2026-07-27)
@@ -668,6 +1333,36 @@ twice, confirm safe upsert") — same 116,568 rows, `count(*) = count(DISTINCT i
 ~190ms including Python startup; an operator-syntax query ("t:creature c:red pow>=5") correctly
 skipped the local cache and returned live Scryfall results — confirming both branches of the
 scope-narrowing decision actually work against real data, not just mocks.
+
+---
+
+## Phase 5 — AI-assisted card search for deck building (planned, not started)
+
+### Why this one, and why now
+
+Raised directly by the user, picked up ahead of Phase 3c (explicitly parked — see Status above) as
+the thing actually being worked on next. Today's card discovery on the deck-building page is
+Scryfall keyword/operator search (`search_cards`, `DeckBuilderSearch.tsx`) — exact-text and
+structured-field matching only. The user wants to ask synergy-style natural-language questions a
+keyword search can't answer: "cards that benefit from artifacts leaving the battlefield," "cards
+that deal damage when an artifact enters the battlefield" — queries about what a card *does*
+semantically, not what text it contains literally (neither example phrase need appear verbatim in
+matching cards' oracle text). User's own opening framing for how to build this: a combination of
+SQL search and a vector DB of the MTG cards.
+
+### Status
+
+Not yet designed. Routed to `mtg-architect` for a design pass before any interview or
+implementation, per this file's own convention for any feature crossing more than one layer
+(here: the AI agent layer, a new data/embedding pipeline, and the DeckBuilder frontend). Ground
+truth to build that design on already exists in this codebase and shouldn't be re-discovered from
+scratch: `deck_advisor_agent` (Phase 1) and its stateless `search_cards` tool, the `make_agent`
+factory, the Scryfall bulk-ingestion pipeline into the local `Card` table (Phase 4) as the likely
+source for whatever gets embedded, and the existing Chroma vector-store setup already used for the
+MTG comprehensive rules index (`backend/app/ai/rag/`, `backend/app/ai/vector_store/`) as precedent
+for standing up a second, card-oracle-text collection rather than inventing new vector-store
+infrastructure. This section gets filled in once that design pass lands, same as every other phase
+in this file.
 
 ---
 

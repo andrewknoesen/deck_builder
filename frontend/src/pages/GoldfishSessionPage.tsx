@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -30,6 +30,7 @@ import type { Deck, ScryfallCard } from "../types/mtg";
 import { GoldfishTree } from "../components/GoldfishTree";
 import { NodeTrackerEditor } from "../components/NodeTrackerEditor";
 import { GoldfishPlaymat } from "../components/GoldfishPlaymat";
+import { opponentOwnerLabel } from "../utils/goldfishLabels";
 import { useCardHover } from "../context/useCardHover";
 
 export const GoldfishSessionPage: React.FC = () => {
@@ -83,6 +84,16 @@ export const GoldfishSessionPage: React.FC = () => {
     enabled: !!deckId,
   });
 
+  const opponentDeckId = data?.session.opponent_deck_id;
+  const { data: opponentDeck } = useQuery({
+    queryKey: ["deck", opponentDeckId],
+    queryFn: async () => {
+      const res = await apiClient.get(`/decks/${opponentDeckId}`);
+      return res.data as Deck;
+    },
+    enabled: !!opponentDeckId,
+  });
+
   const selectedNode = data?.nodes.find((n) => n.id === selectedNodeId);
 
   // Trackers always mirror the selected node's own snapshot; re-synced
@@ -130,6 +141,27 @@ export const GoldfishSessionPage: React.FC = () => {
     },
   });
 
+  // `disabled={addNode.isPending}` on the playmat's buttons only takes effect
+  // once React re-renders with the mutation's updated isPending state - a
+  // fast enough double-click (or double-submit on any board, self or
+  // opponent) can fire twice before that re-render commits. This ref is a
+  // synchronous guard checked at the moment of submission, closing that gap
+  // regardless of render timing.
+  const submittingRef = useRef(false);
+  const submitNode = (payload: {
+    label?: string;
+    trackers?: Record<string, number>;
+    action?: GoldfishAction;
+  }) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    addNode.mutate(payload, {
+      onSettled: () => {
+        submittingRef.current = false;
+      },
+    });
+  };
+
   const deleteNode = useMutation({
     mutationFn: async (nodeId: number) => {
       await apiClient.delete(`/goldfish/nodes/${nodeId}`);
@@ -153,8 +185,19 @@ export const GoldfishSessionPage: React.FC = () => {
     .slice()
     .sort((a, b) => (a.card?.name ?? "").localeCompare(b.card?.name ?? ""));
 
+  const opponentDeckCards = (opponentDeck?.cards ?? [])
+    .filter((dc) => dc.board === "main" || dc.board === "commander")
+    .slice()
+    .sort((a, b) => (a.card?.name ?? "").localeCompare(b.card?.name ?? ""));
+
+  // One merged cardById map from both decks — card identity doesn't depend
+  // on which deck it came from, so both playmat boards can share it. The
+  // deck-list sidebar keeps the two decks' card lists separate (below).
   const cardById: Record<string, ScryfallCard> = {};
   (deck?.cards ?? []).forEach((dc) => {
+    if (dc.card) cardById[dc.card_id] = dc.card;
+  });
+  (opponentDeck?.cards ?? []).forEach((dc) => {
     if (dc.card) cardById[dc.card_id] = dc.card;
   });
 
@@ -162,40 +205,60 @@ export const GoldfishSessionPage: React.FC = () => {
     setActionText((prev) => (prev ? `${prev}, ${name}` : name));
   };
 
-  const deckListContent = (
+  const deckCardList = (cards: typeof deckCards) => (
+    <List dense disablePadding>
+      {cards.map((dc) => (
+        <ListItemButton
+          key={`${dc.card_id}-${dc.board}`}
+          onClick={() => dc.card && addCardToActionText(dc.card.name)}
+          onMouseEnter={() => dc.card && setHoveredCard(dc.card)}
+          onMouseLeave={() => setHoveredCard(null)}
+          sx={{ borderRadius: 1, gap: 1, py: 0.5 }}
+        >
+          <Box
+            component="img"
+            src={dc.card?.image_uris?.small}
+            alt={dc.card?.name}
+            sx={{
+              width: 32,
+              height: 44,
+              objectFit: "cover",
+              borderRadius: 0.5,
+              flexShrink: 0,
+              bgcolor: "action.hover",
+            }}
+          />
+          <ListItemText
+            primary={`${dc.quantity}x ${dc.card?.name ?? dc.card_id}`}
+            slotProps={{ primary: { fontSize: 13 } }}
+          />
+        </ListItemButton>
+      ))}
+    </List>
+  );
+
+  // Two collapsible sections (not a mode toggle) when a second deck is in
+  // play, so you can reference either deck while planning a line without
+  // losing your place in the other.
+  const deckListContent = opponentDeckId ? (
+    <>
+      <Typography variant="overline" color="text.secondary" sx={{ pl: 1 }}>
+        Your Deck ({deckCards.reduce((acc, dc) => acc + dc.quantity, 0)})
+      </Typography>
+      {deckCardList(deckCards)}
+      <Divider sx={{ my: 1 }} />
+      <Typography variant="overline" color="text.secondary" sx={{ pl: 1 }}>
+        {opponentOwnerLabel(opponentDeck?.title)}'s Deck (
+        {opponentDeckCards.reduce((acc, dc) => acc + dc.quantity, 0)})
+      </Typography>
+      {deckCardList(opponentDeckCards)}
+    </>
+  ) : (
     <>
       <Typography variant="overline" color="text.secondary" sx={{ pl: 1 }}>
         Deck List ({deckCards.reduce((acc, dc) => acc + dc.quantity, 0)})
       </Typography>
-      <List dense disablePadding>
-        {deckCards.map((dc) => (
-          <ListItemButton
-            key={`${dc.card_id}-${dc.board}`}
-            onClick={() => dc.card && addCardToActionText(dc.card.name)}
-            onMouseEnter={() => dc.card && setHoveredCard(dc.card)}
-            onMouseLeave={() => setHoveredCard(null)}
-            sx={{ borderRadius: 1, gap: 1, py: 0.5 }}
-          >
-            <Box
-              component="img"
-              src={dc.card?.image_uris?.small}
-              alt={dc.card?.name}
-              sx={{
-                width: 32,
-                height: 44,
-                objectFit: "cover",
-                borderRadius: 0.5,
-                flexShrink: 0,
-                bgcolor: "action.hover",
-              }}
-            />
-            <ListItemText
-              primary={`${dc.quantity}x ${dc.card?.name ?? dc.card_id}`}
-              slotProps={{ primary: { fontSize: 13 } }}
-            />
-          </ListItemButton>
-        ))}
-      </List>
+      {deckCardList(deckCards)}
     </>
   );
 
@@ -291,8 +354,9 @@ export const GoldfishSessionPage: React.FC = () => {
                 state={selectedNode.state}
                 cardById={cardById}
                 turnNumber={selectedNode.turn_number}
-                onAction={(action) => addNode.mutate({ action })}
+                onAction={(action) => submitNode({ action })}
                 disabled={addNode.isPending}
+                opponentDeckTitle={opponentDeck?.title}
               />
               <Divider />
             </>
@@ -318,14 +382,14 @@ export const GoldfishSessionPage: React.FC = () => {
                 onChange={(e) => setActionText(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && actionText.trim()) {
-                    addNode.mutate({ label: actionText, trackers: trackerDraft });
+                    submitNode({ label: actionText, trackers: trackerDraft });
                   }
                 }}
               />
               <Button
                 variant="contained"
                 onClick={() =>
-                  addNode.mutate({ label: actionText, trackers: trackerDraft })
+                  submitNode({ label: actionText, trackers: trackerDraft })
                 }
                 disabled={!actionText.trim() || addNode.isPending}
               >

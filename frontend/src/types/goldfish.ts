@@ -1,19 +1,31 @@
 export interface GoldfishSession {
   id: number;
   deck_id: number;
+  opponent_deck_id: number | null;
   user_id: number;
   name: string;
   created_at: string;
 }
 
-export interface GameState {
+export interface Zones {
   library: string[];
   hand: string[];
   battlefield: string[];
   graveyard: string[];
   exile: string[];
+}
+
+export interface GameState extends Zones {
   life_total: number;
   opponent_life_total: number;
+  // Typed as always-present (matching every node created from Phase 3d
+  // onward, where `.model_dump()` always includes an explicit `opponent_zones:
+  // null`) even though it's genuinely absent (not `null`) on nodes created
+  // before this phase, since `state` is stored as raw JSON and never
+  // re-validated through GameState on read. `Zones | null` still handles both
+  // cases fine as long as nothing does a strict `=== null`/`=== undefined`
+  // check against this field.
+  opponent_zones: Zones | null;
 }
 
 export type GoldfishZone = "library" | "hand" | "battlefield" | "graveyard" | "exile";

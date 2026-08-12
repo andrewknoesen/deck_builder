@@ -1,9 +1,11 @@
 from unittest.mock import AsyncMock
 
 import pytest
+from app.api.deps import get_current_user
 from app.core.config import settings
 from app.main import app
 from app.models.card import Card
+from app.models.goldfish import GoldfishNode, GoldfishSession
 from app.models.user import User
 from app.services.scryfall import get_scryfall_service
 from httpx import AsyncClient
@@ -54,6 +56,39 @@ async def _make_deck_with_cards(
     return user, deck_res.json()["id"]
 
 
+async def _make_deck_for_user(
+    client: AsyncClient,
+    db_session,
+    user: User,
+    title: str,
+    cards: list[dict],
+    deck_format: str | None = None,
+):
+    """
+    Creates a deck for an *existing* user — unlike `_make_deck_with_cards`/
+    `_make_deck_with_many_cards`, which each create a brand-new `User` with a
+    unique email/google_sub. Needed to get "two decks, one owner" (or "two
+    decks, different owners" by passing two different `User`s) for Phase 3d's
+    two-deck goldfishing tests, which the unique email/sub constraint on
+    `User` otherwise makes impossible via the existing helpers.
+    """
+    app.dependency_overrides[get_scryfall_service] = lambda: AsyncMock()
+    try:
+        deck_res = await client.post(
+            f"{settings.API_V1_STR}/decks/",
+            json={
+                "title": title,
+                "format": deck_format,
+                "user_id": user.id,
+                "cards": cards,
+            },
+        )
+    finally:
+        del app.dependency_overrides[get_scryfall_service]
+    assert deck_res.status_code == 200
+    return deck_res.json()["id"]
+
+
 async def _make_deck_with_many_cards(client: AsyncClient, db_session, email: str, sub: str):
     """
     10 copies of a single mainboard card — enough to test a real 7-card
@@ -94,6 +129,43 @@ async def _get_root(client: AsyncClient, session_id: int):
         await client.get(f"{settings.API_V1_STR}/goldfish/sessions/{session_id}")
     ).json()
     return next(n for n in tree["nodes"] if n["parent_id"] is None)
+
+
+async def _make_two_deck_session(
+    client: AsyncClient,
+    db_session,
+    email: str,
+    sub: str,
+    primary_cards: list[dict],
+    opponent_cards: list[dict],
+):
+    """
+    One user, a primary deck and an opponent deck (Card rows must already be
+    committed by the caller), and a freshly created 2-deck goldfish session.
+    Returns (user, session_id, tree) where `tree` is the session's full node
+    list right after creation (root + the combined opening-hand node).
+    """
+    user = User(email=email, google_sub=sub)
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    deck_id = await _make_deck_for_user(
+        client, db_session, user, "Primary Deck", primary_cards
+    )
+    opponent_deck_id = await _make_deck_for_user(
+        client, db_session, user, "Opponent Deck", opponent_cards
+    )
+    session_id = (
+        await client.post(
+            f"{settings.API_V1_STR}/goldfish/sessions",
+            json={"deck_id": deck_id, "opponent_deck_id": opponent_deck_id},
+        )
+    ).json()["id"]
+    tree = (
+        await client.get(f"{settings.API_V1_STR}/goldfish/sessions/{session_id}")
+    ).json()
+    return user, session_id, tree
 
 
 @pytest.mark.asyncio
@@ -569,3 +641,760 @@ async def test_next_turn_respects_explicit_label_override(
     node = response.json()
     assert node["turn_number"] == 1
     assert node["label"] == "Turn 1 (on the draw)"
+
+
+# --- Phase 3d: two-deck goldfishing ---------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_two_deck_session_rejects_opponent_deck_owned_by_other_user(
+    client: AsyncClient, db_session
+) -> None:
+    # _make_deck_with_cards always seeds the same fixed card ids, so it can't
+    # be called twice in one test (duplicate Card rows) — the owner's deck
+    # uses it, the other user's deck uses `_make_deck_for_user` with its own
+    # card instead. `POST /decks/` always assigns the *current* dev-mode user
+    # as owner (`create_deck` ignores any `user_id` in the request body), so
+    # `other`'s deck has to be created under a `get_current_user` override —
+    # same pattern `test_goldfish.py`'s existing ownership test already uses
+    # — otherwise it would silently end up owned by `owner` too.
+    owner, deck_id = await _make_deck_with_cards(
+        client, db_session, "twodeck_owner@example.com", "twodeck_owner_sub"
+    )
+    other = User(email="twodeck_other@example.com", google_sub="twodeck_other_sub")
+    db_session.add(other)
+    db_session.add(
+        Card(id="card-other", name="Other Card", type_line="Land", produced_mana=["C"])
+    )
+    await db_session.commit()
+    await db_session.refresh(other)
+
+    app.dependency_overrides[get_current_user] = lambda: other
+    try:
+        opponent_deck_id = await _make_deck_for_user(
+            client,
+            db_session,
+            other,
+            "Other Deck",
+            [{"card_id": "card-other", "quantity": 1, "board": "main"}],
+        )
+    finally:
+        del app.dependency_overrides[get_current_user]
+    assert owner.id != other.id  # sanity: current_user (dev-mode) defaults to owner
+
+    response = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions",
+        json={"deck_id": deck_id, "opponent_deck_id": opponent_deck_id},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_create_two_deck_session_rejects_format_mismatch(
+    client: AsyncClient, db_session
+) -> None:
+    user = User(email="fmt_mismatch@example.com", google_sub="fmt_mismatch_sub")
+    db_session.add(user)
+    db_session.add(
+        Card(id="card-fmt1", name="Fmt Card 1", type_line="Creature", produced_mana=[])
+    )
+    db_session.add(
+        Card(id="card-fmt2", name="Fmt Card 2", type_line="Creature", produced_mana=[])
+    )
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    deck_id = await _make_deck_for_user(
+        client,
+        db_session,
+        user,
+        "Standard Deck",
+        [{"card_id": "card-fmt1", "quantity": 1, "board": "main"}],
+        deck_format="Standard",
+    )
+    opponent_deck_id = await _make_deck_for_user(
+        client,
+        db_session,
+        user,
+        "Commander Deck",
+        [{"card_id": "card-fmt2", "quantity": 1, "board": "main"}],
+        deck_format="Commander",
+    )
+
+    response = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions",
+        json={"deck_id": deck_id, "opponent_deck_id": opponent_deck_id},
+    )
+    assert response.status_code == 400
+
+    list_res = await client.get(
+        f"{settings.API_V1_STR}/goldfish/sessions", params={"deck_id": deck_id}
+    )
+    assert list_res.json() == []
+
+
+@pytest.mark.asyncio
+async def test_create_two_deck_session_allows_both_formats_none(
+    client: AsyncClient, db_session
+) -> None:
+    user = User(email="fmt_none@example.com", google_sub="fmt_none_sub")
+    db_session.add(user)
+    db_session.add(
+        Card(id="card-none1", name="None Card 1", type_line="Creature", produced_mana=[])
+    )
+    db_session.add(
+        Card(id="card-none2", name="None Card 2", type_line="Creature", produced_mana=[])
+    )
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    deck_id = await _make_deck_for_user(
+        client,
+        db_session,
+        user,
+        "Deck One",
+        [{"card_id": "card-none1", "quantity": 1, "board": "main"}],
+    )
+    opponent_deck_id = await _make_deck_for_user(
+        client,
+        db_session,
+        user,
+        "Deck Two",
+        [{"card_id": "card-none2", "quantity": 1, "board": "main"}],
+    )
+
+    response = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions",
+        json={"deck_id": deck_id, "opponent_deck_id": opponent_deck_id},
+    )
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_two_deck_session_deals_opening_hands_of_seven_each(
+    client: AsyncClient, db_session
+) -> None:
+    db_session.add(
+        Card(id="card-p", name="Primary Card", type_line="Land", produced_mana=["C"])
+    )
+    db_session.add(
+        Card(id="card-o", name="Opponent Card", type_line="Land", produced_mana=["C"])
+    )
+    await db_session.commit()
+
+    _user, _session_id, tree = await _make_two_deck_session(
+        client,
+        db_session,
+        "two_deck_hands@example.com",
+        "two_deck_hands_sub",
+        [{"card_id": "card-p", "quantity": 10, "board": "main"}],
+        [{"card_id": "card-o", "quantity": 10, "board": "main"}],
+    )
+    root = next(n for n in tree["nodes"] if n["parent_id"] is None)
+    opening = next(n for n in tree["nodes"] if n["parent_id"] == root["id"])
+
+    assert len(opening["state"]["hand"]) == 7
+    assert len(opening["state"]["opponent_zones"]["hand"]) == 7
+    # Composition, not just count — catches a self/opponent deck mix-up.
+    assert sorted(root["state"]["opponent_zones"]["library"]) == sorted(["card-o"] * 10)
+    assert opening["label"] == "Drew opening hands (7 cards each)"
+
+
+@pytest.mark.asyncio
+async def test_two_deck_mirror_match_self_target_never_touches_opponent_zones(
+    client: AsyncClient, db_session
+) -> None:
+    user = User(email="mirror@example.com", google_sub="mirror_sub")
+    db_session.add(user)
+    db_session.add(
+        Card(id="card-mirror", name="Mirror Card", type_line="Land", produced_mana=["C"])
+    )
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    deck_id = await _make_deck_for_user(
+        client,
+        db_session,
+        user,
+        "Mirror Deck",
+        [{"card_id": "card-mirror", "quantity": 10, "board": "main"}],
+    )
+
+    session_id = (
+        await client.post(
+            f"{settings.API_V1_STR}/goldfish/sessions",
+            json={"deck_id": deck_id, "opponent_deck_id": deck_id},
+        )
+    ).json()["id"]
+
+    tree = (
+        await client.get(f"{settings.API_V1_STR}/goldfish/sessions/{session_id}")
+    ).json()
+    root = next(n for n in tree["nodes"] if n["parent_id"] is None)
+    opening = next(n for n in tree["nodes"] if n["parent_id"] == root["id"])
+    opponent_zones_before = opening["state"]["opponent_zones"]
+
+    draw_res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={"parent_id": opening["id"], "action": {"type": "draw", "target": "self"}},
+    )
+    assert draw_res.status_code == 200
+    node = draw_res.json()
+    assert node["state"]["opponent_zones"] == opponent_zones_before
+
+    shuffle_res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={"parent_id": node["id"], "action": {"type": "shuffle", "target": "self"}},
+    )
+    assert shuffle_res.status_code == 200
+    node2 = shuffle_res.json()
+    assert node2["state"]["opponent_zones"] == opponent_zones_before
+
+
+@pytest.mark.asyncio
+async def test_opponent_target_draw_label_and_self_zones_unchanged(
+    client: AsyncClient, db_session
+) -> None:
+    db_session.add(
+        Card(
+            id="card-p-draw",
+            name="Primary Draw Card",
+            type_line="Land",
+            produced_mana=["C"],
+        )
+    )
+    db_session.add(
+        Card(
+            id="card-o-draw",
+            name="Opponent Draw Card",
+            type_line="Land",
+            produced_mana=["C"],
+        )
+    )
+    await db_session.commit()
+
+    _user, session_id, tree = await _make_two_deck_session(
+        client,
+        db_session,
+        "opp_draw@example.com",
+        "opp_draw_sub",
+        [{"card_id": "card-p-draw", "quantity": 10, "board": "main"}],
+        [{"card_id": "card-o-draw", "quantity": 10, "board": "main"}],
+    )
+    root = next(n for n in tree["nodes"] if n["parent_id"] is None)
+    opening = next(n for n in tree["nodes"] if n["parent_id"] == root["id"])
+    self_hand_before = list(opening["state"]["hand"])
+    self_library_before = list(opening["state"]["library"])
+    self_battlefield_before = list(opening["state"]["battlefield"])
+    self_graveyard_before = list(opening["state"]["graveyard"])
+    self_exile_before = list(opening["state"]["exile"])
+    opponent_hand_before = list(opening["state"]["opponent_zones"]["hand"])
+    opponent_library_before = list(opening["state"]["opponent_zones"]["library"])
+
+    response = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={
+            "parent_id": opening["id"],
+            "action": {"type": "draw", "target": "opponent"},
+        },
+    )
+    assert response.status_code == 200
+    node = response.json()
+    assert node["label"] == "Opponent: Drew Opponent Draw Card"
+    assert (
+        node["state"]["opponent_zones"]["hand"]
+        == opponent_hand_before + [opponent_library_before[0]]
+    )
+    assert node["state"]["opponent_zones"]["library"] == opponent_library_before[1:]
+
+    # An opponent-target action must never touch the self side.
+    assert node["state"]["hand"] == self_hand_before
+    assert node["state"]["library"] == self_library_before
+    assert node["state"]["battlefield"] == self_battlefield_before
+    assert node["state"]["graveyard"] == self_graveyard_before
+    assert node["state"]["exile"] == self_exile_before
+
+
+@pytest.mark.asyncio
+async def test_opponent_target_play_land_label(client: AsyncClient, db_session) -> None:
+    db_session.add(
+        Card(id="card-p-pl", name="Primary PL Card", type_line="Land", produced_mana=["C"])
+    )
+    db_session.add(
+        Card(
+            id="card-o-pl", name="Opponent PL Card", type_line="Land", produced_mana=["C"]
+        )
+    )
+    await db_session.commit()
+
+    _user, session_id, tree = await _make_two_deck_session(
+        client,
+        db_session,
+        "opp_pl@example.com",
+        "opp_pl_sub",
+        [{"card_id": "card-p-pl", "quantity": 10, "board": "main"}],
+        [{"card_id": "card-o-pl", "quantity": 10, "board": "main"}],
+    )
+    root = next(n for n in tree["nodes"] if n["parent_id"] is None)
+    opening = next(n for n in tree["nodes"] if n["parent_id"] == root["id"])
+    opponent_card_id = opening["state"]["opponent_zones"]["hand"][0]
+
+    response = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={
+            "parent_id": opening["id"],
+            "action": {
+                "type": "play_land",
+                "card_id": opponent_card_id,
+                "target": "opponent",
+            },
+        },
+    )
+    assert response.status_code == 200
+    node = response.json()
+    assert node["label"] == "Opponent: Played Opponent PL Card"
+    assert node["state"]["opponent_zones"]["battlefield"] == [opponent_card_id]
+    # All copies share one card_id, so check count, not membership.
+    assert len(node["state"]["opponent_zones"]["hand"]) == len(
+        opening["state"]["opponent_zones"]["hand"]
+    ) - 1
+
+
+@pytest.mark.asyncio
+async def test_opponent_target_cast_label(client: AsyncClient, db_session) -> None:
+    db_session.add(
+        Card(
+            id="card-p-cast", name="Primary Cast Card", type_line="Land", produced_mana=["C"]
+        )
+    )
+    db_session.add(
+        Card(
+            id="card-o-cast",
+            name="Opponent Cast Card",
+            type_line="Creature",
+            produced_mana=[],
+        )
+    )
+    await db_session.commit()
+
+    _user, session_id, tree = await _make_two_deck_session(
+        client,
+        db_session,
+        "opp_cast@example.com",
+        "opp_cast_sub",
+        [{"card_id": "card-p-cast", "quantity": 10, "board": "main"}],
+        [{"card_id": "card-o-cast", "quantity": 10, "board": "main"}],
+    )
+    root = next(n for n in tree["nodes"] if n["parent_id"] is None)
+    opening = next(n for n in tree["nodes"] if n["parent_id"] == root["id"])
+    opponent_card_id = opening["state"]["opponent_zones"]["hand"][0]
+
+    response = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={
+            "parent_id": opening["id"],
+            "action": {"type": "cast", "card_id": opponent_card_id, "target": "opponent"},
+        },
+    )
+    assert response.status_code == 200
+    node = response.json()
+    assert node["label"] == "Opponent: Cast Opponent Cast Card"
+    assert node["state"]["opponent_zones"]["battlefield"] == [opponent_card_id]
+    assert len(node["state"]["opponent_zones"]["hand"]) == len(
+        opening["state"]["opponent_zones"]["hand"]
+    ) - 1
+
+
+@pytest.mark.asyncio
+async def test_opponent_target_move_zone_label(client: AsyncClient, db_session) -> None:
+    db_session.add(
+        Card(id="card-p-mz", name="Primary MZ Card", type_line="Land", produced_mana=["C"])
+    )
+    db_session.add(
+        Card(
+            id="card-o-mz", name="Opponent MZ Card", type_line="Land", produced_mana=["C"]
+        )
+    )
+    await db_session.commit()
+
+    _user, session_id, tree = await _make_two_deck_session(
+        client,
+        db_session,
+        "opp_mz@example.com",
+        "opp_mz_sub",
+        [{"card_id": "card-p-mz", "quantity": 10, "board": "main"}],
+        [{"card_id": "card-o-mz", "quantity": 10, "board": "main"}],
+    )
+    root = next(n for n in tree["nodes"] if n["parent_id"] is None)
+    opening = next(n for n in tree["nodes"] if n["parent_id"] == root["id"])
+    opponent_card_id = opening["state"]["opponent_zones"]["hand"][0]
+
+    response = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={
+            "parent_id": opening["id"],
+            "action": {
+                "type": "move_zone",
+                "card_id": opponent_card_id,
+                "from_zone": "hand",
+                "to_zone": "graveyard",
+                "target": "opponent",
+            },
+        },
+    )
+    assert response.status_code == 200
+    node = response.json()
+    assert node["label"] == "Opponent: Moved Opponent MZ Card from hand to graveyard"
+    assert node["state"]["opponent_zones"]["graveyard"] == [opponent_card_id]
+    assert len(node["state"]["opponent_zones"]["hand"]) == len(
+        opening["state"]["opponent_zones"]["hand"]
+    ) - 1
+
+
+@pytest.mark.asyncio
+async def test_opponent_target_shuffle_label(client: AsyncClient, db_session) -> None:
+    db_session.add(
+        Card(id="card-p-sh", name="Primary SH Card", type_line="Land", produced_mana=["C"])
+    )
+    db_session.add(
+        Card(
+            id="card-o-sh", name="Opponent SH Card", type_line="Land", produced_mana=["C"]
+        )
+    )
+    await db_session.commit()
+
+    _user, session_id, tree = await _make_two_deck_session(
+        client,
+        db_session,
+        "opp_sh@example.com",
+        "opp_sh_sub",
+        [{"card_id": "card-p-sh", "quantity": 10, "board": "main"}],
+        [{"card_id": "card-o-sh", "quantity": 10, "board": "main"}],
+    )
+    root = next(n for n in tree["nodes"] if n["parent_id"] is None)
+    opening = next(n for n in tree["nodes"] if n["parent_id"] == root["id"])
+    opponent_library_before = list(opening["state"]["opponent_zones"]["library"])
+
+    response = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={
+            "parent_id": opening["id"],
+            "action": {"type": "shuffle", "target": "opponent"},
+        },
+    )
+    assert response.status_code == 200
+    node = response.json()
+    assert node["label"] == "Opponent: Shuffled library"
+    assert sorted(node["state"]["opponent_zones"]["library"]) == sorted(
+        opponent_library_before
+    )
+    assert len(node["state"]["opponent_zones"]["library"]) == len(
+        opponent_library_before
+    )
+    assert node["state"]["hand"] == opening["state"]["hand"]
+
+
+@pytest.mark.asyncio
+async def test_self_target_action_in_two_deck_session_label_unprefixed(
+    client: AsyncClient, db_session
+) -> None:
+    db_session.add(
+        Card(
+            id="card-p-self",
+            name="Primary Self Card",
+            type_line="Land",
+            produced_mana=["C"],
+        )
+    )
+    db_session.add(
+        Card(
+            id="card-o-self",
+            name="Opponent Self Card",
+            type_line="Land",
+            produced_mana=["C"],
+        )
+    )
+    await db_session.commit()
+
+    _user, session_id, tree = await _make_two_deck_session(
+        client,
+        db_session,
+        "self_2deck@example.com",
+        "self_2deck_sub",
+        [{"card_id": "card-p-self", "quantity": 10, "board": "main"}],
+        [{"card_id": "card-o-self", "quantity": 10, "board": "main"}],
+    )
+    root = next(n for n in tree["nodes"] if n["parent_id"] is None)
+    opening = next(n for n in tree["nodes"] if n["parent_id"] == root["id"])
+
+    response = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={"parent_id": opening["id"], "action": {"type": "draw"}},  # target: self
+    )
+    assert response.status_code == 200
+    node = response.json()
+    assert node["label"] == "Drew Primary Self Card"
+    assert not node["label"].startswith("Opponent:")
+
+
+@pytest.mark.asyncio
+async def test_opponent_target_draw_with_empty_opponent_library_does_not_crash(
+    client: AsyncClient, db_session
+) -> None:
+    db_session.add(
+        Card(
+            id="card-p-empty",
+            name="Primary Empty Card",
+            type_line="Land",
+            produced_mana=["C"],
+        )
+    )
+    await db_session.commit()
+
+    _user, session_id, tree = await _make_two_deck_session(
+        client,
+        db_session,
+        "opp_empty_draw@example.com",
+        "opp_empty_draw_sub",
+        [{"card_id": "card-p-empty", "quantity": 10, "board": "main"}],
+        [],
+    )
+    root = next(n for n in tree["nodes"] if n["parent_id"] is None)
+    opening = next(n for n in tree["nodes"] if n["parent_id"] == root["id"])
+    assert opening["state"]["opponent_zones"]["hand"] == []
+
+    response = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={
+            "parent_id": opening["id"],
+            "action": {"type": "draw", "target": "opponent"},
+        },
+    )
+    assert response.status_code == 200
+    node = response.json()
+    assert node["state"]["opponent_zones"]["hand"] == []
+    assert node["label"] == "Opponent: Tried to draw with an empty library"
+
+
+@pytest.mark.asyncio
+async def test_opponent_target_zone_action_without_opponent_deck_returns_400(
+    client: AsyncClient, db_session
+) -> None:
+    _user, deck_id = await _make_deck_with_cards(
+        client, db_session, "no_opp_deck@example.com", "no_opp_deck_sub"
+    )
+    session_id = (
+        await client.post(
+            f"{settings.API_V1_STR}/goldfish/sessions", json={"deck_id": deck_id}
+        )
+    ).json()["id"]
+    root = await _get_root(client, session_id)
+
+    response = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={
+            "parent_id": root["id"],
+            "action": {"type": "shuffle", "target": "opponent"},
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "This session has no opponent deck"
+
+
+@pytest.mark.asyncio
+async def test_opening_hand_asymmetry_opponent_empty_library(
+    client: AsyncClient, db_session
+) -> None:
+    db_session.add(
+        Card(
+            id="card-p-asym1", name="Asym1 Card", type_line="Land", produced_mana=["C"]
+        )
+    )
+    await db_session.commit()
+
+    _user, _session_id, tree = await _make_two_deck_session(
+        client,
+        db_session,
+        "asym_opp_empty@example.com",
+        "asym_opp_empty_sub",
+        [{"card_id": "card-p-asym1", "quantity": 10, "board": "main"}],
+        [],
+    )
+    root = next(n for n in tree["nodes"] if n["parent_id"] is None)
+    opening = next(n for n in tree["nodes"] if n["parent_id"] == root["id"])
+    assert opening["state"]["opponent_zones"]["hand"] == []
+    assert len(opening["state"]["hand"]) == 7
+    assert opening["label"] == "Drew opening hands (7 cards; opponent drew 0 cards)"
+
+
+@pytest.mark.asyncio
+async def test_opening_hand_asymmetry_both_libraries_one_card(
+    client: AsyncClient, db_session
+) -> None:
+    db_session.add(
+        Card(id="card-p-one", name="One P Card", type_line="Land", produced_mana=["C"])
+    )
+    db_session.add(
+        Card(id="card-o-one", name="One O Card", type_line="Land", produced_mana=["C"])
+    )
+    await db_session.commit()
+
+    _user, _session_id, tree = await _make_two_deck_session(
+        client,
+        db_session,
+        "asym_one_each@example.com",
+        "asym_one_each_sub",
+        [{"card_id": "card-p-one", "quantity": 1, "board": "main"}],
+        [{"card_id": "card-o-one", "quantity": 1, "board": "main"}],
+    )
+    root = next(n for n in tree["nodes"] if n["parent_id"] is None)
+    opening = next(n for n in tree["nodes"] if n["parent_id"] == root["id"])
+    assert len(opening["state"]["hand"]) == 1
+    assert len(opening["state"]["opponent_zones"]["hand"]) == 1
+    assert opening["label"] == "Drew opening hands (1 card; opponent drew 1 card)"
+
+
+@pytest.mark.asyncio
+async def test_opening_hand_asymmetry_primary_empty_opponent_full(
+    client: AsyncClient, db_session
+) -> None:
+    db_session.add(
+        Card(id="card-o-full", name="Full O Card", type_line="Land", produced_mana=["C"])
+    )
+    await db_session.commit()
+
+    _user, _session_id, tree = await _make_two_deck_session(
+        client,
+        db_session,
+        "asym_primary_empty@example.com",
+        "asym_primary_empty_sub",
+        [],
+        [{"card_id": "card-o-full", "quantity": 10, "board": "main"}],
+    )
+    root = next(n for n in tree["nodes"] if n["parent_id"] is None)
+    # Updated node-creation guard: the opponent's dealt hand alone must still
+    # produce the combined opening-hand node, even with an empty self hand.
+    opening_nodes = [n for n in tree["nodes"] if n["parent_id"] == root["id"]]
+    assert len(opening_nodes) == 1
+    opening = opening_nodes[0]
+    assert opening["state"]["hand"] == []
+    assert len(opening["state"]["opponent_zones"]["hand"]) == 7
+    assert opening["label"] == "Drew opening hands (0 cards; opponent drew 7 cards)"
+
+
+@pytest.mark.asyncio
+async def test_action_against_pre_3d_state_missing_opponent_zones_key(
+    client: AsyncClient, db_session
+) -> None:
+    """
+    Simulates a genuinely pre-3d row (hand-built `state` dict with no
+    `opponent_zones` key at all — no session created through this phase's
+    code can produce that shape) and confirms an action against it still
+    succeeds, defaulting to `opponent_zones: null`.
+    """
+    user = User(email="pre3d@example.com", google_sub="pre3d_sub")
+    db_session.add(user)
+    db_session.add(
+        Card(id="card-pre3d", name="Pre3D Card", type_line="Land", produced_mana=["C"])
+    )
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    deck_id = await _make_deck_for_user(
+        client,
+        db_session,
+        user,
+        "Pre3D Deck",
+        [{"card_id": "card-pre3d", "quantity": 2, "board": "main"}],
+    )
+
+    session = GoldfishSession(deck_id=deck_id, user_id=user.id, name="Pre-3d session")
+    db_session.add(session)
+    await db_session.commit()
+    await db_session.refresh(session)
+
+    node = GoldfishNode(
+        session_id=session.id,
+        parent_id=None,
+        label="Game start",
+        order_index=0,
+        trackers={},
+        state={
+            "library": ["card-pre3d", "card-pre3d"],
+            "hand": [],
+            "battlefield": [],
+            "graveyard": [],
+            "exile": [],
+            "life_total": 20,
+            "opponent_life_total": 20,
+            # No "opponent_zones" key at all — this is the point of the test.
+        },
+    )
+    db_session.add(node)
+    await db_session.commit()
+    await db_session.refresh(node)
+
+    response = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session.id}/nodes",
+        json={"parent_id": node.id, "action": {"type": "draw"}},
+    )
+    assert response.status_code == 200
+    result = response.json()
+    assert result["state"]["hand"] == ["card-pre3d"]
+    assert result["state"]["opponent_zones"] is None
+
+
+@pytest.mark.asyncio
+async def test_state_dict_has_eight_keys_including_opponent_zones(
+    client: AsyncClient, db_session
+) -> None:
+    _user, deck_id = await _make_deck_with_cards(
+        client, db_session, "keys8@example.com", "keys8_sub"
+    )
+    session_id = (
+        await client.post(
+            f"{settings.API_V1_STR}/goldfish/sessions", json={"deck_id": deck_id}
+        )
+    ).json()["id"]
+    root = await _get_root(client, session_id)
+
+    assert set(root["state"].keys()) == {
+        "library",
+        "hand",
+        "battlefield",
+        "graveyard",
+        "exile",
+        "life_total",
+        "opponent_life_total",
+        "opponent_zones",
+    }
+
+
+@pytest.mark.asyncio
+async def test_next_turn_never_touches_opponent_zones_in_two_deck_session(
+    client: AsyncClient, db_session
+) -> None:
+    db_session.add(
+        Card(id="card-t2d", name="T2D Card", type_line="Land", produced_mana=["C"])
+    )
+    await db_session.commit()
+
+    _user, session_id, tree = await _make_two_deck_session(
+        client,
+        db_session,
+        "turn2deck@example.com",
+        "turn2deck_sub",
+        [{"card_id": "card-t2d", "quantity": 10, "board": "main"}],
+        [{"card_id": "card-t2d", "quantity": 10, "board": "main"}],
+    )
+    root = next(n for n in tree["nodes"] if n["parent_id"] is None)
+    opening = next(n for n in tree["nodes"] if n["parent_id"] == root["id"])
+    opponent_zones_before = opening["state"]["opponent_zones"]
+
+    turn_res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={"parent_id": opening["id"], "action": {"type": "next_turn"}},
+    )
+    assert turn_res.status_code == 200
+    node = turn_res.json()
+    assert node["state"]["opponent_zones"] == opponent_zones_before

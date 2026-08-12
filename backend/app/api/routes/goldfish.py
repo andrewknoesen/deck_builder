@@ -50,10 +50,12 @@ async def create_session(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Start a new goldfishing session for a deck. Auto-creates a root node with
-    a freshly shuffled virtual library, then a child node drawing the opening
-    hand (7 cards, or fewer if the library is smaller) — every session begins
-    ready to play, not with an empty hand waiting on manual draws.
+    Start a new goldfishing session for a deck, optionally paired against a
+    second, opponent deck (Phase 3d two-deck goldfishing). Auto-creates a
+    root node with freshly shuffled virtual libraries, then a single combined
+    child node dealing the opening hand(s) (7 cards each, or fewer if a
+    library is smaller) — every session begins ready to play, not with an
+    empty hand waiting on manual draws.
     """
     result = await db.execute(
         select(Deck)
@@ -66,8 +68,27 @@ async def create_session(
     if deck.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
+    opponent_deck: Optional[Deck] = None
+    if session_in.opponent_deck_id is not None:
+        opponent_result = await db.execute(
+            select(Deck)
+            .where(Deck.id == session_in.opponent_deck_id)
+            .options(selectinload(Deck.cards))  # type: ignore[arg-type]
+        )
+        opponent_deck = opponent_result.scalar_one_or_none()
+        if not opponent_deck:
+            raise HTTPException(status_code=404, detail="Opponent deck not found")
+        if opponent_deck.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+        if opponent_deck.format != deck.format:
+            raise HTTPException(
+                status_code=400,
+                detail="Opponent deck must be the same format as the primary deck",
+            )
+
     db_session = GoldfishSession(
         deck_id=session_in.deck_id,
+        opponent_deck_id=session_in.opponent_deck_id,
         user_id=current_user.id,
         name=session_in.name or f"{deck.title} practice session",
     )
@@ -75,7 +96,7 @@ async def create_session(
     await db.commit()
     await db.refresh(db_session)
 
-    initial_state = build_initial_state(deck)
+    initial_state = build_initial_state(deck, opponent_deck)
     root_node = GoldfishNode(
         session_id=db_session.id,
         parent_id=None,
@@ -88,7 +109,9 @@ async def create_session(
     await db.commit()
 
     opening_state, opening_label = draw_opening_hand(initial_state)
-    if opening_state.hand:
+    if opening_state.hand or (
+        opening_state.opponent_zones and opening_state.opponent_zones.hand
+    ):
         opening_node = GoldfishNode(
             session_id=db_session.id,
             parent_id=root_node.id,
@@ -206,6 +229,17 @@ async def add_node(
                 *parent_state.battlefield,
                 *parent_state.graveyard,
                 *parent_state.exile,
+                *(
+                    {
+                        *parent_state.opponent_zones.library,
+                        *parent_state.opponent_zones.hand,
+                        *parent_state.opponent_zones.battlefield,
+                        *parent_state.opponent_zones.graveyard,
+                        *parent_state.opponent_zones.exile,
+                    }
+                    if parent_state.opponent_zones
+                    else set()
+                ),
             }
             card_names: dict[str, str] = {}
             if all_card_ids:
