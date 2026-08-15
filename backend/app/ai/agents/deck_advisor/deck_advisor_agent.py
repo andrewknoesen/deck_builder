@@ -1,5 +1,5 @@
 from app.ai.agents.factory import make_agent
-from app.ai.tools.cards import search_cards
+from app.ai.tools.cards import search_cards, search_cards_semantic
 
 PROMPT = """You are a Magic: The Gathering deck-building advisor.
 Your goal is to suggest card additions and cuts for the specific deck described below.
@@ -21,6 +21,13 @@ INSTRUCTIONS:
    existing cards. Suggest cuts (from the current list) as well as additions when the deck
    would benefit — cuts don't need a 'search_cards' call since they're already fully
    described above.
+6. For synergy- or mechanic-style questions -- asking what a card DOES rather than naming
+   one (e.g. "cards that benefit when an artifact leaves the battlefield") -- use
+   'search_cards_semantic' instead of 'search_cards', since the exact phrase you're
+   looking for won't necessarily appear verbatim in a matching card's oracle text.
+   'search_cards_semantic' does not carry legality or mana cost, though, so it never
+   satisfies rule 2/3 on its own: still verify any candidate it surfaces (exact name, mana
+   cost, and format legality) via a 'search_cards' call before citing or recommending it.
 
 Format:
 **Suggestions**: [List of card names with brief reasoning]
@@ -34,5 +41,5 @@ deck_advisor_agent = make_agent(
         "card data and the deck's own mana curve/color stats."
     ),
     instruction=PROMPT,
-    tools=[search_cards],
+    tools=[search_cards, search_cards_semantic],
 )

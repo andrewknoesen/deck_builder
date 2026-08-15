@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from app.ai.tools import cards as cards_module
-from app.ai.tools.cards import search_cards
+from app.ai.tools.cards import search_cards, search_cards_semantic
 from app.models.card import Card
 from app.services.scryfall import ScryfallService
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -158,3 +158,34 @@ async def test_search_cards_with_operator_syntax_skips_local_cache(db_session) -
 
     mock_search.assert_awaited_once()
     assert "Some Red Creature" in result
+
+
+@pytest.mark.asyncio
+async def test_search_cards_semantic_formats_results_without_legality() -> None:
+    docs = [
+        "Shattergang Brothers\nLegendary Creature — Human Shaman\n"
+        "Sacrifice an artifact, creature, or enchantment: Each opponent "
+        "sacrifices a permanent of the same type.",
+        "Nihil Spellbomb\nArtifact\nWhen Nihil Spellbomb enters the "
+        "battlefield, draw a card.",
+    ]
+    with patch.object(cards_module.card_rag, "query", return_value=docs) as mock_query:
+        result = await search_cards_semantic(
+            "cards that punish artifacts leaving the battlefield", k=2
+        )
+
+    mock_query.assert_called_once_with(
+        "cards that punish artifacts leaving the battlefield", k=2
+    )
+    assert "Shattergang Brothers" in result
+    assert "Nihil Spellbomb" in result
+    assert "Each opponent" in result
+    assert "Legality" not in result
+
+
+@pytest.mark.asyncio
+async def test_search_cards_semantic_no_results() -> None:
+    with patch.object(cards_module.card_rag, "query", return_value=[]):
+        result = await search_cards_semantic("nonexistent synergy query xyz")
+
+    assert "No cards found" in result

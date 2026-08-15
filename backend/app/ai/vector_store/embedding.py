@@ -45,3 +45,10 @@ class SentenceTransformerEmbedder(EmbeddingModel):
             chunk.embedding = embeddings[i].tolist()
 
         return chunks
+
+
+# One sentence-transformer model (~440MB) shared by every RAGService, instead
+# of each one (RulesRAG, CardRAG, ...) loading its own redundant copy into
+# the same process. See PLAN.md's Phase 5 Design section for why this was
+# extracted once a second real call site existed.
+shared_embedder = SentenceTransformerEmbedder()

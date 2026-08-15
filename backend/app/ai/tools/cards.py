@@ -4,6 +4,7 @@ from typing import Optional
 import httpx
 from sqlmodel import col, select
 
+from app.ai.rag.cards import card_rag
 from app.ai.tools.db import get_tool_session
 from app.core.config import settings
 from app.core.logging import logger
@@ -85,4 +86,36 @@ async def search_cards(query: str, format: Optional[str] = None) -> str:
         return f"No cards found for query: {query}"
 
     formatted = [_format_card(card, format) for card in cards[:10]]
+    return "\n\n".join(formatted)
+
+
+def _doc_to_card(doc: str) -> dict:
+    """Splits a card_rag document ('name\\ntype_line\\noracle_text') back
+    into the dict shape _format_card expects. No mana_cost/legalities --
+    those aren't part of the embedded text (see search_cards_semantic)."""
+    name, _, rest = doc.partition("\n")
+    type_line, _, oracle_text = rest.partition("\n")
+    return {"name": name, "type_line": type_line, "oracle_text": oracle_text}
+
+
+async def search_cards_semantic(query: str, k: int = 10) -> str:
+    """
+    Finds cards by what they DO semantically -- synergy, mechanics, effects
+    -- rather than by exact oracle-text wording. Use this instead of
+    'search_cards' for synergy/mechanic-style questions where the exact
+    phrase isn't expected to appear verbatim in a matching card's oracle
+    text (e.g. "cards that benefit when an artifact leaves the
+    battlefield", "cards that deal damage when an artifact enters the
+    battlefield"). Results do NOT include legality or mana cost -- before
+    citing or recommending any card found here, verify its exact name, mana
+    cost, and format legality via 'search_cards' (passing the deck's
+    format), the same way any other new candidate must be verified.
+    """
+    logger.info(f"Tool 'search_cards_semantic' called with query={query!r} k={k}")
+
+    docs = card_rag.query(query, k=k)
+    if not docs:
+        return f"No cards found for query: {query}"
+
+    formatted = [_format_card(_doc_to_card(doc), format=None) for doc in docs]
     return "\n\n".join(formatted)

@@ -1352,17 +1352,294 @@ SQL search and a vector DB of the MTG cards.
 
 ### Status
 
-Not yet designed. Routed to `mtg-architect` for a design pass before any interview or
-implementation, per this file's own convention for any feature crossing more than one layer
-(here: the AI agent layer, a new data/embedding pipeline, and the DeckBuilder frontend). Ground
-truth to build that design on already exists in this codebase and shouldn't be re-discovered from
-scratch: `deck_advisor_agent` (Phase 1) and its stateless `search_cards` tool, the `make_agent`
-factory, the Scryfall bulk-ingestion pipeline into the local `Card` table (Phase 4) as the likely
-source for whatever gets embedded, and the existing Chroma vector-store setup already used for the
-MTG comprehensive rules index (`backend/app/ai/rag/`, `backend/app/ai/vector_store/`) as precedent
-for standing up a second, card-oracle-text collection rather than inventing new vector-store
-infrastructure. This section gets filled in once that design pass lands, same as every other phase
-in this file.
+Design pass complete (`mtg-architect`, 2026-08-12). Two questions below are flagged for the
+product-owner interview before implementation starts — everything else is a decided
+recommendation, not a menu of options.
+
+### Ground truth this plan is built on
+
+Corrections/refinements against the framing this design pass was handed, checked against actual
+code, not assumed:
+
+- `deck_advisor_agent` (`backend/app/ai/agents/deck_advisor/deck_advisor_agent.py`) is a `make_agent`
+  call with exactly one tool, `search_cards`. Its prompt already establishes the discipline this
+  phase reuses: never cite a card `search_cards` didn't actually return, pass the deck's format to
+  `search_cards` for legality, don't re-look-up cards already given in context.
+- `search_cards` (`backend/app/ai/tools/cards.py:54-88`) already **is** the "SQL search" half of
+  the user's own framing, not something new to build: plain-name queries hit the local `Card`
+  table (`ILIKE`, `_search_local`, line 30) first, and anything using Scryfall's `key:value`
+  operator syntax (`t:creature c:red pow>=5`, ...) — itself a structured/filtered query — falls
+  back to live Scryfall. `_format_card` (line 38) already formats a plain dict (`name`,
+  `mana_cost`, `type_line`, `oracle_text`, optional `legalities`) into the tool's return text —
+  reusable as-is for the new semantic tool's output, just called with `format=None` since Chroma
+  metadata won't carry legality (see below).
+- `Card` (`backend/app/models/card.py:4-22`) has no `keywords` field — the original framing's
+  "oracle text + type line + keywords" isn't buildable as written. Not a real gap: Scryfall's
+  `oracle_text` already spells out keyword ability names inline for the overwhelming majority of
+  cards (e.g. a flier's oracle text literally starts `"Flying"`), so `name + type_line +
+  oracle_text` (all three already populated by Phase 4's ingestion) is sufficient embedding input
+  without adding a new column.
+- `rag/rules.py`'s `RulesRAG` (`backend/app/ai/rag/rules.py`) is the only existing `RAGService`
+  implementation and the direct precedent for a card-oracle-text RAG: it constructs its own
+  `SentenceTransformerEmbedder()` and a `ChromaVectorStore(embedding_model=self.embedder)`
+  (default `collection_name="mtg_rules"`), and is exposed as a bare module-level singleton
+  (`rules_rag = RulesRAG()`), not a class instantiated per-call. `ChromaVectorStore.__init__`
+  (`backend/app/ai/vector_store/chroma.py:13-19`) already takes `collection_name` as a constructor
+  arg — standing up a second collection needs zero changes to that class, just a different name.
+- **Resource note the original framing didn't raise, worth flagging now rather than after two
+  full model loads ship**: `SentenceTransformerEmbedder()` (`backend/app/ai/vector_store/
+  embedding.py`) loads a real ~440MB sentence-transformer model (`BAAI/bge-base-en-v1.5`) into
+  memory on construction. `RulesRAG.__init__` constructs its own instance today; a naive `CardRAG`
+  built the same way would load a **second, fully redundant copy of the same model** into the same
+  process. This is the same shape of duplication that triggered `make_agent`'s extraction in Phase
+  1 (two call sites, real repeated cost, not speculative) — see Design below for the fix.
+- `run_ingestion()` in `backend/app/ai/ingestion/scryfall_ingestion.py:103-122` is a fast,
+  Postgres-only bulk upsert (44s for 116,568 rows per Phase 4's live run) with **no ML inference in
+  it at all**. `rules_ingestion.py` is already a fully separate script from it, populating a
+  different Chroma collection — this phase's ingestion is the same shape of "separate concern,"
+  not a new pattern.
+- `api/routes/cards.py`'s `local_search_cards` (lines 34-64) already has the exact dedup-by-name
+  query this phase needs for embedding: `select(func.min(Card.id)).where(...).group_by(col(Card.name))`
+  collapses ~116k printings down to one row per unique card name, "matching Scryfall's own default
+  `unique=cards` search behavior" (its own docstring). Embedding every printing individually would
+  be ~4x more embedding work for zero search-quality benefit (near-duplicate oracle text crowding
+  results) — reuse this exact grouping, don't re-derive it.
+- `api/routes/ai.py`'s `/suggest` handler (line 68) and `_build_deck_context` (line 24) already do
+  everything a synergy-search request needs: ownership check, `Deck` fetch, format threaded into
+  context. No new route is needed for this phase — see Design below, this is a correction to the
+  original framing's assumption that a new `/api/ai/...` route was required.
+- Frontend: `DeckBuilder.tsx`'s right pane (`rightPaneTab`, line 95; tab buttons, lines 626-644)
+  already toggles between `DeckStats` and `DeckAdvisor` (`backend` confirms this is the Phase 1 tab,
+  not `AgentChat.tsx`). `DeckAdvisor.tsx` posts `{deck_id, query}` to `/ai/suggest` and renders a
+  plain chat thread (`ChatBubble`/`ChatInput`) — no structured/clickable card results exist
+  anywhere in this codebase's chat UI today; `DeckBuilderSearch.tsx`'s Autocomplete-with-click-to-add
+  is a completely separate component/interaction pattern used only for exact-name search.
+
+### Design
+
+**Recommendation on the core question (agent/tool shape): extend `deck_advisor_agent` with one new
+tool. Do not create a new agent, route, schema, or frontend tab.**
+
+Reasoning: the only real argument for a second agent is that a synergy question ("cards that deal
+damage when an artifact enters") isn't "improve this deck," it's open card discovery — a
+plausibly different *intent*. But `rules_agent` already sets the precedent that one agent can juggle
+several distinct tools/query shapes under one prompt (rules lookup vs. card rulings vs. glossary
+terms, three different tools, one agent, one prompt-level dispatch) — nothing here is architecturally
+different from that. `deck_advisor_agent`'s existing **Suggestions**/**Cuts**/**Summary** format
+isn't a hard schema, it's prompt guidance; a synergy answer fits naturally under **Suggestions**
+("matching cards"). A second agent would mean a new subfolder, a new route, new schemas, and either
+a new frontend tab or awkwardly hiding it behind the existing one — real new surface area for a
+capability that's still fundamentally "help me with the deck I have open," not a distinct product
+concern. This is the direct YAGNI call per this repo's own convention (a new agent needs a concrete
+reason it can't share, not just response-format taste) — same bar the `make_agent` factory's own
+history in this file already established.
+
+**Two tools, LLM combines them itself** (the user's "SQL + vector DB" framing, realized literally):
+`deck_advisor_agent.tools` becomes `[search_cards, search_cards_semantic]`. `search_cards` is
+already the SQL/structured half (unchanged). `search_cards_semantic` (new,
+`backend/app/ai/tools/cards.py`, alongside `search_cards`) is the vector half:
+
+```python
+async def search_cards_semantic(query: str, k: int = 10) -> str:
+    """
+    Finds cards by what they DO semantically -- synergy, mechanics, effects --
+    rather than exact oracle-text wording. Use for questions a name/text
+    substring search can't answer (e.g. "cards that benefit when an artifact
+    leaves the battlefield"). Does NOT return legality -- verify a candidate's
+    format legality via 'search_cards' (passing the deck's format) before
+    recommending it.
+    """
+    docs = card_rag.query(query, k=k)
+    ...  # format each result via the existing _format_card(card, format=None)
+```
+
+Prompt addition to `deck_advisor_agent`'s `PROMPT`: a new instruction telling it to use
+`search_cards_semantic` instead of `search_cards` for synergy/mechanic-style questions where the
+exact phrase isn't expected to appear verbatim in a matching card's text, and — critically, to keep
+this phase's citation discipline intact — to still verify a semantic hit's exact name/cost/legality
+via `search_cards` before citing it, since `search_cards_semantic` can't carry legality data (see
+below). This is additive to the existing prompt, not a rewrite.
+
+**No new route, no new schema.** `POST /ai/suggest` (`SuggestCardRequest{deck_id, query}` /
+`SuggestCardResponse{response}`) is reused as-is — the route doesn't know or care which tools the
+agent decides to call. `_build_deck_context`'s existing stats/curve computation is harmless overhead
+on a pure discovery question (already in-memory, no extra I/O), not worth special-casing out.
+
+**No new frontend surface required.** `DeckAdvisor.tsx`'s existing chat tab already sends arbitrary
+natural-language `query` text to `/ai/suggest` — a user can ask a synergy question in the exact same
+box they use today for "what should I add," no new tab/component/route wiring needed. The one
+plausible copy tweak (mentioning synergy questions in the placeholder/intro text,
+`DeckAdvisor.tsx:31`/`:101`) is small enough to leave to whoever implements this, not something this
+blueprint needs to pin down. **This is the one place worth flagging for the interview anyway** — see
+Open questions below — because "keep reusing free text" vs. "build a structured, click-to-add result
+list" is a real product/UX tradeoff this blueprint can't resolve unilaterally even though it can
+recommend a default.
+
+**Vector collection**: a second `ChromaVectorStore` collection, `mtg_cards`, alongside the existing
+`mtg_rules` one — zero changes needed to `ChromaVectorStore` itself, just a different
+`collection_name`. New `backend/app/ai/rag/cards.py`:
+
+```python
+class CardRAG(RAGService):
+    def __init__(self, embedder: Optional[EmbeddingModel] = None):
+        self.embedder = embedder or SentenceTransformerEmbedder()
+        self.store = ChromaVectorStore(embedding_model=self.embedder, collection_name="mtg_cards")
+
+    def query(self, text: str, k: int = 5) -> List[str]: ...  # same shape as RulesRAG.query
+
+card_rag = CardRAG(embedder=shared_embedder)
+```
+
+**Shared embedder, fixing the redundant-model-load issue flagged in Ground Truth above**: add a
+module-level `shared_embedder = SentenceTransformerEmbedder()` to `backend/app/ai/vector_store/
+embedding.py`, and change `RulesRAG.__init__` to accept an optional injected `embedder` (defaulting
+to constructing its own, so nothing breaks if called standalone) the same way `CardRAG` does above.
+`rag/rules.py`'s `rules_rag = RulesRAG(embedder=shared_embedder)` and `rag/cards.py`'s `card_rag =
+CardRAG(embedder=shared_embedder)` then both point at the one loaded model instead of two. This is a
+small, in-scope fix (a few lines), not a speculative refactor — it's the actual second call site
+that makes the duplication real, same trigger condition as the `make_agent` extraction.
+
+**Embedding source and ID**: per card *name* (not per printing) — `name + "\n" + type_line + "\n" +
+oracle_text` as the embedded text, using the same `func.min(Card.id)`-grouped-by-name query
+`local_search_cards` already uses (see Ground Truth). Use the **card's name itself as the Chroma
+document ID**, not the representative row's Scryfall UUID — Chroma IDs are opaque strings with no
+format requirement, and a name-keyed ID makes re-embedding idempotent regardless of which specific
+printing happens to be selected as "representative" on a given run (new printings, or a different
+`min(id)` winner, just overwrite the same vector on the next embedding pass — no drift, no
+duplicate vectors accumulating across runs).
+
+**Pipeline hook: a separate, manual ingestion script, not bolted onto `scryfall_ingestion.py`.**
+New `backend/app/ai/ingestion/card_embedding_ingestion.py`: reads from the already-refreshed local
+`Card` table (not Scryfall directly — `scryfall_ingestion.py` is already the source of truth once
+it's run), groups by name, builds one `ProcessedChunk` per unique card, embeds via
+`shared_embedder`, upserts in batches into the `mtg_cards` collection via `ChromaVectorStore`. Entry
+point `uv run python -m app.ai.ingestion.card_embedding_ingestion`, run by hand, same "no scheduling
+infra" decision Phase 4's interview already settled — this phase doesn't reopen that, it inherits
+it. Deliberately **not** folded into `scryfall_ingestion.py`'s `run_ingestion()`: that function is a
+fast, pure-DB upsert (44s for 116k rows against a live run); embedding tens of thousands of card
+texts through a local sentence-transformer model is a materially slower, CPU/MPS-bound step, and
+silently making every future `Card`-table refresh also pay that cost would be a real, easy-to-miss
+regression to the workflow Phase 4 optimized for. Keeping them as two explicit, separately-run
+scripts mirrors the existing `rules_ingestion.py` vs. `scryfall_ingestion.py` separation exactly —
+not a new pattern.
+
+**Staleness/re-sync**: same manual cadence as Phase 4 — re-run `card_embedding_ingestion.py` by hand
+after `scryfall_ingestion.py` whenever the card data's been refreshed and the vector index should
+catch up. Idempotent by construction (name-keyed upsert, see above), so re-running it is always
+safe, same as `upsert_cards`' own idempotency. No new scheduling question to resolve here — Phase
+4's interview outcome already covers this; this phase just adds a second manual script to the same
+already-accepted "run by hand" workflow.
+
+**Legality**: deliberately **not** stored in Chroma metadata (it would go stale independently of the
+`Card` table's own refresh cadence, and duplicate data already served correctly by `search_cards`).
+`search_cards_semantic` returns name/type/oracle-text only; the updated prompt instructs the agent
+to verify any semantic-search candidate's legality via `search_cards` (which already does this
+correctly) before citing it — composing the two tools is exactly the point, not a limitation to
+route around.
+
+### Open questions for the product-owner interview
+
+1. **Result presentation: reuse the existing free-text advisor chat, or build a structured,
+   click-to-add result list?** Recommended default: reuse `DeckAdvisor.tsx`'s existing chat UI
+   as-is (zero new frontend surface, ships as a backend+prompt+ingestion change only). The
+   alternative — matching results rendered as clickable cards (closer to `DeckBuilderSearch.tsx`'s
+   Autocomplete, one-click add-to-deck) — is a real, meaningfully bigger lift: `search_cards_semantic`
+   would need to return structured data, not formatted text, `/ai/suggest`'s response shape would
+   need to change (or a second endpoint added after all), and a new result-list component would be
+   needed. Worth asking directly rather than assuming free text is "good enough" — this is a genuine
+   product/UX call, not a technical one.
+2. **Ingestion scope: embed literally everything in the local `Card` table (tokens, Un-set/silver-
+   border joke cards, art-series cards, memorabilia — whatever Scryfall's `default_cards` bulk file
+   contains and Phase 4 already ingested unfiltered), or filter down to "real," tournament-legal-set
+   cards only?** Recommended default: unfiltered, matching the local `Card` table's own existing
+   scope — nothing in this codebase filters by `set_type` today (confirmed: no such field even
+   exists on `Card`), so an unfiltered card-vector index is the *consistent* choice, not a new
+   problem this phase introduces. Filtering would require adding a new `Card.set_type` field
+   upstream in Phase 4's ingestion first — worth asking only if joke/promo-card pollution in
+   synergy-search results turns out to bother the user in practice; not a blocker for v1.
+
+### Interview outcome (resolved before writing code, per-phase process)
+
+Both open questions above resolved by interview, 2026-08-12 — both took the blueprint's own
+recommended default, no deviation:
+
+1. **Result presentation: reuse the existing free-text advisor chat.** No new frontend surface —
+   `DeckAdvisor.tsx`'s chat tab is unchanged; synergy questions just work in the same input as
+   today's "what should I add" queries. If free-text answers turn out to feel insufficient once
+   this ships (e.g. the user wants one-click add-to-deck on a synergy hit), the structured
+   click-to-add list from the Design section's alternative is the fallback, not designed further
+   now.
+2. **Ingestion scope: unfiltered**, matching the local `Card` table's existing scope exactly. No
+   new `Card.set_type` field, no filtering logic in `card_embedding_ingestion.py`.
+
+Implementation now proceeds per the Design section above: `search_cards_semantic` tool, `CardRAG`/
+`mtg_cards` collection, shared embedder fix, `card_embedding_ingestion.py`, and the
+`deck_advisor_agent` prompt update — no route/schema/frontend changes.
+
+### Shipped: built exactly per Design, one real bug caught on the live run
+
+Built per the Design section above, no deviation on the architecture. `backend/app/ai/vector_store/
+embedding.py` gained the module-level `shared_embedder` singleton; `RulesRAG.__init__`
+(`backend/app/ai/rag/rules.py`) now accepts an optional injected `embedder`, and its own module-level
+`rules_rag` singleton passes `shared_embedder` — one loaded sentence-transformer model shared by both
+RAG services, not two. New `backend/app/ai/rag/cards.py`'s `CardRAG` is the same shape, pointed at a
+second `mtg_cards` Chroma collection, exposed as `card_rag = CardRAG(embedder=shared_embedder)`. New
+`search_cards_semantic` (`backend/app/ai/tools/cards.py`) queries `card_rag` and reuses the existing
+`_format_card(card, format=None)` helper — a small `_doc_to_card()` parses the embedded
+`name\ntype_line\noracle_text` document back into the dict shape `_format_card` expects, since
+`CardRAG.query()` returns plain text (same shape as `RulesRAG.query`), not structured metadata.
+`deck_advisor_agent` (`backend/app/ai/agents/deck_advisor/deck_advisor_agent.py`) now registers both
+`search_cards` and `search_cards_semantic`, with an additive prompt instruction (point 6) telling it
+when to reach for the semantic tool and to still verify any hit's legality via `search_cards` before
+citing it — the existing citation-discipline instructions (points 1-5) are untouched.
+
+New `backend/app/ai/ingestion/card_embedding_ingestion.py` mirrors `rules_ingestion.py`'s shape as a
+separate manual script (`uv run python -m app.ai.ingestion.card_embedding_ingestion`), not folded
+into `scryfall_ingestion.py`. `fetch_unique_cards()` reuses `local_search_cards`'s exact
+`func.min(Card.id)`-grouped-by-name query; `_chunk_for_card()` embeds `name + "\n" + type_line + "\n"
++ oracle_text` keyed by the card's name (not its Scryfall UUID) for idempotent re-runs;
+`embed_and_upsert()` batches (500/batch) through `shared_embedder` into `card_rag`'s store. Unfiltered,
+per the interview outcome — no set_type/token/joke-card filtering.
+
+One real bug the unit tests (mocked embedder/store) couldn't catch, only surfaced by running against
+the live stack: `ChromaVectorStore.upsert` passes each `ProcessedChunk.metadata` straight through to
+Chroma, and Chroma's `upsert` **rejects an empty metadata dict outright**
+(`ValueError: Expected metadata to be a non-empty dict, got 0 metadata attributes`) — the first live
+run died on batch 1. `ProcessedChunk.metadata` defaults to `{}` and `_chunk_for_card()` wasn't setting
+it. Fixed by giving each chunk `metadata={"name": card.name}` (not otherwise used today, just enough
+to be non-empty) and added a unit test asserting `chunk.metadata` is truthy so this can't silently
+regress. Also caught along the way: a first pass tried validating retrieval with a raw `chromadb`
+client's `collection.query(query_texts=...)`, which used Chroma's own default embedding function
+(384-dim MiniLM) instead of the app's `bge-base-en-v1.5` (768-dim) — `InvalidArgumentError: Collection
+expecting embedding with dimension of 768, got 384`. Not a bug in the shipped code (confirms the
+stored vectors are the correct 768-dim shape); just the wrong way to spot-check retrieval outside the
+app's own `CardRAG`/`search_cards_semantic` code path, corrected by testing through
+`search_cards_semantic` directly instead.
+
+**Live-verified against the real stack** (`deck_builder-backend-1`/`mtg-chromadb`/`deck_builder-db-1`,
+2026-08-12): the local `Card` table already held 116,694 rows (from a prior `scryfall_ingestion.py`
+run) across 36,063 unique names. Ran `card_embedding_ingestion.py` inside the backend container
+against real Postgres and real Chroma — completed in ~74 minutes on CPU (this container has no
+GPU/MPS, unlike local dev), logging `Card embedding ingestion complete: 36063 cards upserted`.
+Confirmed the `mtg_cards` collection's count (`36063`) matches the unique-name count exactly — no
+duplicate vectors. Called `search_cards_semantic` directly (through the real tool, not mocked) for
+both of the user's own example queries ("cards that deal damage when an artifact enters the
+battlefield", "cards that benefit from artifacts leaving the battlefield") — both returned real,
+plausible artifact-synergy cards (e.g. *Letter Bomb*, *Wake the Past*, *Portcullis*) with no crash and
+no legality field, confirming the full pipeline (embed → store → query → format) works end-to-end
+against live data, not just mocks.
+
+Test coverage added: `search_cards_semantic` formatting/no-results (`test_cards_tool.py`),
+`card_embedding_ingestion.py`'s dedup-by-name query, chunk-building, and batched embed/upsert logic
+against a mocked embedder/store (new `test_card_embedding_ingestion.py`), and a small
+`test_deck_advisor_agent.py` confirming the agent registers both tools and the prompt mentions
+verifying semantic hits. `cd backend && uv run pytest` (112 passed) and `uv run ruff check .` both
+clean on every file this phase touched (two pre-existing, unrelated files already needed
+`ruff format` before this phase started — left alone, out of scope).
+
+No deviation from the Design section's route/schema/frontend scope: `POST /ai/suggest`,
+`SuggestCardRequest`/`SuggestCardResponse`, and `DeckAdvisor.tsx` are all untouched, exactly as
+decided.
 
 ---
 

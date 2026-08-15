@@ -1,31 +1,32 @@
 # from functools import lru_cache
 
-from typing import List
+from typing import List, Optional
 
 from app.ai.rag.base import RAGService
 from app.ai.types import ProcessedChunk
+from app.ai.vector_store.base import EmbeddingModel
 from app.ai.vector_store.chroma import ChromaVectorStore
-from app.ai.vector_store.embedding import SentenceTransformerEmbedder
+from app.ai.vector_store.embedding import SentenceTransformerEmbedder, shared_embedder
 
 
 class RulesRAG(RAGService):
     """Retrieval-Augmented Generation for MTG Rules."""
 
-    def __init__(self):
+    def __init__(self, embedder: Optional[EmbeddingModel] = None):
         self._enabled = False
         try:
-            # We initialize the shared components.
-            # In a real app, these might be injected or singletons managed by FastAPI dependencies.
-            self.embedder = SentenceTransformerEmbedder()  # Will auto-detect device
+            # Accept an injected embedder (e.g. the shared_embedder singleton)
+            # so this doesn't load its own redundant copy of the model when a
+            # second RAGService (CardRAG) also needs one; falls back to
+            # constructing its own so this still works called standalone.
+            self.embedder = embedder or SentenceTransformerEmbedder()
             self.store = ChromaVectorStore(embedding_model=self.embedder)
             self._enabled = True
         except Exception as e:
             print(f"Failed to initialize RAG: {e}")
             self._enabled = False
 
-    def query(
-        self, text: str, k: int = 5, filters: dict = None
-    ) -> List[str]:
+    def query(self, text: str, k: int = 5, filters: dict = None) -> List[str]:
         """
         Retrieves top-k relevant rules for the query.
         Returns a list of rule texts.
@@ -53,4 +54,4 @@ class RulesRAG(RAGService):
 # def get_rules_rag() -> RulesRAG:
 #     return RulesRAG()
 
-rules_rag = RulesRAG()
+rules_rag = RulesRAG(embedder=shared_embedder)
