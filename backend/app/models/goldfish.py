@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel
-from sqlmodel import Column, Field, JSON, SQLModel
+from sqlmodel import Column, Field, JSON, SQLModel, String
 
 
 def _utcnow_naive() -> datetime:
@@ -66,6 +66,14 @@ class GoldfishSessionBase(SQLModel):
     name: str
     opponent_deck_id: Optional[int] = Field(
         default=None, foreign_key="deck.id", index=True
+    )
+    # Manual, session-level, freely editable outcome (Phase 7) — not tied to
+    # any specific tree branch/node, since a session's tree can have multiple
+    # sibling lines with no server-side concept of "which one actually
+    # happened." None means "not recorded." sa_column is explicit because
+    # SQLModel can't auto-derive a column type from Optional[Literal[...]].
+    outcome: Optional[Literal["win", "loss", "draw"]] = Field(
+        default=None, sa_column=Column(String)
     )
 
 

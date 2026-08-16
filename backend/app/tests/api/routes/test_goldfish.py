@@ -296,3 +296,104 @@ async def test_cannot_access_another_users_session(
         assert add_res.status_code == 403
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_update_session_outcome_set_and_clear(
+    client: AsyncClient, db_session
+) -> None:
+    _user, deck_id = await _make_user_and_deck(
+        client, db_session, "goldfish_outcome@example.com", "gf_sub_outcome"
+    )
+    session_id = (
+        await client.post(
+            f"{settings.API_V1_STR}/goldfish/sessions", json={"deck_id": deck_id}
+        )
+    ).json()["id"]
+
+    # New sessions start with no recorded outcome.
+    tree_res = await client.get(f"{settings.API_V1_STR}/goldfish/sessions/{session_id}")
+    assert tree_res.json()["session"]["outcome"] is None
+
+    set_res = await client.patch(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}",
+        json={"outcome": "win"},
+    )
+    assert set_res.status_code == 200
+    assert set_res.json()["outcome"] == "win"
+
+    # Freely editable — no lock/finalize concept.
+    update_res = await client.patch(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}",
+        json={"outcome": "loss"},
+    )
+    assert update_res.status_code == 200
+    assert update_res.json()["outcome"] == "loss"
+
+    clear_res = await client.patch(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}",
+        json={"outcome": None},
+    )
+    assert clear_res.status_code == 200
+    assert clear_res.json()["outcome"] is None
+
+
+@pytest.mark.asyncio
+async def test_update_session_outcome_rejects_invalid_value(
+    client: AsyncClient, db_session
+) -> None:
+    _user, deck_id = await _make_user_and_deck(
+        client, db_session, "goldfish_outcome_invalid@example.com", "gf_sub_outcome_inv"
+    )
+    session_id = (
+        await client.post(
+            f"{settings.API_V1_STR}/goldfish/sessions", json={"deck_id": deck_id}
+        )
+    ).json()["id"]
+
+    response = await client.patch(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}",
+        json={"outcome": "tie"},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_update_session_outcome_ownership(
+    client: AsyncClient, db_session
+) -> None:
+    _owner, deck_id = await _make_user_and_deck(
+        client, db_session, "gf_owner_outcome@example.com", "gf_owner_outcome_sub"
+    )
+    other = User(
+        email="gf_other_outcome@example.com", google_sub="gf_other_outcome_sub"
+    )
+    db_session.add(other)
+    await db_session.commit()
+    await db_session.refresh(other)
+
+    session_id = (
+        await client.post(
+            f"{settings.API_V1_STR}/goldfish/sessions", json={"deck_id": deck_id}
+        )
+    ).json()["id"]
+
+    app.dependency_overrides[get_current_user] = lambda: other
+    try:
+        response = await client.patch(
+            f"{settings.API_V1_STR}/goldfish/sessions/{session_id}",
+            json={"outcome": "win"},
+        )
+        assert response.status_code == 403
+    finally:
+        # Only remove the get_current_user override here, not .clear() — this
+        # test still has a DB-dependent call below, and .clear() would also
+        # wipe the client fixture's get_db override (a real bug hit and fixed
+        # in Phase 3b, per PLAN.md).
+        del app.dependency_overrides[get_current_user]
+
+    not_found_res = await client.patch(
+        f"{settings.API_V1_STR}/goldfish/sessions/999999",
+        json={"outcome": "win"},
+    )
+    assert not_found_res.status_code == 404

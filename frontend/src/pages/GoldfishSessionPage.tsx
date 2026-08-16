@@ -14,6 +14,8 @@ import {
   Drawer,
   useMediaQuery,
   useTheme,
+  ToggleButtonGroup,
+  ToggleButton,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/DeleteOutline";
@@ -172,6 +174,21 @@ export const GoldfishSessionPage: React.FC = () => {
     },
   });
 
+  // Manual, session-level, freely-editable outcome (Phase 7) — no lock/
+  // finalize step, this can be changed at any time.
+  const updateOutcome = useMutation({
+    mutationFn: async (outcome: "win" | "loss" | "draw" | null) => {
+      const res = await apiClient.patch(`/goldfish/sessions/${sessionId}`, {
+        outcome,
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: ["goldfishAnalytics"] });
+    },
+  });
+
   if (isLoading || !data) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", p: 6 }}>
@@ -298,6 +315,27 @@ export const GoldfishSessionPage: React.FC = () => {
         <Typography variant="h6" fontWeight="700" sx={{ flex: 1 }}>
           {data.session.name}
         </Typography>
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={data.session.outcome ?? "none"}
+          onChange={(_e, value) => {
+            if (value === null) return;
+            updateOutcome.mutate(value === "none" ? null : value);
+          }}
+          disabled={updateOutcome.isPending}
+        >
+          <ToggleButton value="win" color="success">
+            Win
+          </ToggleButton>
+          <ToggleButton value="loss" color="error">
+            Loss
+          </ToggleButton>
+          <ToggleButton value="draw" color="warning">
+            Draw
+          </ToggleButton>
+          <ToggleButton value="none">—</ToggleButton>
+        </ToggleButtonGroup>
         <IconButton
           onClick={() => setShowDeckList((v) => !v)}
           size="small"

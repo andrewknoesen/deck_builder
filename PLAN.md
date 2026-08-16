@@ -120,9 +120,10 @@ below for the full record.
 implementation, run in parallel since the two are independent of each other (different subsystems:
 AI/deck-building vs. goldfishing). Design passes and product-owner interviews both complete for
 each — every open question resolved to the blueprint's own recommended default, no deviation.
-**Phase 6 shipped, 2026-08-16** (frontend-only as designed, live-verified against the real docker
-stack after isolating one transient Gemini-API blip from the actual code). Phase 7's design and
-interview are complete too; its implementation is next. See Phase 6 below.
+**Phase 7 shipped, 2026-08-15** (backend then frontend, no scope deviation, live-verified against
+the real docker stack). **Phase 6 shipped, 2026-08-16** (frontend-only as designed, live-verified
+against the real docker stack after isolating one transient Gemini-API blip from the actual code).
+See Phase 6 and Phase 7 below.
 
 ---
 
@@ -1815,6 +1816,254 @@ two things worth recording (neither a defect in the shipped code):
 
 `npx tsc -b` and `npx eslint .` both clean. No backend files changed, matching the Design section's
 scope exactly.
+
+---
+
+## Phase 7 — Goldfish session analytics (shipped, 2026-08-15)
+
+### Why this one, and why now
+
+Second of two features raised in the same 2026-08-15 brainstorming session (Phase 6 above is the
+first, picked up ahead of this one per stated priority). Three full phases of investment in
+goldfishing (3a branching tree, 3b assisted simulator, 3d two-deck goldfishing) and today every
+session is viewable only in isolation — `GoldfishTree.tsx` renders one session's tree,
+`GoldfishSessionPage.tsx` is scoped to one session at a time. Nothing aggregates across sessions.
+User asked for an aggregate analytics view (win rate, average game length, mulligan/mana-screw
+frequency raised as illustrative examples, not a fixed spec).
+
+### Status
+
+Design pass complete (`mtg-architect`, 2026-08-15). Four open questions flagged for the
+product-owner interview before implementation — the first blocks everything else in this phase.
+
+### Ground truth this plan is built on
+
+Checked directly against current code, not assumed:
+
+- `GoldfishSession` (`backend/app/models/goldfish.py:63-74`) has exactly `deck_id`, `user_id`,
+  `name`, `opponent_deck_id`, `created_at`. **No outcome/result field of any kind exists.** No
+  win/loss/draw concept, no "session ended" event, no "session complete" flag anywhere.
+- `GoldfishNode` (`goldfish.py:88-113`) has `turn_number: Optional[int]` (bumped only by an
+  explicit `next_turn` action), `trackers: Optional[Dict[str, int]]` (opaque, freeform), and
+  `state: Optional[Dict]` (a `GameState` snapshot: zones, `life_total`, `opponent_life_total`,
+  `opponent_zones`).
+- **Sessions are trees, not linear logs** — a second load-bearing constraint alongside the missing
+  outcome field. A session can have multiple sibling branches (`parent_id`, `order_index`)
+  representing alternate hypothetical lines, with no server-side concept of which branch "actually
+  happened." `selectedNodeId` in `GoldfishSessionPage.tsx:48` is frontend-only, ephemeral, never
+  persisted. "How did the game end" and "how long did it go" are both ambiguous at the tree level,
+  not just unrecorded — there's no canonical path to read them off even in principle.
+- The action vocabulary (`GoldfishActionIn.type`) is `draw`, `play_land`, `cast`, `move_zone`,
+  `set_life`, `shuffle`, `next_turn`. **No `mulligan` action exists.** A user could simulate one via
+  `move_zone` + `shuffle` + `draw`, but nothing tags it as a mulligan — indistinguishable in the log
+  from an unrelated shuffle. Mulligan frequency is not inferable from existing data at all.
+- Mana screw/flood *is* theoretically derivable (cross-reference `state.hand`/`state.battlefield`
+  against `Card.type_line` containing `"Land"` at each turn boundary) but needs its own threshold
+  design and is the most expensive candidate metric to compute (per-turn, per-node, joined against
+  `Card`). A scope/cost question, not a schema gap.
+- `backend/app/services/goldfish.py` is pure state-transform functions, no aggregation logic.
+  `stats.py`'s `calculate_stats(deck)` is the existing "service function computes, thin route calls
+  it" precedent — but it's deck-*composition* math, a different domain (per the subagent roster,
+  `mtg-maths` owns mana curve/draw odds/color balance, not gameplay-history aggregation). This
+  phase's aggregation doesn't belong folded into `stats.py`.
+- `goldfish.py`'s `list_sessions` already filters by `deck_id` **and** `user_id` — the exact
+  `?deck_id=` scoping precedent this phase should reuse. `_get_owned_session` is the reusable
+  per-session ownership-check pattern for a new outcome-update endpoint.
+- Frontend: `Goldfish.tsx` is the deck-picker → session-list page; once a deck is selected it
+  already fetches sessions scoped to that `deck_id` — the natural, already-deck-scoped surface for
+  an aggregate view, no new page/route needed. `types/goldfish.ts`'s `GoldfishSession` interface
+  uses `| null` on always-present keys (`opponent_deck_id: number | null`), never `?:` — the
+  convention to match if `outcome` is added.
+- `backend/app/api/api.py:12` already registers `goldfish.router` at `/goldfish` — a new `GET
+  /goldfish/analytics` route is a same-router addition, not new registration wiring.
+
+### Design
+
+**Central decision this phase has to make before any metric is buildable: how does a session's
+outcome get recorded.** No candidate answer is already implied by existing code — genuinely new
+ground. Recommendation, offered as an interview starting point, not a silent pick:
+
+- **Manual only** — matches this system's established philosophy (3d's interview: "manual
+  dual-piloting... no automation"; no rules engine exists, and life-total-hits-zero win detection
+  wouldn't be reliable anyway since users may never touch life total if only testing draws/curve).
+- **Session-level, not node/branch-level.** A new nullable `GoldfishSession.outcome:
+  Optional[Literal["win", "loss", "draw"]]`, set via a small control on `GoldfishSessionPage.tsx`,
+  not tied to any specific tree node — sidesteps the branch-ambiguity problem above entirely by
+  recording "how this practice session went" as one whole-session judgment call.
+- **Freely editable, not a one-way "end session" action.** Nothing else in this system treats a
+  session as "closed" — a locking/finalization step would be new, unrequested ceremony. A
+  dropdown/toggle the user can set or change at any time is the smaller, more consistent design.
+- New endpoint: `PATCH /goldfish/sessions/{id}` (schema `GoldfishSessionOutcomeUpdate {outcome:
+  Literal["win","loss","draw"] | None}`), reusing `_get_owned_session` like every other
+  session-scoped route.
+- Migration: single nullable `op.add_column`, no FK — matches the shape of the two simple prior
+  goldfish migrations, not 3d's heavier FK-adding one.
+
+**Analytics aggregation — a new module, not folded into `stats.py`.** New
+`backend/app/services/goldfish_analytics.py`, following the existing "service function computes,
+route stays thin" pattern. One function, `async def compute_deck_analytics(db, deck_id, user_id) ->
+GoldfishAnalyticsPublic`, deck-scoped (matching `list_sessions`'s `?deck_id=` convention — no
+cross-deck rollup in v1, trivially addable later). New schema in `backend/app/schemas/goldfish.py`:
+
+```python
+class GoldfishAnalyticsPublic(BaseModel):
+    session_count: int
+    sessions_with_outcome: int
+    wins: int
+    losses: int
+    draws: int
+    win_rate: Optional[float]          # None when sessions_with_outcome == 0
+    average_max_turn: Optional[float]  # None when no session has any turn_number set
+    two_deck_session_ratio: Optional[float]  # None when session_count == 0
+```
+
+New route `GET /goldfish/analytics?deck_id=`, same file, same auth/ownership shape as
+`list_sessions`.
+
+**v1 metric set — only what's soundly computable today, nothing assumed into existence:**
+
+1. `win_rate` = wins / sessions_with_outcome (excludes sessions with no recorded outcome from the
+   denominator; `sessions_with_outcome` reported alongside so "0 sessions marked" reads distinctly
+   from "0% win rate"). Entirely contingent on the outcome-recording mechanism shipping first.
+2. `wins`/`losses`/`draws` breakdown.
+3. `session_count`, `sessions_with_outcome` — a completion-rate signal on its own.
+4. `average_max_turn` — for each session, `MAX(turn_number)` across every node in that session's
+   *whole tree* (not one branch — there is no canonical branch to prefer per Ground Truth),
+   averaged across sessions. Caveat for the UI copy: this can overcount vs. "how long the game
+   actually went" if the user explored a longer hypothetical branch than the line they actually
+   played — a known, stated limitation, not silently hidden.
+5. `two_deck_session_ratio` — fraction of sessions with `opponent_deck_id` set, i.e. real
+   opponent-board testing vs. solo goldfishing.
+
+**Explicitly not in v1, with reasons:**
+
+- **Mulligan frequency** — not inferable from the current action vocabulary at all; would need a
+  new explicit `mulligan` action type first, a real vocabulary change, not an analytics-layer
+  add-on. Separate open question below.
+- **Mana screw/flood frequency** — theoretically derivable but needs its own threshold design and
+  is the most expensive metric to compute. Matches this codebase's repeated pattern (3a/3b) of
+  shipping a plain first cut and iterating only once real usage surfaces friction. Separate open
+  question below.
+- **Wall-clock session duration** — cheap to add later (`created_at` delta, root to latest node)
+  but conflates thinking/pause time with game length; lower value than turn-count, addable
+  independently at any time without touching the outcome-recording work.
+
+**Frontend:** new `GoldfishAnalyticsPanel.tsx` (`frontend/src/components/`), rendered inside
+`Goldfish.tsx`'s deck-selected view above/beside the existing session `List` — reuses the page's
+existing `selectedDeckId` scoping, no new route/page. `useQuery(["goldfishAnalytics",
+selectedDeckId], ...)` against `GET /goldfish/analytics?deck_id=`, rendered as a small stat-row
+(session count, win rate, avg turns reached, two-deck ratio) — matches the "tab/section beside
+existing content" precedent from Phase 1 (advisor tab next to Deck Statistics) rather than a new
+page. Outcome-recording control (a small `Win / Loss / Draw / —` toggle) lives on
+`GoldfishSessionPage.tsx`'s header, next to the existing tree/deck-list toggles. `types/goldfish.ts`'s
+`GoldfishSession` gains `outcome: "win" | "loss" | "draw" | null`, matching the established
+`| null`-on-always-present-key convention.
+
+### Concrete steps (once the interview below resolves)
+
+1. **Outcome-recording foundation** (backend): `outcome` column + migration on `GoldfishSession`,
+   `GoldfishSessionOutcomeUpdate` schema, `PATCH /goldfish/sessions/{id}` reusing
+   `_get_owned_session`. Tests: set/clear/update outcome, ownership check (403 on someone else's
+   session), invalid literal value rejected.
+2. **Outcome-recording UI** (frontend): small control on `GoldfishSessionPage.tsx`, wired to the
+   new `PATCH`, `outcome` added to `types/goldfish.ts`.
+3. **Analytics service + endpoint** (backend): `goldfish_analytics.py`, `GoldfishAnalyticsPublic`
+   schema, `GET /goldfish/analytics?deck_id=`. Tests: zero-session deck (all-None/zero response),
+   mixed win/loss/draw + unrecorded sessions (win_rate denominator excludes unrecorded),
+   `average_max_turn` against a small multi-branch fixture tree (confirms whole-tree max, not
+   first-branch), two-deck ratio, ownership (deck not owned by requester → 403/404 matching
+   existing deck-route pattern).
+4. **Analytics UI** (frontend): `GoldfishAnalyticsPanel.tsx` wired into `Goldfish.tsx`.
+
+### Verify (once built)
+
+`cd backend && uv run pytest` covers the new endpoints, not just structural typing. Manually
+against the docker stack: record win/loss/draw on a few real sessions for one deck, confirm the
+analytics panel's win rate and counts match by hand-count; confirm a deck with zero sessions
+renders a sane empty state (not a crash/NaN%); confirm `average_max_turn` reflects a session with a
+longer abandoned branch than its "real" line, and that this is visibly explained in the UI copy,
+not silently misleading.
+
+### Open questions for the product-owner interview
+
+1. **(Central, blocks everything else) How should a session's outcome be recorded — mechanism,
+   granularity, and mutability?** The recommendation above (manual button, session-level not
+   per-branch, freely editable, no "end session" lock) is a starting point, not a decision. Needs
+   an actual answer before Step 1 can be written.
+2. **Should outcome-recording (and therefore win-rate) apply to single-deck sessions too, or only
+   two-deck (Phase 3d) sessions?** A single-deck session has no in-app opponent board — "win/loss"
+   there would describe a match played elsewhere (paper/MTGO) while goldfishing draws in this app.
+   Both are plausible; changes what "win rate" even means and whether the control should be
+   conditionally hidden.
+3. **Is mana screw/flood detection wanted for v1**, despite the added threshold-design and compute
+   cost, or deferred until real usage of the simpler metrics surfaces demand (matching 3a/3b's
+   "ship plain, iterate on friction" precedent)?
+4. **Is mulligan frequency wanted badly enough to justify adding a new `mulligan` action type
+   first** (a real change to the existing action vocabulary, not just an analytics addition), or
+   deferred?
+
+### Interview outcome (resolved before writing code, per-phase process)
+
+All four questions resolved by interview, 2026-08-15 — all took the blueprint's recommended
+default, no deviation:
+
+1. **Outcome recording: manual toggle, session-level, freely editable, no lock/finalize concept.**
+2. **Scope: both single-deck and two-deck sessions** can record an outcome — a single-deck
+   session's win/loss describes a match played elsewhere while goldfishing draws in-app, still a
+   meaningful signal.
+3. **Mana screw/flood detection: not in v1**, deferred until the core metric set surfaces real
+   demand.
+4. **Mulligan frequency: not in v1**, deferred — no new `mulligan` action type added at this time.
+
+Implementation proceeds per the Design and Concrete Steps sections above, in order: outcome-
+recording foundation (backend) → outcome-recording UI (frontend) → analytics service + endpoint
+(backend) → analytics UI (frontend).
+
+### Shipped: backend then frontend, no deviation on scope
+
+Routed to `mtg-backend` (Concrete Steps 1 and 3) then `mtg-frontend` (Steps 2 and 4), same
+sequencing precedent as Phase 3d. Backend: `GoldfishSession` gained a nullable
+`outcome: Optional[Literal["win","loss","draw"]]` on `GoldfishSessionBase` (inherited by
+`GoldfishSession`/`GoldfishSessionPublic`, deliberately **not** added to `GoldfishSessionCreate` — a
+session never starts with an outcome), needing an explicit `sa_column=Column(String)` since SQLModel
+can't auto-derive a column type from `Optional[Literal[...]]` (a real `TypeError` on import caught
+this before it shipped, not inspection). New migration `9ebb5d15bcf9` — single nullable
+`op.add_column`, matching the two simplest prior goldfish migrations, not 3d's heavier FK-adding
+one. `PATCH /goldfish/sessions/{id}` (body `{"outcome": "win"|"loss"|"draw"|null}`, reuses
+`_get_owned_session`) and `GET /goldfish/analytics?deck_id=` (new `goldfish_analytics.py`'s
+`compute_deck_analytics`, one flat query for `average_max_turn` across each session's *whole* tree,
+not one branch — no per-branch traversal) both shipped as specified, no scope deviation (no
+mana-screw/mulligan metrics, applies to both single- and two-deck sessions).
+
+One real bug the implementer's own tests caught, not inspection: two test files had
+`app.dependency_overrides.clear()` fired mid-test with a DB call still to come after it — the exact
+`dependency_overrides.clear()` footgun Phase 3b's section of this file already documents. Surfaced
+as a real Postgres-connection-attempt failure while running the suite; fixed both to use
+`del app.dependency_overrides[get_current_user]` instead, matching the already-documented fix.
+
+Frontend: a `ToggleButtonGroup` (Win/Loss/Draw/—) on `GoldfishSessionPage.tsx`'s header wired to the
+new `PATCH`, invalidating both the session-tree query and `["goldfishAnalytics"]` on success so the
+analytics panel can't go stale from a stale outcome. New `GoldfishAnalyticsPanel.tsx` (a `Paper`
+stat row: sessions / win rate / avg. max turn / two-deck ratio) wired into `Goldfish.tsx` above the
+existing session list, rendering a distinct empty state at zero sessions and `—` per-field for any
+null optional rather than `NaN%`. `average_max_turn`'s label carries a tooltip stating it reflects
+the longest explored branch, not necessarily the line actually played, per this section's own
+Design-stage caveat. `types/goldfish.ts` gained `outcome: "win"|"loss"|"draw"|null` on
+`GoldfishSession` (the file's established `| null`-on-always-present-key convention) and a new
+`GoldfishAnalytics` interface mirroring `GoldfishAnalyticsPublic`. `ToggleButtonGroup` is a
+genuinely new MUI component in this codebase (no prior usage to match) — flagged by the implementer
+as a judgment call, not hidden.
+
+**Live-verified against the real docker stack**, not just typechecked: confirmed the migration
+applied via container logs; toggled a session's outcome to Win, reloaded, confirmed it persisted;
+set a second session to Loss; confirmed the deck's analytics panel read `Sessions: 3`,
+`Win rate (2 recorded): 50%`, `1W / 1L / 0D`, `Avg. max turn: —` (correctly null — no node in those
+sessions has `turn_number` set), `Two-deck sessions: 0%` — matched hand-counting exactly. Confirmed
+the pre-outcome empty/unrecorded state renders sanely (no NaN/crash). No console/network errors on
+any goldfish route. `cd backend && uv run pytest` (120 passed), `uv run ruff check .` clean on every
+file this phase touched (one pre-existing, unrelated `F401` in `scryfall.py` confirmed untouched by
+this phase via `git diff HEAD` — left alone, out of scope). `npx tsc -b` and `npx eslint .` both
+clean on the frontend.
 
 ---
 

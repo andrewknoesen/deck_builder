@@ -5,6 +5,21 @@ export interface GoldfishSession {
   user_id: number;
   name: string;
   created_at: string;
+  // Manual, session-level, freely-editable outcome (Phase 7) — null means
+  // "not recorded." Not tied to any specific tree branch/node.
+  outcome: "win" | "loss" | "draw" | null;
+}
+
+export interface GoldfishAnalytics {
+  session_count: number;
+  sessions_with_outcome: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  // None/null when their denominator is zero/undefined — never coerced to 0.
+  win_rate: number | null;
+  average_max_turn: number | null;
+  two_deck_session_ratio: number | null;
 }
 
 export interface Zones {

@@ -31,6 +31,7 @@ import axios from "axios";
 import { apiClient } from "../api/client";
 import type { Deck } from "../types/mtg";
 import type { GoldfishSession } from "../types/goldfish";
+import { GoldfishAnalyticsPanel } from "../components/GoldfishAnalyticsPanel";
 
 export const Goldfish: React.FC = () => {
   const navigate = useNavigate();
@@ -146,6 +147,8 @@ export const Goldfish: React.FC = () => {
           {selectedDeck?.title}
         </Typography>
       </Box>
+
+      <GoldfishAnalyticsPanel deckId={selectedDeckId} />
 
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <Typography variant="h6" color="text.secondary">

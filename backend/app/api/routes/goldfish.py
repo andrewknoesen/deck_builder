@@ -14,13 +14,18 @@ from app.models.goldfish import (
     GoldfishSessionPublic,
 )
 from app.models.user import User
-from app.schemas.goldfish import GoldfishSessionTree
+from app.schemas.goldfish import (
+    GoldfishAnalyticsPublic,
+    GoldfishSessionOutcomeUpdate,
+    GoldfishSessionTree,
+)
 from app.services.goldfish import (
     apply_action,
     build_initial_state,
     draw_card,
     draw_opening_hand,
 )
+from app.services.goldfish_analytics import compute_deck_analytics
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -162,6 +167,48 @@ async def get_session_tree(
     return GoldfishSessionTree(session=session, nodes=nodes)
 
 
+@router.patch("/sessions/{session_id}", response_model=GoldfishSessionPublic)
+async def update_session_outcome(
+    session_id: int,
+    outcome_in: GoldfishSessionOutcomeUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Set, change, or clear a session's manually-recorded outcome
+    (win/loss/draw/None). Session-level, not tied to any tree branch — there's
+    no "end session" lock, this can be freely edited at any time, for both
+    single-deck and two-deck sessions.
+    """
+    session = await _get_owned_session(session_id, db, current_user)
+    session.outcome = outcome_in.outcome
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+    return session
+
+
+@router.get("/analytics", response_model=GoldfishAnalyticsPublic)
+async def get_analytics(
+    deck_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Aggregate goldfishing analytics across every session for a deck (owned by
+    the requesting user) — win rate, average max turn reached, and two-deck
+    session ratio.
+    """
+    deck_result = await db.execute(select(Deck).where(Deck.id == deck_id))
+    deck = deck_result.scalar_one_or_none()
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+    if deck.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    return await compute_deck_analytics(db, deck_id, current_user.id)
+
+
 @router.post("/sessions/{session_id}/nodes", response_model=GoldfishNodePublic)
 async def add_node(
     session_id: int,
@@ -263,9 +310,7 @@ async def add_node(
         new_state = parent_node.state
 
     if not label:
-        raise HTTPException(
-            status_code=400, detail="label or action is required"
-        )
+        raise HTTPException(status_code=400, detail="label or action is required")
 
     siblings_result = await db.execute(
         select(GoldfishNode)
