@@ -21,9 +21,10 @@ interface Message {
 
 interface DeckAdvisorProps {
   deckId?: number;
+  synergySeed?: { query: string; nonce: number } | null;
 }
 
-export const DeckAdvisor: React.FC<DeckAdvisorProps> = ({ deckId }) => {
+export const DeckAdvisor: React.FC<DeckAdvisorProps> = ({ deckId, synergySeed }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "agent",
@@ -63,6 +64,27 @@ export const DeckAdvisor: React.FC<DeckAdvisorProps> = ({ deckId }) => {
     setMessages((prev) => [...prev, { role: "user", content: message }]);
     mutation.mutate(message);
   };
+
+  // Seed a message from a per-card "Find synergies" click (DeckBuilder.tsx). Keyed
+  // on nonce (not just query) so clicking the same card twice in a row still fires.
+  // Tracks the last-processed nonce in a ref (rather than relying solely on
+  // mutation.isPending) because React StrictMode's dev-only double-invoke of
+  // effects runs synchronously, before the pending state from the first call is
+  // reflected in a re-render -- a pending-flag-only check would still double-send.
+  const lastSeedNonceRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!synergySeed || synergySeed.nonce === lastSeedNonceRef.current) return;
+    // A genuinely new seed (different card clicked) while a request is already
+    // in flight is dropped rather than queued -- matches ChatInput's own
+    // disabled-while-pending behavior.
+    if (mutation.isPending) return;
+    lastSeedNonceRef.current = synergySeed.nonce;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    handleSend(synergySeed.query);
+    // Only re-run when a new seed arrives; handleSend/mutation are recreated each
+    // render and would otherwise cause this to fire on every mutation state change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [synergySeed?.nonce]);
 
   if (!deckId) {
     return (

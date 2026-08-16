@@ -109,9 +109,20 @@ oracle text. User's own opening framing: a SQL + vector-DB hybrid. Routed to `mt
 for a design pass before any interview or implementation, per this file's own convention for
 anything crossing backend AI layer + data pipeline + frontend. See Phase 5 below once that lands.
 
-**Every phase gets an interview before implementation** — a short round of clarifying questions
-on the genuinely open design decisions, resolved and recorded before any code is written. Applied
-to Phase 2 already; apply to Phase 1 and Phase 3 the same way when they're picked up.
+**Phase 5 shipped, 2026-08-12.** `search_cards_semantic`/`CardRAG` over a new `mtg_cards` Chroma
+collection, a shared sentence-transformer embedder between `RulesRAG` and `CardRAG`, and a manual
+`card_embedding_ingestion.py` script. Live-verified end-to-end against the real stack. See Phase 5
+below for the full record.
+
+**Phase 6 (Per-card synergy lookup) and Phase 7 (Goldfish session analytics) — picked up next,
+2026-08-15.** Both user-requested in the same brainstorming session, in this stated priority order
+(synergy lookup first). Both routed to `mtg-architect` for a design pass before any interview or
+implementation, run in parallel since the two are independent of each other (different subsystems:
+AI/deck-building vs. goldfishing). Design passes and product-owner interviews both complete for
+each — every open question resolved to the blueprint's own recommended default, no deviation.
+**Phase 6 shipped, 2026-08-16** (frontend-only as designed, live-verified against the real docker
+stack after isolating one transient Gemini-API blip from the actual code). Phase 7's design and
+interview are complete too; its implementation is next. See Phase 6 below.
 
 ---
 
@@ -1640,6 +1651,170 @@ clean on every file this phase touched (two pre-existing, unrelated files alread
 No deviation from the Design section's route/schema/frontend scope: `POST /ai/suggest`,
 `SuggestCardRequest`/`SuggestCardResponse`, and `DeckAdvisor.tsx` are all untouched, exactly as
 decided.
+
+---
+
+## Phase 6 — Per-card synergy lookup (shipped, 2026-08-16)
+
+### Why this one, and why now
+
+Second-order follow-up to Phase 5, raised directly by the user in a 2026-08-15 brainstorming
+session as the first of two features to build next (Phase 7 below is the second). Phase 5 shipped
+`search_cards_semantic`/`CardRAG` and wired synergy-style questions into `deck_advisor_agent`'s
+free-text chat — but only reachable by typing a question. This phase adds a lower-friction trigger:
+click a card already in the deck and get synergy suggestions seeded from that specific card,
+without typing anything.
+
+### Status
+
+Design pass complete (`mtg-architect`, 2026-08-15). One open question flagged for the
+product-owner interview before implementation — everything else is a decided recommendation.
+
+### Ground truth this plan is built on
+
+- **Correction to the original framing**: `frontend/src/components/DeckListItem.tsx` is *not* the
+  per-card row inside a deck — it's the per-*deck* row on the deck list page (`DeckListItem.tsx:29-
+  132`, props `{deck: Deck, onDelete}`, navigates to `/decks/:id`). The actual per-card row inside
+  deck-building is `DeckCard.tsx`, rendered as `DeckCardComponent` in `DeckBuilder.tsx:596-611`.
+  This design is built against `DeckCard.tsx`.
+- `DeckCard.tsx` already has the exact trigger surface this needs: a hover-revealed Actions Row
+  (`DeckCard.tsx:246-343`) with icon-button callbacks (quantity, board-move menu, delete), each
+  `e.stopPropagation()`-guarded. A new "find synergies" icon button fits this existing idiom
+  directly — no new interaction paradigm.
+- `DeckBuilder.tsx` already has a two-tab right pane (`rightPaneTab: "stats" | "advisor"`, state at
+  line 95, tabs at lines 626-644) and an established "disabled until deck is saved" convention for
+  deck-scoped actions (the goldfish practice-mode button, lines 486-504: `disabled={!deck?.id}` +
+  explanatory `Tooltip`). Both reusable as-is.
+- `DeckAdvisor.tsx` posts `{deck_id, query}` to `/ai/suggest` via `useMutation` (lines 40-60) and
+  appends both sides of the exchange as chat bubbles via `handleSend` (lines 62-65). `ChatInput.tsx`
+  owns its own uncontrolled input state and only exposes `onSend(message: string)` — there's no
+  existing way to pre-fill it from a parent, so a card-triggered query means calling `handleSend`
+  directly, not touching `ChatInput.tsx`.
+- `POST /ai/suggest` (`ai.py:68-104`) and `_build_deck_context` (`ai.py:24-65`) already do
+  everything a synergy query needs: ownership check, `Deck` fetch, stats, and a context string of
+  every mainboard card. `deck_advisor_agent`'s prompt (instruction 6) already tells it to reach for
+  `search_cards_semantic` on synergy-style questions and verify legality via `search_cards` before
+  citing — this phase's job is producing a query and sending it through this already-working
+  pipeline, not building new agent capability.
+- **Real gap found while grounding this**: `_build_deck_context` only includes `board == "main"`
+  cards (`ai.py:25`) — a synergy click on a sideboard/maybeboard/commander card wouldn't have its
+  oracle text in the agent's context, only its bare name. Fix: build the query **client-side** with
+  the card's own oracle text/type baked in (`DeckCard.tsx`'s `deckCard.card` is already a full
+  `ScryfallCard`), which is board-agnostic and also matches what `search_cards_semantic` actually
+  embeds (`name\ntype_line\noracle_text`) — better than a bare name for vector search quality too.
+- `SuggestCardRequest{deck_id, query}` / `SuggestCardResponse{response}` already have everything
+  needed — no new schema field.
+
+### Design
+
+**Central question, resolved: route through the full `deck_advisor_agent` turn via the existing
+`POST /ai/suggest`. No new endpoint, no new schema, no bypass of the agent.**
+
+A per-card click is a new *trigger* for a query shape Phase 5 already built and already verified
+end-to-end, not a new query shape. A bypass route calling `card_rag`/`search_cards_semantic`
+directly would mean re-implementing legality filtering in Python (duplicating what `_format_card`
+already does inside the tool), losing the agent's prose reasoning tied to the deck's actual stats,
+and standing up new route/schema/rendering surface for zero new capability — the same YAGNI bar
+this file already applies elsewhere (`make_agent`'s own precedent, Phase 5's "don't build a second
+agent" reasoning).
+
+**Trigger and query construction:**
+- `DeckCard.tsx` gains an optional `onFindSynergies?: (deckCard: DeckCardType) => void` prop,
+  rendered as a new `IconButton` in the existing Actions Row, shown only when the prop is passed
+  (same idiom as the existing `onMoveCard` guard) and disabled if `!deckCard.card`.
+- `DeckBuilder.tsx` passes `onFindSynergies={deck?.id ? handleFindSynergies : undefined}` (same
+  "disabled until saved" convention as the practice-mode button). `handleFindSynergies(dc)`:
+  1. builds the query client-side, e.g. ``What cards would synergize well with `${card.name}`
+     (${card.type_line})? Its text: "${card.oracle_text}"``;
+  2. switches `rightPaneTab` to `"advisor"`;
+  3. passes the query to `DeckAdvisor` via a new prop, e.g. `synergySeed: { query: string; nonce:
+     number } | null` — the `nonce` (e.g. `Date.now()`) exists so clicking the *same* card twice in
+     a row still fires, even though the query string alone would be unchanged.
+- `DeckAdvisor.tsx` accepts `synergySeed` and adds a `useEffect` keyed on `synergySeed?.nonce` that
+  calls the existing `handleSend(synergySeed.query)` directly — no change to `ChatInput.tsx`. Guard
+  against firing a second send while one is in flight, same precedent as Phase 3d's synchronous
+  double-submit guard.
+
+**Results render in the existing `DeckAdvisor` chat pane** — not a new popover/panel. `DeckBuilder`'s
+right pane is already dual-purpose (stats/advisor tabs) and already has a separate hover-preview
+overlay; stacking a third UI paradigm (a click-anchored popover) on top would be real new surface
+area for no gain, and would contradict Phase 5's own already-shipped interview decision to keep
+synergy answers as chat prose rather than a structured list. Switching tabs + auto-sending into the
+same pane is the smallest diff that satisfies the ask.
+
+**Backend: no changes required.** `POST /ai/suggest`, its schemas, and `deck_advisor_agent`'s
+tools/prompt are already correctly shaped — this phase is frontend-only (a new prop on
+`DeckCard.tsx`, a handler + prop-threading in `DeckBuilder.tsx`, a seed-effect in `DeckAdvisor.tsx`).
+
+### Files touched (if the recommended default is confirmed)
+
+- `frontend/src/components/DeckCard.tsx` — new `onFindSynergies?` prop, new conditional
+  `IconButton` in the Actions Row.
+- `frontend/src/pages/DeckBuilder.tsx` — new `synergySeed` state, `handleFindSynergies` handler,
+  prop-threading into `DeckCardComponent` and `DeckAdvisor`.
+- `frontend/src/components/DeckAdvisor.tsx` — new `synergySeed?` prop, a `useEffect` calling the
+  existing `handleSend`, an in-flight guard against double-firing.
+- No backend files change under the recommended default. If the interview instead picks the bypass
+  fallback below: new `backend/app/api/routes/ai.py` endpoint + `backend/app/schemas/ai.py`
+  addition, reusing `card_rag`/`_card_to_dict`/`_format_card` rather than duplicating them.
+
+### Open question for the product-owner interview
+
+**Is a full agent turn per click acceptable, or does the lower-friction trigger (a click vs. typing
+a chat message) change the cost/latency calculus enough to want a cheaper bypass for this specific
+interaction?**
+
+Recommended default (above): route through the full agent turn, reusing `/ai/suggest` as-is —
+zero backend changes, reuses Phase 5's already-verified citation/legality discipline, keeps the
+agent's prose "why this synergizes" explanation.
+
+The real tension: Phase 1's own measured numbers put a `/ai/suggest` call at roughly 15-90 seconds
+depending on how many `search_cards` verifications the agent needs — a cost the user already
+accepts for a deliberately-typed chat question. A one-click button invites much higher-frequency,
+lower-intent use (clicking through several cards in a row just to browse), the same operation paid
+for more often. If that tradeoff turns out to matter, the fallback is a lightweight variant that
+skips the LLM turn entirely: a new endpoint calling `card_rag.query(...)` directly, filtering
+results against the local `Card` table's `legalities` in code (deterministic, no LLM needed —
+`_card_to_dict`/`_format_card` already do this lookup), rendering either as a single chat-style
+message in the same pane (cheap, but loses the agent's synthesized reasoning) or a genuinely new
+structured/click-to-add result list (real new surface area, reopening Phase 5's own already-
+answered interview question about that exact fallback). Worth asking directly rather than assuming
+the existing chat latency is "fine" just because it was fine for typed queries.
+
+### Interview outcome (resolved before writing code, per-phase process)
+
+Resolved by interview, 2026-08-15 — took the blueprint's recommended default, no deviation: **route
+through the full `deck_advisor_agent` turn via the existing `POST /ai/suggest`.** No bypass
+endpoint, no new backend surface. Implementation proceeds per the Design section above:
+`onFindSynergies` prop on `DeckCard.tsx`, `handleFindSynergies` + `synergySeed` state in
+`DeckBuilder.tsx`, seed-effect in `DeckAdvisor.tsx` calling `handleSend` directly.
+
+### Shipped: built exactly per Design, no deviation
+
+Routed to `mtg-frontend`, frontend-only as planned. `DeckCard.tsx` gained the `onFindSynergies?`
+prop and a new `AutoAwesomeIcon` button in the Actions Row, tooltipped "Find synergies," rendered
+only when the deck card has resolved card data. `DeckBuilder.tsx`'s `handleFindSynergies` builds the
+query client-side from the clicked card's own name/type/oracle text, switches `rightPaneTab` to
+`"advisor"`, and sets a `{ query, nonce }` seed. `DeckAdvisor.tsx`'s seed-effect calls `handleSend`
+directly — a `lastSeedNonceRef` (not just `mutation.isPending`) tracks the last-processed nonce, a
+deliberate choice to survive React StrictMode's dev-only double-invoke of effects, which fires
+synchronously before a first call's pending state would be reflected in a re-render.
+
+**Live-verified against the real docker stack**, not just typechecked, after a first pass surfaced
+two things worth recording (neither a defect in the shipped code):
+
+1. The first click's real network call failed with a genuine `ServerDisconnectedError` from the
+   Gemini API — an infrastructure blip, confirmed via `docker logs` and reproduced as unrelated to
+   this phase's code (a direct `curl` to `/ai/suggest` minutes later, no code changes in between,
+   succeeded in 33s with a normal response). Nothing to fix; the existing "Sorry, I couldn't get a
+   suggestion" error bubble (Phase 1's own error handling) rendered correctly when it happened.
+2. A second verification pass, after a fresh page load, clicked "Find synergies" on a non-commander
+   creature (Arbor Elf) and got a real, on-topic synergy answer (leading with **Utopia Sprawl**) —
+   confirming the full path (button → query construction → tab switch → `/ai/suggest` → agent
+   response) end to end, not just the click-and-switch-tabs part.
+
+`npx tsc -b` and `npx eslint .` both clean. No backend files changed, matching the Design section's
+scope exactly.
 
 ---
 

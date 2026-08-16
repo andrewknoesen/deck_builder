@@ -7,11 +7,13 @@ import {
   IconButton,
   Menu,
   MenuItem,
+  Tooltip,
 } from "@mui/material";
 import RemoveIcon from "@mui/icons-material/Remove";
 import AddIcon from "@mui/icons-material/Add";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import DeleteIcon from "@mui/icons-material/Delete";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import type { DeckCard as DeckCardType } from "../types/mtg";
 
 import { useCardHover } from "../context/useCardHover";
@@ -21,6 +23,7 @@ interface DeckCardProps {
   onUpdateQuantity: (cardId: string, delta: number) => void;
   onRemove: (cardId: string) => void;
   onMoveCard?: (cardId: string, fromBoard: string, toBoard: string, quantity?: number) => void;
+  onFindSynergies?: (deckCard: DeckCardType) => void;
   isCommanderFormat?: boolean;
   limit?: number;
   isIllegal?: boolean;
@@ -34,6 +37,7 @@ export const DeckCard = React.memo<DeckCardProps>(
     onUpdateQuantity,
     onRemove,
     onMoveCard,
+    onFindSynergies,
     isCommanderFormat,
     limit = 4,
     isIllegal = false,
@@ -323,6 +327,25 @@ export const DeckCard = React.memo<DeckCardProps>(
                         )}
                     </Menu>
                   </>
+                )}
+
+                {onFindSynergies && deckCard.card && (
+                  <Tooltip title="Find synergies">
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onFindSynergies(deckCard);
+                      }}
+                      sx={{
+                        bgcolor: "background.paper",
+                        color: "text.secondary",
+                        "&:hover": { bgcolor: "primary.main", color: "white" },
+                      }}
+                    >
+                      <AutoAwesomeIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 )}
 
                 <IconButton

@@ -93,6 +93,7 @@ export const DeckBuilder: React.FC = () => {
   const [format, setFormat] = useState("Commander");
   const [deckCards, setDeckCards] = useState<DeckCard[]>([]);
   const [rightPaneTab, setRightPaneTab] = useState<"stats" | "advisor">("stats");
+  const [synergySeed, setSynergySeed] = useState<{ query: string; nonce: number } | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">(
     "saved",
   );
@@ -261,6 +262,16 @@ export const DeckBuilder: React.FC = () => {
 
   const removeCard = useCallback((cardId: string, board: string) => {
     setDeckCards((prev) => prev.filter((dc) => !(dc.card_id === cardId && dc.board === board)));
+  }, []);
+
+  const handleFindSynergies = useCallback((dc: DeckCard) => {
+    const card = dc.card;
+    if (!card) return;
+    setRightPaneTab("advisor");
+    setSynergySeed({
+      query: `What cards would synergize well with \`${card.name}\` (${card.type_line})? Its text: "${card.oracle_text}"`,
+      nonce: Date.now(),
+    });
   }, []);
 
   const handleMoveCard = useCallback((cardId: string, fromBoard: string, toBoard: string, quantity: number = 1) => {
@@ -598,6 +609,7 @@ export const DeckBuilder: React.FC = () => {
                               onUpdateQuantity={(cid, delta) => updateQuantity(cid, dc.board, delta)}
                               onRemove={(cid) => removeCard(cid, dc.board)}
                               onMoveCard={handleMoveCard}
+                              onFindSynergies={deck?.id ? handleFindSynergies : undefined}
                               limit={getCardLimit(format, dc.card)}
                               isCommanderFormat={isCommanderLike}
                               isIllegal={
@@ -653,7 +665,10 @@ export const DeckBuilder: React.FC = () => {
                 format={format}
               />
             ) : (
-              <DeckAdvisor deckId={deck ? deck.id : undefined} />
+              <DeckAdvisor
+                deckId={deck ? deck.id : undefined}
+                synergySeed={synergySeed}
+              />
             )}
           </Box>
         </Box>
