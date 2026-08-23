@@ -6,6 +6,10 @@ graphify-out/manifest.json
 graphify-out/.graphify_labels.json
 graphify-out/.graphify_python
 graphify-out/cost.json
+# graphify's own dated auto-backup dirs (created before each rebuild) + the
+# wiki export (regenerate via `graphify update . && graphify export wiki`)
+graphify-out/wiki/
+graphify-out/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
 
 # Large reference files fetched at runtime by the rules ingestion pipeline —
 # see backend/app/ai/ingestion/rules_ingestion.py

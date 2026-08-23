@@ -50,7 +50,8 @@ uv run pytest
 - `frontend/`: React frontend with modern UI components.
 - `docker-compose.yml`: Orchestrates the backend, frontend, and database volumes.
 - `bin/`: Helper utility scripts for development and orchestration.
-- `docs/`: Architecture diagrams, technical specifications, and design documents.
+- `docs/`: Architecture diagrams, technical specifications, and design documents — start at
+  [`docs/README.md`](docs/README.md), the central index for everything in this repo.
 - `references/`: Local scratch space for reference materials (gitignored). The MTG comprehensive
   rules text is fetched automatically at ingestion time by
   `backend/app/ai/ingestion/rules_ingestion.py` — nothing here needs to be committed.
@@ -74,6 +75,12 @@ The project includes several helper scripts in the `bin/` directory to simplify 
 ## 🔑 Key Features
 
 - **Live Scryfall Search:** Proxy API to fetch real card data directly from Scryfall.
-- **Deck Management:** Create, read, and manage MTG decks (persisted in SQLite).
+- **Deck Management:** Create, read, and manage MTG decks (Postgres in prod, async SQLite in
+  tests — see `docker-compose.yml`/`backend/app/core/config.py`).
 - **Async Implementation:** Full async/await stack for high performance.
-- **AI Suggestions:** Built-in hooks for AI-powered deck building (experimental).
+- **AI Suggestions:** A deck advisor agent (keyword + semantic card search, mana-curve/legality
+  aware) and a rules-lookup agent, both shipped and live-verified — see `docs/README.md`.
+- **Practice Mode:** Branching-tree goldfishing simulator — single or two-deck, manual
+  hand/battlefield/life/mana tracking, session outcome analytics.
+- **MCP server:** Exposes the AI tools above to external MCP clients over stdio — see
+  `docs/mcp_server.md`.

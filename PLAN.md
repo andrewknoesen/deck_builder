@@ -149,6 +149,13 @@ that renamed the API this design was built against) and one real bug found and f
 verification (stdout logging corrupting the stdio JSON-RPC stream). See "Shipped" under Phase 9
 below for the full record, including the genuine MCP wire-protocol client verification performed.
 
+**Phase 10 (Central project wiki) shipped, 2026-08-23** — user-requested same day, design pass
+(`mtg-architect`) then scope review (`mtg-em`) before implementation, all three interview
+questions resolved (refresh stale docs now, generate the previously-aspirational
+`graphify-out/wiki/`, route through `mtg-em` before writing). `docs/README.md` is now the central
+routing index for both agents and human developers — see "Shipped" under Phase 10 below for the
+full record.
+
 ---
 
 ## Phase 1 — AI Deck Advisor (done, 2026-07-26)
@@ -2609,6 +2616,117 @@ returned empty results — not a bug, the local rules/card RAG collections aren'
 this dev environment (a separate, orthogonal ingestion-pipeline concern). Not verified: an actual
 Claude Desktop handshake (not installed in this environment) — the SDK's own client library
 exercises the identical wire protocol, the closest achievable substitute here.
+
+---
+
+## Phase 10 — Central project wiki (shipped, 2026-08-23)
+
+### Why this one, and why now
+
+User-requested directly, same day as Phase 8/9 shipping: a central docs entry point for both AI
+agents and human developers, specifically for "how to expand on this project" — not end-user
+docs. It must be **the** place both audiences find everything without already knowing a file
+exists — no separate digging required.
+
+### Status
+
+Design pass complete (`mtg-architect`), scope/routing review complete (`mtg-em`), both before any
+implementation — matching this file's own per-phase process. All three interview questions
+resolved, then implemented directly by the orchestrating session (no specialist in the roster
+owns cross-cutting root-level documentation).
+
+### Ground truth this plan is built on
+
+Verified directly, not assumed — full detail in the `mtg-architect` design pass and the
+`mtg-em` scope review that followed it:
+
+- Nine `docs/*.md` files, three `README.md` files (root, `backend/`, `backend/app/ai/`), 2800+
+  lines of `PLAN.md`, and ten `.claude/agents/*.md` files existed with no single routing point.
+- `CLAUDE.md` already referenced `graphify-out/wiki/index.md` for code-structure navigation, but
+  it had never actually been generated — only `GRAPH_REPORT.md`/`graph.json`/etc existed, and the
+  graph itself was stale (last built 2026-08-04, before Phases 5-9).
+- `docs/ARCHITECTURE.md` and `backend/app/ai/README.md` had both drifted — missing `CardRAG`/
+  `search_cards_semantic` (Phase 5), the `make_agent` factory (Phase 1), the goldfish `PATCH
+  /sessions/{id}`/`GET /analytics` routes (Phase 7), two-deck goldfishing (Phase 3d), the mana
+  tracker (Phase 8), and the MCP server (Phase 9) entirely. Root `README.md` wrongly claimed
+  SQLite persistence (it's Postgres in prod) and called shipped AI features "experimental."
+  `mtg-em`'s scope review spot-checked the remaining `docs/*.md` files against Phase 0's own
+  2026-07-08 doc audit and found **4 of the 5 files the design pass flagged for a new status
+  banner already had one** — only `docs/UI_DEGENERIC_DESIGN.md` genuinely lacked one. This
+  correction was applied before writing anything.
+- `PLAN.md`'s own Status section explicitly refuses to summarize itself (see the paragraph above
+  Phase 1) — a load-bearing precedent this phase's index respects: it links to `PLAN.md`, never
+  paraphrases it.
+- No CI runs in this repo today (`Deferred` below) — any enforcement mechanism had to be process,
+  not tooling.
+
+### Design
+
+**Format: in-repo markdown, no new tooling.** Rejected a GitHub Wiki (not reachable by file tools,
+not co-versioned with code) and a generated static site (new build/hosting burden, no CI to run
+it against). Chosen: **`docs/README.md`** as the central routing index — matches this repo's
+existing `README.md` naming convention (`backend/README.md`, `frontend/README.md`) and
+auto-renders as `docs/`'s GitHub landing page.
+
+**Structure: a routing index, not a content migration.** No existing file moved. `docs/README.md`
+links to everything in place: `CLAUDE.md` first (always-loaded for agents, stated explicitly for
+human devs), `PLAN.md`'s Status section (link only), `docs/ARCHITECTURE.md`, `backend/app/ai/
+README.md`, `frontend/README.md`, a status table over the remaining `docs/*.md` files, graphify's
+code-structure navigation, the subagent roster, and an "Expanding this project" section that's the
+actual answer to the user's stated goal.
+
+**Enforcement: a new `## Documentation` section in `CLAUDE.md`** (not a bullet buried in "Key
+Conventions" — `mtg-em`'s recommendation, since this is a standing process obligation, not a
+one-line style rule) stating the convention: any new persistent doc file must be linked from
+`docs/README.md` as part of that phase's Concrete Steps. Process-only, no CI dependency.
+
+### Interview outcome (resolved before writing code, per-phase process)
+
+All three questions resolved by interview, 2026-08-23:
+
+1. **Staleness: refresh the content now**, not just flag it — `docs/ARCHITECTURE.md`,
+   `backend/app/ai/README.md`, and root `README.md`'s stale claims all get fixed as part of this
+   phase, not deferred to a follow-up.
+2. **Generate `graphify-out/wiki/`**: yes — makes `CLAUDE.md`'s existing (previously aspirational)
+   reference to it actually true.
+3. **Who implements**: route through `mtg-em` for a scope/routing review first (the non-default
+   option — the design pass's own recommendation was to skip straight to direct implementation),
+   then the orchestrating session writes the content directly.
+
+### Concrete steps (as implemented)
+
+1. **`docs/README.md`** (new) — the central index, per Design above.
+2. **`CLAUDE.md`** — new `## Documentation` section (enforcement convention + pointer).
+3. **`docs/ARCHITECTURE.md`** — refreshed: AI/Agent layer bullet gained `CardRAG`/
+   `search_cards_semantic` and an MCP server pointer; API table's `goldfish` row gained
+   `opponent_deck_id`, `PATCH /sessions/{id}`, `GET /analytics`, and the `mana_spent`/`target`
+   action fields; "what's not built yet" gained the MCP HTTP/SSE gate and an explicit "3c parked"
+   note; added a dated status banner.
+4. **`backend/app/ai/README.md`** — refreshed: `ingestion/`/`rag/` sections gained
+   `card_embedding_ingestion.py`/`CardRAG`; `agents/` section gained `deck_advisor_agent` and the
+   `factory.py`/`make_agent` extraction; `tools/` section gained `cards.py`/`db.py`; new section
+   pointing at `backend/app/mcp/` with a cross-link to `docs/mcp_server.md` rather than
+   duplicating it; added a dated status banner.
+5. **Root `README.md`** — fixed the SQLite→Postgres claim, replaced the "experimental" AI framing
+   with the actual shipped feature list (deck advisor, semantic search, goldfishing, MCP server),
+   added a `docs/README.md` pointer under "Project Structure."
+6. **`docs/UI_DEGENERIC_DESIGN.md`** — added the one genuinely-missing status banner (an
+   unactioned audit/backlog item, not tracked as a `PLAN.md` phase).
+7. **`graphify-out/wiki/`** — generated via `graphify update .` (incremental, AST-only, no LLM
+   cost — the lighter path this repo's own `CLAUDE.md` convention already establishes, used
+   instead of a full corpus re-extraction) then `graphify export wiki` (154 articles +
+   `index.md`). Linked from `docs/README.md`. Gitignored (regenerated locally, same treatment as
+   `graph.json`/`graph.html`) — `.gitignore` gained a pattern for it and for graphify's own dated
+   auto-backup dirs, alongside its existing generated-artifact entries.
+
+### Verify
+
+Read `docs/README.md` start-to-finish and confirmed every link resolves to a real file or repo
+path. Confirmed `docs/ARCHITECTURE.md`'s API table matches the actual registered routes
+(`grep "@router\." backend/app/api/routes/ai.py backend/app/api/routes/goldfish.py`) rather than
+trusting the design pass's citations blindly. Confirmed `graphify-out/wiki/index.md` was generated
+and non-empty (172-line index, 154 community articles). No code paths touched — nothing to run
+`pytest`/`tsc`/`eslint` against; this phase is docs and one gitignore change only.
 
 ---
 

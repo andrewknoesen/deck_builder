@@ -1,5 +1,10 @@
 # De-genericizing the UI: why it still reads "AI-generated"
 
+> **Status: audit/recommendation, not tracked as a PLAN.md phase (as of 2026-08-23).** No evidence
+> in `PLAN.md` or `git log` that the "Suggested order of work" below has been picked up — treat
+> this as an open backlog item, not a record of what shipped. If picking it up, route through
+> `mtg-ux`/`mtg-frontend` as the doc itself recommends, and add it to `PLAN.md` as a real phase.
+
 Audit date: 2026-08-06. Scope: `frontend/src/pages/LandingPage.tsx` + `frontend/src/theme.ts`,
 extrapolated to the rest of the app's component patterns (`DeckBuilder`, `AgentChat`,
 `Collection`, `DeckList`). Triggered by [f4b67ff](../../commit/f4b67ff) (the warm/gold palette

@@ -105,6 +105,23 @@ docker compose up
 
 ---
 
+## Documentation
+
+`docs/README.md` is the central docs index — the one place both agents and human developers
+should be able to find everything (architecture, subsystem design docs, the decision-making
+process, the subagent roster, how to explore the codebase structurally) without already knowing a
+file exists. This file (`CLAUDE.md`) is always loaded automatically and doesn't need routing to;
+`docs/README.md`'s job is bridging from here to everything else.
+
+**Convention**: any new persistent doc file anywhere in the repo (`docs/*.md`, a new subdirectory
+`README.md`, a new `.claude/agents/*.md`) gets linked from `docs/README.md` as part of that
+phase's Concrete Steps — the same "update the doc" discipline `PLAN.md` already applies to
+`docs/ARCHITECTURE.md`'s "what's not built yet" section, widened to cover the index itself. This
+is process, not tooling — there's no CI to enforce it, so it depends on whoever's implementing a
+phase actually doing it.
+
+---
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
