@@ -189,6 +189,9 @@ interface GoldfishPlayerBoardProps {
   cardById: Record<string, ScryfallCard>;
   lifeTotal: number;
   onLifeChange: (newValue: number) => void;
+  // Backend-computed running total of mana spent on `cast` actions for this
+  // side (Phase 8). Read-only — never user-editable, unlike lifeTotal.
+  manaSpent: number;
   // Callback already carries whichever `target` ("self"/"opponent") this
   // board's owner corresponds to — this component stays agnostic to that.
   onAction: (action: GoldfishAction) => void;
@@ -206,6 +209,7 @@ const GoldfishPlayerBoard: React.FC<GoldfishPlayerBoardProps> = ({
   cardById,
   lifeTotal,
   onLifeChange,
+  manaSpent,
   onAction,
   ownerLabel,
   isSelf,
@@ -291,6 +295,14 @@ const GoldfishPlayerBoard: React.FC<GoldfishPlayerBoardProps> = ({
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, ml: "auto" }}>
           <LifeCounter label="Life" value={lifeTotal} disabled={disabled} onChange={onLifeChange} />
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <Typography variant="caption" color="text.secondary">
+              Mana Spent
+            </Typography>
+            <Typography variant="body2" sx={{ minWidth: 16, textAlign: "center" }}>
+              {manaSpent}
+            </Typography>
+          </Box>
         </Box>
       </Box>
 
@@ -442,6 +454,7 @@ export const GoldfishPlaymat: React.FC<GoldfishPlaymatProps> = ({
         onLifeChange={(newValue) =>
           onAction({ type: "set_life", life_total: newValue, target: "self" })
         }
+        manaSpent={state.mana_spent ?? 0}
         onAction={(action) => onAction({ ...action, target: "self" })}
         ownerLabel="You"
         isSelf
@@ -456,6 +469,7 @@ export const GoldfishPlaymat: React.FC<GoldfishPlaymatProps> = ({
           onLifeChange={(newValue) =>
             onAction({ type: "set_life", life_total: newValue, target: "opponent" })
           }
+          manaSpent={state.opponent_mana_spent ?? 0}
           onAction={(action) => onAction({ ...action, target: "opponent" })}
           ownerLabel={opponentOwnerLabel(opponentDeckTitle)}
           isSelf={false}

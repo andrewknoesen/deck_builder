@@ -2,6 +2,7 @@ import math
 import re
 from typing import Dict, List, Any
 from app.models.deck import Deck
+from app.services.mana import calculate_cmc as _calculate_cmc
 
 
 def calculate_stats(deck: Deck) -> Dict[str, Any]:
@@ -45,11 +46,14 @@ def calculate_stats(deck: Deck) -> Dict[str, Any]:
             mana_curve[key] += qty
 
             # Avg CMC stats
-            total_cmc += (cmc * qty)
+            total_cmc += cmc * qty
 
             # Heuristics for Ramp/Cantrip
             # Ramp: Artifact/Creature, CMC <= 2, produces mana (oracle text 'add {')
-            if cmc <= 2 and ("Creature" in (card.type_line or "") or "Artifact" in (card.type_line or "")):
+            if cmc <= 2 and (
+                "Creature" in (card.type_line or "")
+                or "Artifact" in (card.type_line or "")
+            ):
                 if "add {" in (card.oracle_text or "").lower():
                     ramp_count += qty
 
@@ -60,7 +64,7 @@ def calculate_stats(deck: Deck) -> Dict[str, Any]:
     avg_cmc = total_cmc / sum(dc.quantity for dc in non_lands) if non_lands else 0
 
     # 2. Recommendations
-    is_commander = total_cards > 80 # Simple heuristic
+    is_commander = total_cards > 80  # Simple heuristic
 
     if is_commander:
         base_lands = 31.42 + (3.13 * avg_cmc)
@@ -87,35 +91,16 @@ def calculate_stats(deck: Deck) -> Dict[str, Any]:
             "land_count": recommended,
             "ramp_count": ramp_count,
             "cantrip_count": cantrip_count,
-            "reasoning": f"Based on avg CMC {round(avg_cmc, 2)} and {ramp_count} ramp sources."
+            "reasoning": f"Based on avg CMC {round(avg_cmc, 2)} and {ramp_count} ramp sources.",
         },
         "color_stats": color_stats,
-        "draw_odds": draw_odds
+        "draw_odds": draw_odds,
     }
 
 
-def _calculate_cmc(mana_cost: str) -> float:
-    if not mana_cost:
-        return 0
-
-    cmc = 0
-    # Count generic numbers e.g. {2}
-    numbers = re.findall(r'\{(\d+)\}', mana_cost)
-    for num in numbers:
-        cmc += int(num)
-
-    # Count pips e.g. {W}, {U/B} counts as 1 usually for CMC
-    # Simple count of {...} minus the generic numbers
-    # Actually easier: Remove regex matches for {\d+} then count remaining {}
-
-    remaining = re.sub(r'\{(\d+)\}', '', mana_cost)
-    pips = len(re.findall(r'\{.*?\}', remaining))
-    cmc += pips
-
-    return float(cmc)
-
-
-def _calculate_color_needs(non_lands: List[Any], lands: List[Any], is_commander: bool) -> Dict[str, Any]:
+def _calculate_color_needs(
+    non_lands: List[Any], lands: List[Any], is_commander: bool
+) -> Dict[str, Any]:
     """
     Calculate pip counts, source counts, and recommended sources based on Karsten's heuristics.
     """
@@ -126,15 +111,15 @@ def _calculate_color_needs(non_lands: List[Any], lands: List[Any], is_commander:
     # Format: (CMC/Turn, Pips) -> Required Sources
     # Values for 60-card / Commander
     karsten_table = {
-        (1, 1): (14, 23), # {C} Turn 1
-        (2, 1): (13, 20), # {1}{C} Turn 2
-        (2, 2): (20, 33), # {C}{C} Turn 2
-        (3, 1): (12, 19), # {2}{C} Turn 3
-        (3, 2): (18, 29), # {1}{C}{C} Turn 3
-        (3, 3): (23, 38), # {C}{C}{C} Turn 3
-        (4, 1): (11, 18), # {3}{C} Turn 4
-        (4, 2): (16, 26), # {2}{C}{C} Turn 4
-        (4, 3): (20, 32), # {1}{C}{C}{C} Turn 4 (Extrapolated)
+        (1, 1): (14, 23),  # {C} Turn 1
+        (2, 1): (13, 20),  # {1}{C} Turn 2
+        (2, 2): (20, 33),  # {C}{C} Turn 2
+        (3, 1): (12, 19),  # {2}{C} Turn 3
+        (3, 2): (18, 29),  # {1}{C}{C} Turn 3
+        (3, 3): (23, 38),  # {C}{C}{C} Turn 3
+        (4, 1): (11, 18),  # {3}{C} Turn 4
+        (4, 2): (16, 26),  # {2}{C}{C} Turn 4
+        (4, 3): (20, 32),  # {1}{C}{C}{C} Turn 4 (Extrapolated)
     }
 
     # 1. Count Pips & Requirements
@@ -152,7 +137,7 @@ def _calculate_color_needs(non_lands: List[Any], lands: List[Any], is_commander:
             # Count pips
             pips = len(re.findall(f"{{{color}}}", cost))
             if pips > 0:
-                stats[color]["pips"] += (pips * qty)
+                stats[color]["pips"] += pips * qty
 
                 # Determine recommendation (Max of any card)
                 # Turn is roughly CMC (clamped to sensible range for table 1-4)
@@ -163,12 +148,14 @@ def _calculate_color_needs(non_lands: List[Any], lands: List[Any], is_commander:
                 if (turn, lookup_pips) in karsten_table:
                     req_60, req_cmd = karsten_table[(turn, lookup_pips)]
                     req = req_cmd if is_commander else req_60
-                    stats[color]["recommended_sources"] = max(stats[color]["recommended_sources"], req)
+                    stats[color]["recommended_sources"] = max(
+                        stats[color]["recommended_sources"], req
+                    )
 
         # Colorless pips (C)
         c_pips = len(re.findall(r"\{C\}", cost))
         if c_pips > 0:
-            stats["C"]["pips"] += (c_pips * qty)
+            stats["C"]["pips"] += c_pips * qty
 
     # 2. Count Sources
     for dc in lands:
@@ -236,7 +223,4 @@ def _calculate_draw_odds(total_cards: int, total_lands: int) -> Dict[str, Any]:
         "turn_4_land_drop": prob_at_least(total_cards, total_lands, 10, 4),
     }
 
-    return {
-        "opening_hand": opening_hand,
-        "on_curve": on_curve
-    }
+    return {"opening_hand": opening_hand, "on_curve": on_curve}

@@ -47,6 +47,13 @@ class GameState(Zones):
     life_total: int = 20
     opponent_life_total: int = 20
     opponent_zones: Optional[Zones] = None
+    # Phase 8 — running total mana value spent on `cast` actions, tracked
+    # separately per side. Backend-computed (see `apply_action`'s `cast`
+    # branch), not user-editable. Backfills to 0 for any pre-existing stored
+    # node missing these keys, same JSON-column mechanism as every other
+    # GameState field added since Phase 3b.
+    mana_spent: int = 0
+    opponent_mana_spent: int = 0
 
 
 class GoldfishActionIn(BaseModel):

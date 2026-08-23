@@ -72,18 +72,30 @@ const GoldfishTreeInner: React.FC<GoldfishTreeProps> = ({
     const positions = layoutTree(nodes);
 
     const flowNodes: Node[] = nodes.map((n) => {
-      const trackerSummary =
+      const trackerEntries =
         n.trackers && Object.keys(n.trackers).length > 0
-          ? Object.entries(n.trackers)
-              .map(([name, value]) => `${name}: ${value}`)
-              .join(" · ")
-          : null;
+          ? Object.entries(n.trackers).map(([name, value]) => `${name}: ${value}`)
+          : [];
+
+      // Mana-spent tracker (Phase 8) - appended after `trackers` in the same
+      // "label: value" chip style. Missing on nodes created before this
+      // phase, so default to 0 defensively. Opponent figure only shown for
+      // two-deck sessions (nodes with a real `opponent_zones`).
+      const manaSpent = n.state?.mana_spent ?? 0;
+      const opponentManaSpent = n.state?.opponent_mana_spent ?? 0;
+      const manaEntries: string[] = [];
+      if (manaSpent) manaEntries.push(`Mana: ${manaSpent}`);
+      if (n.state?.opponent_zones && opponentManaSpent) {
+        manaEntries.push(`Opp Mana: ${opponentManaSpent}`);
+      }
+
+      const summary = [...trackerEntries, ...manaEntries].join(" · ") || null;
 
       // Skip the "T{n}:" prefix when the label already says "Turn N" (the
       // next_turn action's own auto-generated label) - avoids "T1: Turn 1".
       const needsTurnPrefix = n.turn_number && !/^Turn \d+/.test(n.label);
       const label = `${needsTurnPrefix ? `T${n.turn_number}: ` : ""}${n.label}${
-        trackerSummary ? `\n${trackerSummary}` : ""
+        summary ? `\n${summary}` : ""
       }`;
 
       return {

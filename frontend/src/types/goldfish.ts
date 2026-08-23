@@ -41,6 +41,13 @@ export interface GameState extends Zones {
   // cases fine as long as nothing does a strict `=== null`/`=== undefined`
   // check against this field.
   opponent_zones: Zones | null;
+  // Phase 8 mana-spent tracker (backend-computed, sum of cast mana values).
+  // Typed as always-present, matching `opponent_zones` above, even though
+  // it's genuinely absent (not `0`) on nodes created before this phase,
+  // since `state` is stored as raw JSON and never re-validated through
+  // GameState on read. Default to 0 defensively on read.
+  mana_spent: number;
+  opponent_mana_spent: number;
 }
 
 export type GoldfishZone = "library" | "hand" | "battlefield" | "graveyard" | "exile";

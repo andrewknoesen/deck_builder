@@ -8,7 +8,7 @@ from app.services.scryfall import get_scryfall_service
 
 # Mock data for tests
 MOCK_DECK_WITH_STATS = {
-    "title": "Stats Test Deck", 
+    "title": "Stats Test Deck",
     "format": "Commander",
     "user_id": 102,
     "cards": [
@@ -24,8 +24,9 @@ MOCK_DECK_WITH_STATS = {
         {"card_id": "big-boom", "quantity": 2, "board": "main"},
         # Sideboard Card (Should be ignored)
         {"card_id": "plains-1", "quantity": 5, "board": "side"},
-    ]
+    ],
 }
+
 
 @pytest.fixture
 def mock_scryfall():
@@ -34,21 +35,53 @@ def mock_scryfall():
     mock.get_cards_by_ids.return_value = []
     return mock
 
+
 @pytest.mark.asyncio
 async def test_get_deck_stats(client: AsyncClient, db_session, mock_scryfall):
     app.dependency_overrides[get_scryfall_service] = lambda: mock_scryfall
-    
+
     # 0. Create User
     user = User(id=102, email="test_stats@example.com", google_sub="substats")
     db_session.add(user)
-    
+
     # 1. Create Cards in DB
     cards_to_create = [
-        Card(id="plains-1", name="Plains", type_line="Basic Land — Plains", produced_mana=["W"], mana_cost=""),
-        Card(id="creature-w-1", name="White Weenie", type_line="Creature", mana_cost="{W}", produced_mana=[]),
-        Card(id="sol-ring", name="Sol Ring", type_line="Artifact", mana_cost="{1}", oracle_text="Add {2}", produced_mana=["C"]),
-        Card(id="counterspell", name="Counterspell", type_line="Instant", mana_cost="{U}{U}", produced_mana=[]),
-        Card(id="big-boom", name="Big Boom", type_line="Sorcery", mana_cost="{3}{R}{R}", produced_mana=[]),
+        Card(
+            id="plains-1",
+            name="Plains",
+            type_line="Basic Land — Plains",
+            produced_mana=["W"],
+            mana_cost="",
+        ),
+        Card(
+            id="creature-w-1",
+            name="White Weenie",
+            type_line="Creature",
+            mana_cost="{W}",
+            produced_mana=[],
+        ),
+        Card(
+            id="sol-ring",
+            name="Sol Ring",
+            type_line="Artifact",
+            mana_cost="{1}",
+            oracle_text="Add {2}",
+            produced_mana=["C"],
+        ),
+        Card(
+            id="counterspell",
+            name="Counterspell",
+            type_line="Instant",
+            mana_cost="{U}{U}",
+            produced_mana=[],
+        ),
+        Card(
+            id="big-boom",
+            name="Big Boom",
+            type_line="Sorcery",
+            mana_cost="{3}{R}{R}",
+            produced_mana=[],
+        ),
     ]
     for card in cards_to_create:
         db_session.add(card)
@@ -68,38 +101,84 @@ async def test_get_deck_stats(client: AsyncClient, db_session, mock_scryfall):
     app.dependency_overrides.clear()
 
     # 4. Verify Content
-    assert data["total_cards"] == 21 # 10+4+1+4+2
-    
+    assert data["total_cards"] == 21  # 10+4+1+4+2
+
     # Check Mana Curve
     # 1 CMC: 4 (White Weenie) + 1 (Sol Ring - CMC 1) = 5
     # 2 CMC: 4 (Counterspell) -> Wait, UU is CMC 2
     # 5 CMC: 2 (Big Boom)
     # Lands (0 CMC?) -> Excluded from curve usually or 0. Logic says "non_lands" in service.
-    
+
     # Let's check the service logic expectations:
     # Sol Ring: {1} -> CMC 1
     # Creature: {W} -> CMC 1
     # Counterspell: {U}{U} -> CMC 2
     # Big Boom: {3}{R}{R} -> CMC 5
-    
+
     curve = data["mana_curve"]
-    assert curve["1"] == 5 # 4 creatures + 1 sol ring
-    assert curve["2"] == 4 # 4 counterspells
-    assert curve["5"] == 2 # 2 big booms
+    assert curve["1"] == 5  # 4 creatures + 1 sol ring
+    assert curve["2"] == 4  # 4 counterspells
+    assert curve["5"] == 2  # 2 big booms
     assert curve["0"] == 0
-    
+
     # Check Colors
     colors = data["color_stats"]
-    assert colors["W"]["pips"] == 4 # 4 * {W}
+    assert colors["W"]["pips"] == 4  # 4 * {W}
     # Sol Ring produced C, Plains produced W.
     # We have 10 Plains -> 10 W sources
     assert colors["W"]["sources"] == 10
-    
+
     # Check Recommendations
     recs = data["recommendations"]
-    assert recs["ramp_count"] == 1 # Sol Ring
-    
+    assert recs["ramp_count"] == 1  # Sol Ring
+
     # Check Draw Odds
     odds = data["draw_odds"]
     assert "opening_hand" in odds
     assert "on_curve" in odds
+
+
+@pytest.mark.asyncio
+async def test_get_deck_stats_x_spell_cmc_fix(
+    client: AsyncClient, db_session, mock_scryfall
+):
+    """
+    Phase 8: {X} must contribute 0 to mana value, not 1 like other bracket
+    symbols — {X}{R} is mana value 1, not 2. Deliberate behavior change from
+    the pre-Phase-8 parser, not a regression.
+    """
+    app.dependency_overrides[get_scryfall_service] = lambda: mock_scryfall
+
+    user = User(id=103, email="test_stats_x@example.com", google_sub="substatsx")
+    db_session.add(user)
+    db_session.add(
+        Card(
+            id="x-spell",
+            name="X Spell",
+            type_line="Sorcery",
+            mana_cost="{X}{R}",
+            produced_mana=[],
+        )
+    )
+    await db_session.commit()
+
+    resp = await client.post(
+        "/api/v1/decks/",
+        json={
+            "title": "X Spell Deck",
+            "user_id": 103,
+            "cards": [{"card_id": "x-spell", "quantity": 1, "board": "main"}],
+        },
+    )
+    assert resp.status_code == 200
+    deck_id = resp.json()["id"]
+
+    stats_resp = await client.get(f"/api/v1/decks/{deck_id}/stats")
+    assert stats_resp.status_code == 200
+    data = stats_resp.json()
+
+    app.dependency_overrides.clear()
+
+    assert data["average_cmc"] == 1.0
+    assert data["mana_curve"]["1"] == 1
+    assert data["mana_curve"]["2"] == 0

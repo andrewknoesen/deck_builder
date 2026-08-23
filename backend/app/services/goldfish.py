@@ -3,6 +3,7 @@ from typing import Dict, Optional, Tuple
 
 from app.models.deck import Deck
 from app.models.goldfish import GameState, GoldfishActionIn, Zones
+from app.services.mana import calculate_cmc
 
 COMMANDER_LIKE_FORMATS = {"Commander", "Brawl", "Oathbreaker"}
 
@@ -112,7 +113,10 @@ def draw_opening_hand(state: GameState, count: int = 7) -> Tuple[GameState, str]
 
 
 def apply_action(
-    state: GameState, action: GoldfishActionIn, card_names: Dict[str, str]
+    state: GameState,
+    action: GoldfishActionIn,
+    card_names: Dict[str, str],
+    card_mana_costs: Dict[str, str],
 ) -> Tuple[GameState, str]:
     """
     Applies a structured action to a state snapshot and returns the resulting
@@ -131,7 +135,9 @@ def apply_action(
     target_zones: Optional[Zones] = None
     prefix = ""
     if action.type in ZONE_MUTATING_ACTIONS:
-        target_zones = next_state if action.target == "self" else next_state.opponent_zones
+        target_zones = (
+            next_state if action.target == "self" else next_state.opponent_zones
+        )
         if target_zones is None:
             raise ValueError("This session has no opponent deck")
         prefix = "" if action.target == "self" else "Opponent: "
@@ -155,6 +161,12 @@ def apply_action(
         target_zones.battlefield.append(action.card_id)
         if action.target == "opponent":
             next_state.opponent_zones = target_zones
+        if action.type == "cast":
+            cmc = int(calculate_cmc(card_mana_costs.get(action.card_id, "")))
+            if action.target == "opponent":
+                next_state.opponent_mana_spent += cmc
+            else:
+                next_state.mana_spent += cmc
         verb = "Played" if action.type == "play_land" else "Cast"
         return next_state, f"{prefix}{verb} {name_of(action.card_id)}"
 

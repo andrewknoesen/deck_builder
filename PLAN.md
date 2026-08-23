@@ -125,6 +125,30 @@ the real docker stack). **Phase 6 shipped, 2026-08-16** (frontend-only as design
 against the real docker stack after isolating one transient Gemini-API blip from the actual code).
 See Phase 6 and Phase 7 below.
 
+**Phase 8 (Total mana spent tracker) and Phase 9 (Expose deck_builder's tools via MCP) — routed to
+`mtg-architect`, 2026-08-23.** Both design passes complete, run in parallel since the two are
+independent (goldfish gameplay tracking vs. a new MCP server subsystem). Phase 8: recommends
+extracting the existing `stats.py` CMC parser into a shared module rather than adding a stored
+`cmc` column, and storing the running total as a first-class `GameState` field rather than deriving
+it on read — two open questions (tree-view surfacing, bundling a pre-existing parser bug fix)
+flagged for interview. Phase 9: recommends a `FastMCP`-based server in new `backend/app/mcp/`
+exposing all five existing read-only ADK tools over **stdio only** for v1 — explicitly not
+HTTP/SSE, which the design treats as a hard blocker on real auth landing first, not a "later"
+item. Both interviews complete, 2026-08-23: Phase 8 took the *non*-default on both its questions
+(tree view included, not deferred; the pre-existing `{X}` CMC-parser bug gets fixed now, not left
+alone) — Phase 9 confirmed every recommended default with no deviation.
+
+**Phase 8 shipped, 2026-08-23** (backend then frontend, no scope deviation from the interview
+outcome). See "Shipped" under Phase 8 below for the full record, including the corrected `{X}`
+mana-value numbers and both the playmat and tree-node surfaces live-verified against the real
+docker stack, single-deck and two-deck.
+
+**Phase 9 shipped, 2026-08-23** (backend-only, matching the design — no frontend surface for an
+MCP server). One dependency-version deviation (`mcp<2`, pinned against a same-day `2.0.0` release
+that renamed the API this design was built against) and one real bug found and fixed during live
+verification (stdout logging corrupting the stdio JSON-RPC stream). See "Shipped" under Phase 9
+below for the full record, including the genuine MCP wire-protocol client verification performed.
+
 ---
 
 ## Phase 1 — AI Deck Advisor (done, 2026-07-26)
@@ -2067,6 +2091,527 @@ clean on the frontend.
 
 ---
 
+## Phase 8 — Total mana spent tracker (shipped, 2026-08-23)
+
+### Why this one, and why now
+
+User-requested, 2026-08-16: surface a running "total mana spent so far" figure in a goldfish
+session's game history, alongside the life total and other trackers already shown during play.
+
+### Status
+
+Design pass complete (`mtg-architect`, 2026-08-23). Two open questions flagged for the
+product-owner interview before implementation — everything else is a decided recommendation.
+
+### Ground truth this plan is built on
+
+Re-verified directly against current code, not the earlier backlog stub's partial pass — several
+details there were stale (line numbers had moved, and it missed the `self`/`opponent` target
+dimension entirely, added by Phase 3d after the stub was written):
+
+- `GoldfishActionIn` (`backend/app/models/goldfish.py:52-60`) has `type: Literal["draw","play_land",
+  "cast","move_zone","set_life","shuffle","next_turn"]` and a `target: Literal["self","opponent"] =
+  "self"` field. `apply_action`'s `play_land`/`cast` branch (`backend/app/services/goldfish.py:149-
+  159`) is shared code for both types — it moves a card from hand to the *target's* battlefield
+  (self or opponent) and generates a label. **No mana value is looked up or stored anywhere today.**
+- `Card` (`backend/app/models/card.py:4-19`) has `mana_cost: Optional[str]` (Scryfall's raw string,
+  e.g. `"{2}{G}"`), no numeric `cmc` column. Confirmed via a repo-wide grep: no `cmc` field exists
+  anywhere in `models/`, `scryfall_ingestion.py`, or `services/scryfall.py` — Scryfall's numeric
+  `cmc` is not fetched or persisted at all today, not a "fetched but unused" situation.
+- **A correct CMC-from-string parser already exists and is shipped**: `backend/app/services/
+  stats.py:97-115` (`_calculate_cmc`), used today for the deck-stats mana curve and color-source
+  recommendations. It strips `{\d+}` generic-mana symbols and sums their values, then counts every
+  *remaining* `{...}` symbol as 1 — mana-value-correct for hybrid (`{G/U}`), Phyrexian (`{G/P}`), and
+  colored-pip symbols alike (each contributes exactly 1 regardless of what's inside the braces).
+  **One real pre-existing bug, not introduced by this phase**: `{X}` also matches "non-numeric
+  bracket content" and is counted as 1 rather than X's off-stack value of 0 — `{X}{R}` computes as
+  mana value 2 instead of 1. Already affects the shipped mana-curve/avg-CMC stat today; called out
+  below as an explicit choice, not silently inherited.
+- **The frontend has its own, weaker, parallel parser**: `frontend/src/components/DeckStats.tsx:77-
+  90` — uses `.match()` without the global flag (only ever reads the *first* `{\d+}` occurrence) and
+  only matches single-letter pips, missing hybrid/Phyrexian entirely. Not something to reuse here —
+  a separate latent bug in the existing mana-curve card, out of scope for this phase.
+- `apply_action` already takes a `card_names: Dict[str, str]` (id→name) lookup, built in the route
+  (`backend/app/api/routes/goldfish.py:291-296`) via `select(Card.id, Card.name).where(Card.id.
+  in_(all_card_ids))` over every card_id in the parent state's zones (self + opponent, null-guarded).
+  This is the exact seam a mana-cost lookup slots into — same query, one more column.
+- `GoldfishNode.state` is an untyped JSON column (`backend/app/models/goldfish.py:116`); `GameState
+  (**parent_node.state)` backfills pydantic defaults for any field missing from an older stored
+  blob — already the zero-migration mechanism Phase 3b (`opponent_life_total`) and Phase 3d
+  (`opponent_zones`) both used, confirmed still true, no new migration needed for a new field.
+- Frontend: `GoldfishPlaymat.tsx`'s `GoldfishPlayerBoard` (`frontend/src/components/
+  GoldfishPlaymat.tsx:187-295`) is instantiated twice (self, opponent) with per-player `zones`/
+  `lifeTotal`/`onLifeChange` props — the one place both boards' UI is defined, so a per-player
+  counter added there renders for both sides for free. `LifeCounter` sits in an `ml: "auto"` box at
+  line 292-294. The standalone bare "Opp" life counter (rendered only when `!state.opponent_zones`,
+  i.e. no real opponent board) is structurally incompatible with a mana-spent counter — there's no
+  opponent hand to cast from in that mode, so opponent mana spent can't ever be nonzero there.
+
+### Design
+
+**1. What counts as "mana spent": `cast` only.** `play_land` never has a cost (`mana_cost` is empty
+for every land, so including it would always be a no-op), and no action in today's vocabulary
+represents activated abilities or other costs — out of scope because the vocabulary has nothing to
+represent them with, not a gap this phase should try to paper over.
+
+**2. Numeric source: parse `Card.mana_cost`, don't add a stored `cmc` column.** Extract `stats.py`'s
+existing `_calculate_cmc` into a small shared module, `backend/app/services/mana.py` (public
+`calculate_cmc(mana_cost: str) -> float`), and have `stats.py` import it (one-line change, nothing
+else in that file touched). `goldfish.py`'s service imports it directly. This is a real-duplication
+extraction (two independent services now need identical parsing logic), not a speculative one — the
+same bar this codebase already applies to `make_agent` (Phase 1). A stored `cmc` column would mean a
+migration, a backfill of every already-cached `Card` row, and threading `cmc` through three separate
+card-persistence call sites (`decks.py:89`, `collection.py:54`, `scryfall_ingestion.py:56`) — real
+new surface for a number the existing string parser already produces correctly for every symbol type
+that matters here.
+   - **Explicit, deliberately out-of-scope note**: the parser's pre-existing `{X}` mishandling is not
+     being fixed as part of this phase — fixing it would silently change the already-shipped
+     mana-curve/avg-CMC numbers for any deck containing X spells, a behavior change with a blast
+     radius outside this feature. Flagged for interview confirmation only in case the product owner
+     wants it bundled — default is: leave it, file separately.
+
+**3. Derived-on-read vs. stored-on-node: stored, as a first-class `GameState` field, computed by the
+backend at write time.** Mirrors 3b's own `life_total` decision (stays first-class on `state`, not
+folded into `trackers`) for the same reason, plus one the life_total precedent didn't have to deal
+with: a pure read-time derivation genuinely isn't reconstructable from what's stored today. Nodes
+don't record which action created them — only the resulting `label` (free text) and `state` (a
+snapshot). Diffing a node's battlefield against its parent's to guess "a card was cast here" is
+unreliable, because `move_zone` is a fully generic action that can also move a card onto the
+battlefield (e.g. reanimation-style hand/graveyard→battlefield) with an identical resulting-state
+shape to a `cast` — there is no way to tell them apart after the fact without storing more than just
+the number. Add:
+```python
+class GameState(Zones):
+    ...
+    mana_spent: int = 0
+    opponent_mana_spent: int = 0
+```
+Both default to `0` and ride along for free on every action that isn't a self/opponent `cast` —
+`apply_action` already does `next_state = state.model_copy(deep=True)` at the top of every branch, so
+untouched fields are preserved automatically, exactly like every other carry-forward field already
+works. Only the `cast` branch needs new code: look up the cast card's `mana_cost` from a new
+`card_mana_costs: Dict[str, str]` parameter (built the same way `card_names` already is, one extra
+column on the same query), run it through `calculate_cmc`, and add it to `next_state.mana_spent`
+(target `self`) or `next_state.opponent_mana_spent` (target `opponent`). Symmetric self/opponent
+tracking follows the exact precedent `target` already established for `cast`/`set_life` in Phase 3d.
+   - Genuinely zero migration: `state` is a JSON column; both new fields backfill to `0` via pydantic
+     default for every pre-existing stored node, same mechanism Phase 3b/3d already relied on.
+   - `trackers` is explicitly the wrong home for this, on the existing precedent's own terms: 3a's
+     own reasoning for `trackers` is "the backend does zero inheritance logic — trackers is just
+     whatever the request provides." Mana spent needs real backend-computed inheritance logic
+     (increment on `cast`, carry forward otherwise) — the opposite of that design intent.
+
+**4. Frontend surface: `GoldfishPlaymat.tsx`'s `GoldfishPlayerBoard`, next to each side's
+`LifeCounter`.** Add a `manaSpent: number` prop to `GoldfishPlayerBoardProps`, rendered as a plain
+read-only label (not editable like `LifeCounter` — this number is never user-set, only
+backend-computed) in the same `ml: "auto"` box as the existing `LifeCounter`. Threaded from the
+parent exactly like `lifeTotal` already is: `state.mana_spent` for the self board,
+`state.opponent_mana_spent` for the opponent board. Because `GoldfishPlayerBoard` is one shared
+component instantiated for both sides, this single edit site covers both self and two-deck-opponent
+rendering — the bare fallback "Opp" life counter is correctly left untouched.
+
+### Open questions for the product-owner interview
+
+1. **Does the game-history tree (`GoldfishTree.tsx`) also need this, or is the live playmat counter
+   enough?** The user's phrasing ("in a goldfish session's game history... alongside the life total
+   and other trackers already shown during play") plausibly means either "the playmat, which is
+   what's live during play" or "the tree, which is literally the history." `GoldfishTree.tsx` already
+   renders a per-node `trackers` summary line (`GoldfishTree.tsx:74-87`) reading `n.trackers`;
+   extending that line to also read `n.state?.mana_spent`/`opponent_mana_spent` when present is cheap
+   and additive, but it's a second UI surface the Design above doesn't strictly require. Recommended
+   default: ship the playmat counter first (unambiguously "alongside the life total... during play");
+   add the tree-node line as a fast follow-up if wanted, rather than building both on a guess.
+2. **Bundle the pre-existing `{X}` CMC-parser bug fix, or leave it out of scope?** Recommended
+   default: leave it — it would silently change the shipped mana-curve stat for X-spell decks, an
+   unrelated behavior change. Confirm before Concrete Step 1 in case both should ship together.
+
+Everything else above (cast-only scope, string-parsing over a stored `cmc` column, stored-not-derived,
+`GameState`-field placement, symmetric self/opponent tracking, playmat-component placement) follows
+directly from existing codebase convention with no live product ambiguity — decided, not reopened.
+
+### Interview outcome (resolved before writing code, per-phase process)
+
+Both questions resolved by interview, 2026-08-23 — **both went against the blueprint's own
+recommended default**, unlike Phase 5/6/7's interviews:
+
+1. **Tree view: yes, both surfaces.** The playmat counter ships as designed, *and*
+   `GoldfishTree.tsx`'s per-node summary line gets extended to also show mana spent at each node —
+   not deferred as a "fast follow-up."
+2. **CMC parser `{X}` bug: fix it now, as part of this phase**, accepting that this changes the
+   already-shipped mana-curve/avg-CMC numbers for any deck containing `{X}` spells. This is a
+   deliberate, informed behavior change to existing stats, not an accidental side effect — worth
+   this note existing so a future reader doesn't mistake the shifted mana-curve numbers for a
+   regression.
+
+### Concrete steps (per the interview outcome above)
+
+1. **`backend/app/services/mana.py`** (new) — `calculate_cmc(mana_cost: str) -> float`, body moved
+   from `stats.py:97-115`, **fixing the `{X}` bug in the same move**: an `{X}` symbol must contribute
+   `0` to the total, not `1` like every other non-numeric `{...}` symbol. `stats.py` imports it as
+   `_calculate_cmc` in place of the local def (one-line change, everything else in that file
+   untouched) — its own existing mana-curve/avg-CMC tests are expected to need updating for any
+   fixture deck containing `{X}` costs, per the interview outcome's accepted tradeoff, not a
+   regression to chase down.
+2. **`backend/app/models/goldfish.py`** — add `mana_spent: int = 0` and `opponent_mana_spent: int =
+   0` to `GameState`. No migration.
+3. **`backend/app/services/goldfish.py`** — `apply_action` gains a `card_mana_costs: Dict[str, str]`
+   parameter (alongside `card_names`); in the `cast` branch only, compute
+   `calculate_cmc(card_mana_costs.get(action.card_id, ""))` and add it to `next_state.mana_spent` or
+   `next_state.opponent_mana_spent` depending on `action.target`.
+4. **`backend/app/api/routes/goldfish.py`** — extend the existing card-lookup query (line ~294) to
+   also select `Card.mana_cost`, build the second `card_mana_costs` dict, pass it into `apply_action`.
+5. **Tests**: extend `backend/app/tests/api/routes/test_goldfish_actions.py` — cast increments
+   `mana_spent`/`opponent_mana_spent` correctly for generic/colored/hybrid/Phyrexian/`{X}` costs,
+   `play_land` leaves it unchanged, every other action type carries the value forward unchanged, and
+   a `GameState(**old_state_dict)` missing the new keys entirely still backfills to `0`. Add unit
+   tests for `mana.py`'s extracted `calculate_cmc` directly (including the fixed `{X}` = 0 case),
+   update `stats.py`'s existing mana-curve tests for the corrected numbers on any `{X}`-cost fixture.
+6. **Frontend**: add `mana_spent`/`opponent_mana_spent: number` to `GameState` in `frontend/src/
+   types/goldfish.ts` (same "typed as always-present, may be absent on older nodes" caveat comment as
+   `opponent_zones`); add `manaSpent: number` to `GoldfishPlayerBoardProps` and render it next to
+   `LifeCounter` in `GoldfishPlaymat.tsx`, reading `state.mana_spent ?? 0` / `state.
+   opponent_mana_spent ?? 0` defensively for pre-existing sessions.
+7. **`GoldfishTree.tsx`**: extend the existing per-node tracker-summary line (`GoldfishTree.tsx:74-
+   87`) to append `n.state?.mana_spent` (and `n.state?.opponent_mana_spent` when
+   `n.state?.opponent_zones` is set) after the existing `trackers` summary, defensively defaulting
+   missing values to `0` for pre-existing nodes.
+
+### Verify (once built)
+
+`cd backend && uv run pytest` covers the new `cast`-branch behavior, the extracted `calculate_cmc`,
+and the old-state-backfill case. Manually against the docker stack: drive a single-deck session,
+cast spells of different cost shapes (generic, colored, hybrid), confirm the counter increments
+correctly and other actions (play_land, draw, move_zone, next_turn) don't change it; repeat against a
+two-deck session casting from both sides, confirming the two counters track independently. `npx tsc
+-b` / `npx eslint .` clean on the frontend files touched.
+
+### Shipped: as designed, no scope deviation
+
+Built exactly per the Concrete Steps above, backend then frontend (frontend renders the backend's
+real `mana_spent`/`opponent_mana_spent` response fields, same ordering rationale as Phase 3d).
+
+**Backend**: `backend/app/services/mana.py` (new) holds `calculate_cmc`, moved out of `stats.py`
+with the `{X}` fix landed in the same move (`{X}` now contributes `0`, not `1`); `stats.py` imports
+it as a one-line change. `GameState` gained `mana_spent`/`opponent_mana_spent: int = 0` — no
+migration, backfilled by pydantic for every pre-existing stored node. `apply_action` gained a
+`card_mana_costs` parameter alongside the existing `card_names`, used only in the `cast` branch;
+`goldfish.py`'s route extended its existing card-lookup query to also select `Card.mana_cost`.
+137 backend tests pass, including new coverage for every cost shape (generic/colored/hybrid/
+Phyrexian/`{X}`) on both `self`/`opponent` targets, every non-`cast` action carrying the fields
+forward unchanged, and the old-state-backfill case. `test_stats.py` gained a regression test
+proving `{X}{R}` now computes as mana value 1, confirming the accepted, deliberate shift in the
+already-shipped mana-curve numbers per the interview outcome — no prior fixture contained `{X}`, so
+no existing expected numbers needed updating.
+
+**Frontend**: `GoldfishPlaymat.tsx`'s shared `GoldfishPlayerBoard` gained a read-only "Mana Spent"
+label next to each side's `LifeCounter` (self and opponent both, single edit site per the Design's
+own reasoning); the single-deck fallback bare "Opp" life counter was correctly left without one.
+`GoldfishTree.tsx`'s per-node summary line now appends `Mana: n` (nonzero only) and, for two-deck
+sessions only, `Opp Mana: n`, matching the existing `trackers` chip-list formatting. `npx tsc -b`
+and `npx eslint .` both clean.
+
+**Live-verified** against the real docker stack, not just unit tests: a single-deck session
+(`pauper test`) — cast two spells, playmat counter went 0 → 3 → 5 correctly, `play_land` left it
+unchanged, tree nodes showed the matching `Mana: n` labels; a two-deck session (`pauper test` vs.
+`pauper test`) — self and opponent counters tracked independently (2 vs. 3), tree node showed both
+`Mana:`/`Opp Mana:` figures together on the same line. No console errors, all goldfish API calls
+200 OK throughout.
+
+---
+
+## Phase 9 — Expose deck_builder's tools via MCP (shipped, 2026-08-23)
+
+### Why this one, and why now
+
+User-requested, 2026-08-16: make this app's tools/capabilities usable by **external** agents (not
+just its own `rules_agent`/`deck_advisor_agent`), by standing up an MCP *server* so an outside MCP
+client (Claude Desktop, another agent) can call in — the reverse direction of how MCP is normally
+discussed for this codebase (an ADK agent *consuming* external MCP tools via `MCPToolset`). That
+client-consumption direction is well-trodden in ADK's own docs and irrelevant here; this phase is
+unambiguously the server direction, confirmed by both the user's own framing ("external agents can
+use my tools") and the research below.
+
+### Status
+
+**Shipped** (`mtg-backend`, 2026-08-23). `backend/app/mcp/server.py` builds a `FastMCP("deck_builder")`
+instance and registers all five tools via `add_tool(fn)`, imported unwrapped from `app.ai.tools.*`;
+entry point `uv run python -m app.mcp.server` (stdio only), matching the design exactly. One
+implementation-time finding not anticipated by the design: `app.ai.rag`/`app.ai.vector_store` use
+raw `print()` (plus the shared `app.core.logging` logger's stdout handler) for status/error
+messages, which corrupts the stdio JSON-RPC stream if left alone — mitigated inside `server.py`
+(redirect stdout to stderr around the tool-module imports, repoint the shared logger's handler
+stream to stderr in-process) without touching `app/ai/*` itself, since that's `mtg-ai-engineer`'s
+scope; the residual gap (rare, error-path-only `print()` calls inside `app/ai/rag`/
+`app/ai/vector_store` that would still leak to stdout on a RAG exception mid-session) is flagged for
+`mtg-ai-engineer` to clean up (swap those `print()`s for `logger` calls), not fixed here. New
+dependency: `mcp<2` (pinned below the SDK's brand-new 2.0 release, which renamed `FastMCP` to
+`MCPServer` and moved its module path — 1.29.0 is what the design's `FastMCP`/`add_tool`/
+`list_tools` API surface was actually verified against). Verified live: full MCP stdio handshake via
+the `mcp` SDK's own client (`ClientSession`/`stdio_client`) against the running docker-compose
+stack (Postgres, ChromaDB) — `list_tools()` returned all five names, `call_tool()` round-tripped
+real Postgres-backed card data (`search_cards`) and real live-Scryfall rulings
+(`lookup_card_rulings`) over the actual wire protocol, not just an in-process shortcut. Docs:
+`docs/mcp_server.md`. Four open questions flagged for the product-owner interview before
+implementation — the first (terminology) and third (transport) are the ones that most change the
+shape of everything else.
+
+### Ground truth this plan is built on
+
+Re-verified directly against the repo and the actual `mcp`/ADK docs, not assumed from the earlier
+backlog stub's partial pass:
+
+- **Candidate tools, all plain, stateless, self-contained async/sync functions** already registered
+  on ADK `Agent`s via `make_agent` (`backend/app/ai/agents/factory.py:8-23`): `search_cards(query,
+  format=None)` and `search_cards_semantic(query, k=10)` (`backend/app/ai/tools/cards.py:55`,
+  `:101`), `query_comprehensive_rules(query)` and `lookup_glossary_term(term)`
+  (`backend/app/ai/tools/rules.py:6`, `:21`), `lookup_card_rulings(card_names)`
+  (`backend/app/ai/tools/scryfall.py:52`). **All five are read-only** — nothing in this codebase's
+  ADK tool layer mutates state today; deck/collection/goldfish mutation only ever happens through
+  the REST routes, never through an agent tool. Directly relevant to the scope question below.
+- All five are already portable outside the FastAPI process: `search_cards` opens its own DB
+  session via `get_tool_session()` (`backend/app/ai/tools/db.py:19` — a directly-importable
+  `async_sessionmaker` bound to the same `engine`, built specifically because "ADK calls tool
+  functions directly — there's no FastAPI request/route cycle"), `search_cards_semantic`/
+  `query_comprehensive_rules`/`lookup_glossary_term` import module-level `card_rag`/`rules_rag`
+  singletons (`backend/app/ai/rag/cards.py:10-29`, no dependency on the FastAPI `app` instance or
+  its `lifespan`), and `lookup_card_rulings` opens its own `httpx.AsyncClient` per call. None of the
+  five reach into `app.state`. **This means the MCP server can be a genuinely separate process that
+  never boots the FastAPI app at all** — it only needs `app.core.config.settings`-driven env vars
+  (DB URL, Chroma host, Scryfall base URL), same as every ingestion script already requires.
+- **No `mcp` package dependency exists anywhere in this project today** — confirmed directly in
+  `backend/uv.lock`: no package named `mcp` appears as a top-level or transitive dependency,
+  specifically checked against `google-adk`'s own resolved entry (`uv.lock:739-767`, pinned at
+  `2.4.0`). Despite ADK's own docs saying it "uses FastMCP to handle MCP protocol details" for its
+  `MCPToolset` client path, that isn't a hard dependency pulled in at this pinned version — `mcp` is
+  a genuinely new dependency this phase would add (`uv add mcp`).
+- **`backend/app/main.py`** is a single flat `FastAPI()` instance: CORS middleware, one
+  `include_router` (`backend/app/api/api.py:1-13`, six routers), a `lifespan` that only manages a
+  shared Scryfall `httpx.AsyncClient`, three bare routes. **No `app.mount(...)` anywhere** — no
+  existing precedent for mounting a second ASGI app, which is what an HTTP/SSE MCP server embedded
+  in-process would require. A mounted-route approach would be new infrastructure, not a small
+  addition to something already there.
+- **`backend/app/api/deps.py`'s `get_current_user`** is a genuine stub: ignores any bearer token
+  entirely, always returns (or lazily creates) the first `User` row. Confirms this file's own
+  "Deferred" section verbatim (see "Real auth" under Deferred below) — single-tenant today, by
+  explicit product-owner choice gated on "complete and finished," not an oversight. Any transport
+  that's network-reachable inherits this gap directly and materially changes its blast radius
+  (arbitrary internet/agent traffic vs. the developer's own browser).
+- **`.claude/` (agents, commands, `settings.json`, `launch.json`)** is entirely Claude-Code-
+  development-time tooling. None of it is imported by, referenced from, or has any runtime existence
+  inside `backend/app` or `frontend/src`. It cannot be "exposed" by an MCP server because it isn't a
+  capability the deployed app serves — it's a way of working *on* this repo inside Claude Code. This
+  settles the terminology question technically; which one the user meant is still the right thing to
+  ask (Open Question 1), since "skills" is a real, different, reasonable thing to want exposed for a
+  *different* purpose — just not something this phase's MCP server can serve at all, by construction.
+- **Existing manual-entry-point precedent**: every one-off backend script (`scryfall_ingestion.py`,
+  `rules_ingestion.py`, `card_embedding_ingestion.py`) is invoked as `uv run python -m
+  app.ai.ingestion.<module>`, run by hand, deliberately not wired into `docker-compose.yml` or any
+  scheduler. This is the exact precedent to follow for an MCP server's entry point.
+
+### Research: how an MCP server actually gets built, and what ADK offers
+
+- **The official `mcp` Python SDK (PyPI: `mcp`) now ships `FastMCP` directly** as
+  `mcp.server.fastmcp.FastMCP` — the standalone `fastmcp` project's 1.0 API was folded into the
+  official SDK; `pip install mcp` is sufficient. Declaring a tool is `@mcp.tool()` on a plain
+  function (or `mcp.add_tool(fn)` programmatically) — the JSON schema and description are
+  auto-derived from type hints and the docstring, and the framework supports `stdio`, `http`, and
+  `sse` transports out of the box. This is directly usable against this codebase's existing tool
+  functions with **zero wrapping** — they're already plain typed functions with docstrings, exactly
+  the shape both ADK's own tool convention (CLAUDE.md: "Agent tools are plain async functions") and
+  `FastMCP`'s tool convention want.
+- **Google ADK does document a server-direction path**, but it is *not* a one-line "expose my Agent
+  as a server" helper — it's a lower-level pattern: wrap each ADK-registered tool via
+  `google.adk.tools.mcp_tool.conversion_utils.adk_to_mcp_tool_type`, then hand-roll `@app.
+  list_tools()`/`@app.call_tool()` handlers on `mcp.server.lowlevel.Server`, then serve over
+  `mcp.server.stdio.stdio_server()`. This requires first wrapping the plain functions in ADK's
+  `FunctionTool` machinery purely to satisfy that lower-level API's shape — machinery this codebase
+  doesn't otherwise need, and which the plain-function tools were deliberately kept clear of (Phase
+  1's "tools stay stateless" decision). Given YAGNI: **bypass ADK entirely on the server side.** ADK
+  is irrelevant to serving MCP — it only matters that Phase 1's original "tools are plain,
+  DB-session-self-managed functions" choice happens to make them directly portable to `FastMCP`'s
+  high-level API with no adapter layer at all.
+- One more option, explicitly **not recommended for v1**: `FastMCP.from_fastapi(app=api_app)` can
+  auto-generate an MCP server that exposes an existing FastAPI app's *REST routes* as MCP tools,
+  including its middleware/auth/schemas. Real and well-documented, but the wrong shape for this
+  phase's actual ask — the user asked for this app's AI *tools*, not its REST CRUD surface, and
+  blanket-exposing every `/api/v1/...` route (including deck-mutating ones, protected only by the
+  `get_current_user` stub) as MCP tools would silently and drastically expand scope past what was
+  asked, reintroducing exactly the auth/mutation exposure this design deliberately keeps out of v1.
+  Worth remembering as a natural next step *if* a future phase decides deck-mutating capabilities
+  should also be MCP-exposed — not this phase's design.
+
+### Design
+
+**1. Scope: all five existing tools, v1.** Because every existing ADK tool in this codebase is
+already read-only, "all of them" and "a conservative read-only subset" are the same set — no actual
+tradeoff to litigate, unlike a codebase where some tools mutate state. Recommend exposing all five:
+`search_cards`, `search_cards_semantic`, `query_comprehensive_rules`, `lookup_glossary_term`,
+`lookup_card_rulings`. No deck/collection/goldfish mutation tool exists to accidentally expose. A
+future MCP tool that mutates a deck (e.g. "add this card to my deck" from an external agent) is a
+materially different design problem — it would need to decide *whose* deck an anonymous external
+caller is mutating, entangled with the auth gap in a way today's read-only tools aren't. Flagged as
+future scope, not this phase's.
+
+**2. Transport: stdio for v1, HTTP/SSE explicitly deferred and gated.** The MCP client (Claude
+Desktop, another local agent) spawns the server as a subprocess via a configured command (e.g. `uv
+run --project /path/to/backend python -m app.mcp.server`) and talks over stdin/stdout — no network
+socket, no listener, nothing internet-reachable. Matches the existing ingestion-script precedent of
+a manually-invoked local process, and sidesteps the auth gap *by construction*, not by omission:
+whoever can run that command already has full local access to `backend/.env`, the DB, and Scryfall
+credentials — the same trust boundary as running any other script in this repo today.
+
+**HTTP/SSE is explicitly not v1**, and — unlike CI/deployment in this file's existing Deferred
+list — this is a **hard blocker on real auth landing first**, not a "revisit later at our leisure"
+item. Everything else in Deferred is unreachable by anyone but the developer's own browser
+regardless of the gap; a network-reachable MCP endpoint is by definition reachable by whatever the
+operator points at it, and `get_current_user`'s current behavior would hand any caller full access
+to that single tenant's data through the tool layer's DB-backed paths — this would be the first
+network-facing surface in the app with zero auth check at all, including the placebo bearer-token
+acceptance the REST routes at least go through the motions of. Do not build this path until real
+auth is either in place or the product owner explicitly, knowingly accepts the risk for a specific
+narrow reason.
+
+**3. Module placement and architecture.** New package **`backend/app/mcp/`** — a sibling of
+`app/ai/`, `app/api/`, `app/services/`, since this is a genuinely new kind of thing (a server entry
+point, not a tool implementation, not a route, not a service class).
+- **`backend/app/mcp/server.py`** (new) — builds a `FastMCP` instance (name e.g. `"deck_builder"`),
+  registers the five existing tool functions directly via `mcp.add_tool(fn)` (imported straight
+  from `app.ai.tools.cards`/`rules`/`scryfall` — **no thin wrappers needed**, their existing
+  signatures and docstrings are already exactly what `FastMCP` derives schema/description from), and
+  under `if __name__ == "__main__":` calls `mcp.run(transport="stdio")`. Entry point: `uv run python
+  -m app.mcp.server`, matching the ingestion-script precedent exactly.
+- **No FastAPI involvement at all** — this process never imports or boots `app.main:app`. Only
+  needs `app.core.config.settings` (same env-driven config every other script already uses) plus the
+  tool modules themselves. A deliberate architectural payoff of Phase 1's original "tools stay
+  stateless, own their DB session" decision — worth citing back to explicitly since it's what makes
+  this phase cheap.
+- **No `docker-compose.yml` change for v1** — a manually-run local process on the operator's own
+  machine, not a service the docker-compose stack needs to host. If it later needs to run *inside*
+  the docker network (e.g. Chroma/Postgres only reachable there), that's a straightforward addition
+  then, not now.
+- **New dependency**: `mcp` added to `backend/pyproject.toml`'s `dependencies` (not
+  `dependency-groups.dev` — a real runtime capability of the shipped backend package, even though
+  it's invoked manually) via `uv add mcp`. Not added yet, pending the interview.
+- Explicit registration mechanism: **five explicit imports and `add_tool` calls**
+  (`from app.ai.tools.cards import search_cards, search_cards_semantic`, etc.), not an "auto-
+  discover everything in `app.ai.tools`" mechanism — a short, fixed, deliberately-curated list (see
+  Scope above), and auto-discovery would be exactly the kind of speculative generality this file's
+  own YAGNI convention argues against for a five-item list not expected to grow quickly.
+
+**4. Auth stance for v1.** **Not a blocker for the stdio path**: the trust boundary for v1 is "can
+this OS user run this command on this machine," identical to running `scryfall_ingestion.py` or `uv
+run pytest` today. This is not "auth is fine" — it's "auth is orthogonal to a transport that never
+leaves the local process boundary," and that reasoning stops applying the instant HTTP/SSE enters
+the picture. **Is a hard blocker for any future HTTP/SSE exposure** — that expansion should not ship
+until either real auth lands (gated on the product owner's own "complete and finished" judgment,
+per this file's existing Deferred entry) or the product owner explicitly, knowingly accepts running
+a fully open, single-tenant, unauthenticated network endpoint for a specific narrow reason.
+
+### Open questions for the product-owner interview
+
+1. **Terminology, needs a real answer, not a guess**: does "tools and skills" mean (a) this app's
+   existing ADK tool functions — the only thing an MCP server built against this backend *can*
+   expose — or (b) also/instead the `.claude/` Claude Code skills? Those have zero runtime presence
+   in the deployed app and cannot be served by any MCP server this phase could build. If the actual
+   want is "let another Claude Code session reuse this repo's dev conventions," that's a completely
+   different, unrelated ask (e.g. publishing `.claude/agents/*.md` as shareable skill files) and
+   should be scoped as its own item, not folded into this phase.
+2. **Scope confirmation**: all five existing read-only tools, as recommended — or a narrower/
+   different starting set (e.g. just card search, holding rules lookup back)? None of the five
+   mutate anything, so there's no safety-driven reason to narrow further unless there's a product
+   reason (e.g. `search_cards_semantic` runs a local sentence-transformer model per call — the
+   heaviest of the five, worth knowing before external callers can trigger it freely).
+3. **Transport confirmation**: stdio-only, local-process v1, as recommended — specifically, does
+   "external agents" mean "another agent/tool the user runs on their own machine" (what stdio
+   covers) or "an agent running somewhere else that needs to reach this over a network" (what stdio
+   does *not* cover, forcing the HTTP/SSE-plus-real-auth conversation immediately)? The single most
+   important thing to pin down before any code gets written — it changes both the transport and the
+   auth answer.
+4. **Deliverable shape**: does "shipped" for this phase include a short setup doc (e.g. `docs/
+   mcp_server.md` or a `backend/README.md` section) walking through pointing an MCP client at the
+   resulting `uv run python -m app.mcp.server` command, matching this repo's own convention of
+   updating docs when a gap they mention gets closed? Recommended default: yes, but confirm rather
+   than assume.
+
+### Interview outcome (resolved before writing code, per-phase process)
+
+All four questions resolved by interview, 2026-08-23 — all took the blueprint's own recommended
+default, no deviation:
+
+1. **Terminology: the app's own AI tools** (`search_cards`, `search_cards_semantic`,
+   `query_comprehensive_rules`, `lookup_glossary_term`, `lookup_card_rulings`), not the `.claude/`
+   Claude Code skills — confirmed those are out of scope for this phase entirely, not just
+   deprioritized.
+2. **Transport: stdio, local-process only.** No HTTP/SSE — confirmed "external agents" means the
+   user's own other agents/tools on their own machine, not a network-reachable endpoint. The
+   real-auth-first gate on any future HTTP/SSE exposure stands as designed.
+3. **Scope: all five existing read-only tools**, no narrowing.
+4. **Docs: yes**, a short setup doc ships as part of this phase.
+
+Implementation proceeds per the Design and Concrete Steps sections above, exactly as designed.
+
+### Concrete steps (once the interview above resolves)
+
+1. `uv add mcp` in `backend/` (new runtime dependency, `pyproject.toml` + `uv.lock`).
+2. New `backend/app/mcp/__init__.py` and `backend/app/mcp/server.py`: `FastMCP("deck_builder")`
+   instance, `add_tool(...)` for each of the five tools imported directly from their existing
+   modules, `mcp.run(transport="stdio")` under `if __name__ == "__main__":`.
+3. Manually verify by pointing an actual MCP client (e.g. Claude Desktop's
+   `claude_desktop_config.json`, `"command": "uv", "args": ["run", "--project", "<path>/backend",
+   "python", "-m", "app.mcp.server"]`) at it, confirm all five tools appear with correct
+   auto-derived schemas, and exercise at least one end-to-end call per tool against the live local
+   stack (Chroma/Postgres up via `docker compose up`, since the tool functions still reach into
+   those) — this repo's own "verify against the live stack before calling work done" convention,
+   adapted to an MCP client instead of a browser.
+4. Tests: a focused pytest module (e.g. `backend/app/tests/mcp/test_server.py`) asserting the five
+   tools are registered on the `FastMCP` instance with the expected names — a smoke-level test, not
+   a reimplementation of each tool's own existing test coverage (confirm exact existing-test
+   location before writing this, don't assume).
+5. Docs: whatever Open Question 4 resolves — likely a short new `docs/mcp_server.md` or a
+   `backend/README.md` section with the exact client-config snippet used in step 3.
+6. Update this file's own Status paragraph once shipped, per every other phase's convention.
+
+### Shipped: as designed, one version pin and one real bug found live
+
+Built per the Concrete Steps above: `backend/app/mcp/server.py` (new) builds a `FastMCP
+("deck_builder")` instance and registers all five tools — `search_cards`, `search_cards_semantic`
+(`app.ai.tools.cards`), `query_comprehensive_rules`, `lookup_glossary_term` (`app.ai.tools.rules`),
+`lookup_card_rulings` (`app.ai.tools.scryfall`) — via `mcp.add_tool(fn)` with zero wrapping, no
+FastAPI import anywhere in the module. `docs/mcp_server.md` (new) has the entry-point command and a
+`claude_desktop_config.json` snippet. `backend/app/tests/mcp/test_server.py` (new) smoke-tests tool
+registration. 138 backend tests pass; ruff clean on everything touched.
+
+**Dependency deviation, not a design change**: the design cited `mcp.server.fastmcp.FastMCP`, but
+`mcp` shipped a `2.0.0` release the same day that renamed `FastMCP` → `MCPServer` and moved its
+module path. Pinned `mcp<2` (resolved to `1.29.0`), which has exactly the `FastMCP`/`add_tool`/
+`list_tools`/`run(transport="stdio")` surface the design was actually verified against — confirmed
+by directly importing and inspecting both versions, not guessed.
+
+**Real bug found during live verification, fixed in-scope**: `app.ai.rag`/`app.ai.vector_store`'s
+`print()` calls and the shared `app.core.logging` logger (both writing to stdout) corrupt the stdio
+transport's JSON-RPC stream — a real MCP client hit `Failed to parse JSONRPC message from server`
+before the fix. Fixed entirely inside `server.py` (`redirect_stdout(sys.stderr)` around the
+tool-module imports, repointing `logging.getLogger("app")`'s handler to stderr in-process) rather
+than touching `app/ai/*` itself, which is `mtg-ai-engineer` territory. **Residual gap, not fixed
+here**: rare error-path `print()` calls inside `app/ai/rag`/`app/ai/vector_store` would still leak
+to stdout if a RAG call raises mid-session — worth a small follow-up swapping those for `logger`
+calls, flagged for `mtg-ai-engineer`, not blocking this phase.
+
+**Live verification actually performed, not just claimed**: brought up `docker compose up -d db
+chromadb backend`, confirmed the server module imports/builds without ever touching `app.main`,
+connects to real ChromaDB. Drove a genuine MCP stdio wire-protocol handshake using the `mcp` SDK's
+own client (`ClientSession` + `stdio_client`, spawning `uv run python -m app.mcp.server` as a real
+subprocess): `initialize()`, `list_tools()` (all 5 names over the wire), and `call_tool()` for
+`search_cards` (real Postgres-backed data) and `lookup_card_rulings` (real live Scryfall data) —
+clean, no protocol errors, confirming the stdout-pollution fix actually worked end-to-end. The
+other three tools were exercised via direct `mcp.call_tool()` rather than over the wire and
+returned empty results — not a bug, the local rules/card RAG collections aren't fully populated in
+this dev environment (a separate, orthogonal ingestion-pipeline concern). Not verified: an actual
+Claude Desktop handshake (not installed in this environment) — the SDK's own client library
+exercises the identical wire protocol, the closest achievable substitute here.
+
+---
+
 ## Deferred (explicit choice, not an oversight)
 
 Production-readiness was considered and deliberately deprioritized behind feature work. Recorded
@@ -2087,6 +2632,15 @@ here so it isn't forgotten, not because it's next:
   undetected indefinitely under this setup.
 - **Deployment target**: no `fly.toml`/`render.yaml`/Procfile/etc. anywhere — `docker-compose.yml`
   is local-dev only. Nothing to change until there's a decision on where this actually runs.
+- **Stored `cmc` column on `Card`**: raised 2026-08-23 during Phase 8 review — Phase 8 deliberately
+  kept mana value as parsed-on-write from `Card.mana_cost` (via `calculate_cmc`) rather than adding
+  a stored numeric column, since a migration + backfill + threading `cmc` through three
+  card-persistence call sites (`decks.py`, `collection.py`, `scryfall_ingestion.py`) wasn't worth it
+  just to save a cheap string parse done once per `cast` action. User flagged a real future reason
+  this calculus could change: a stored `cmc` is something **agents would want to reference directly**
+  once the app starts using agents to build/suggest decks (cheaper for an agent to filter/sort/reason
+  over than re-parsing `mana_cost` per candidate card). Not needed yet — no such agent capability
+  exists today. Revisit if/when an agent-driven deck-building feature is actually scoped, not before.
 
 ### Fixed: `mtg-chromadb` container reporting `unhealthy` (2026-07-30)
 

@@ -289,15 +289,20 @@ async def add_node(
                 ),
             }
             card_names: dict[str, str] = {}
+            card_mana_costs: dict[str, str] = {}
             if all_card_ids:
                 names_result = await db.execute(
-                    select(Card.id, Card.name).where(Card.id.in_(all_card_ids))
+                    select(Card.id, Card.name, Card.mana_cost).where(
+                        Card.id.in_(all_card_ids)
+                    )
                 )
-                card_names = dict(names_result.all())
+                rows = names_result.all()
+                card_names = {row[0]: row[1] for row in rows}
+                card_mana_costs = {row[0]: row[2] or "" for row in rows}
 
             try:
                 resulting_state, auto_label = apply_action(
-                    parent_state, node_in.action, card_names
+                    parent_state, node_in.action, card_names, card_mana_costs
                 )
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e))

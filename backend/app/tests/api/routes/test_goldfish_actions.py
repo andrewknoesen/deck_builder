@@ -5,7 +5,7 @@ from app.api.deps import get_current_user
 from app.core.config import settings
 from app.main import app
 from app.models.card import Card
-from app.models.goldfish import GoldfishNode, GoldfishSession
+from app.models.goldfish import GameState, GoldfishNode, GoldfishSession
 from app.models.user import User
 from app.services.scryfall import get_scryfall_service
 from httpx import AsyncClient
@@ -89,7 +89,9 @@ async def _make_deck_for_user(
     return deck_res.json()["id"]
 
 
-async def _make_deck_with_many_cards(client: AsyncClient, db_session, email: str, sub: str):
+async def _make_deck_with_many_cards(
+    client: AsyncClient, db_session, email: str, sub: str
+):
     """
     10 copies of a single mainboard card — enough to test a real 7-card
     opening hand draw distinctly from "drew everything because the library
@@ -129,6 +131,127 @@ async def _get_root(client: AsyncClient, session_id: int):
         await client.get(f"{settings.API_V1_STR}/goldfish/sessions/{session_id}")
     ).json()
     return next(n for n in tree["nodes"] if n["parent_id"] is None)
+
+
+async def _make_deck_with_mana_cards(
+    client: AsyncClient, db_session, email: str, sub: str
+):
+    """
+    A deck with one copy each of five distinctly-costed nonland cards
+    (generic, colored, hybrid, Phyrexian, {X}) plus a land — enough to move
+    any specific one from library to hand deterministically (via `move_zone`,
+    which doesn't care about library order) and cast it.
+    """
+    user = User(email=email, google_sub=sub, full_name="Test User")
+    db_session.add(user)
+
+    cards = [
+        Card(
+            id="mana-land",
+            name="Mana Land",
+            type_line="Land",
+            mana_cost="",
+            produced_mana=["C"],
+        ),
+        Card(
+            id="mana-generic",
+            name="Generic Card",
+            type_line="Artifact",
+            mana_cost="{2}",
+            produced_mana=[],
+        ),
+        Card(
+            id="mana-color",
+            name="Colored Card",
+            type_line="Instant",
+            mana_cost="{R}",
+            produced_mana=[],
+        ),
+        Card(
+            id="mana-hybrid",
+            name="Hybrid Card",
+            type_line="Sorcery",
+            mana_cost="{G/U}",
+            produced_mana=[],
+        ),
+        Card(
+            id="mana-phyrexian",
+            name="Phyrexian Card",
+            type_line="Creature",
+            mana_cost="{G/P}",
+            produced_mana=[],
+        ),
+        Card(
+            id="mana-x",
+            name="X Card",
+            type_line="Sorcery",
+            mana_cost="{X}{R}",
+            produced_mana=[],
+        ),
+    ]
+    for card in cards:
+        db_session.add(card)
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    app.dependency_overrides[get_scryfall_service] = lambda: AsyncMock()
+    try:
+        deck_res = await client.post(
+            f"{settings.API_V1_STR}/decks/",
+            json={
+                "title": "Mana Test Deck",
+                "user_id": user.id,
+                "cards": [
+                    {"card_id": c.id, "quantity": 1, "board": "main"} for c in cards
+                ],
+            },
+        )
+    finally:
+        del app.dependency_overrides[get_scryfall_service]
+    assert deck_res.status_code == 200
+    return user, deck_res.json()["id"]
+
+
+async def _move_to_hand(
+    client: AsyncClient,
+    session_id: int,
+    parent_id: int,
+    card_id: str,
+    target: str = "self",
+):
+    res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={
+            "parent_id": parent_id,
+            "action": {
+                "type": "move_zone",
+                "card_id": card_id,
+                "from_zone": "library",
+                "to_zone": "hand",
+                "target": target,
+            },
+        },
+    )
+    assert res.status_code == 200
+    return res.json()
+
+
+async def _cast(
+    client: AsyncClient,
+    session_id: int,
+    parent_id: int,
+    card_id: str,
+    target: str = "self",
+):
+    res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={
+            "parent_id": parent_id,
+            "action": {"type": "cast", "card_id": card_id, "target": target},
+        },
+    )
+    assert res.status_code == 200
+    return res.json()
 
 
 async def _make_two_deck_session(
@@ -214,7 +337,10 @@ async def test_draw_action_moves_top_card_to_hand(
     assert len(node["state"]["hand"]) == 1
     assert node["state"]["hand"][0] == library_before[0]
     assert len(node["state"]["library"]) == len(library_before) - 1
-    assert node["label"] == f"Drew {'Card A' if library_before[0] == 'card-a' else 'Card B'}"
+    assert (
+        node["label"]
+        == f"Drew {'Card A' if library_before[0] == 'card-a' else 'Card B'}"
+    )
 
 
 @pytest.mark.asyncio
@@ -740,10 +866,14 @@ async def test_create_two_deck_session_allows_both_formats_none(
     user = User(email="fmt_none@example.com", google_sub="fmt_none_sub")
     db_session.add(user)
     db_session.add(
-        Card(id="card-none1", name="None Card 1", type_line="Creature", produced_mana=[])
+        Card(
+            id="card-none1", name="None Card 1", type_line="Creature", produced_mana=[]
+        )
     )
     db_session.add(
-        Card(id="card-none2", name="None Card 2", type_line="Creature", produced_mana=[])
+        Card(
+            id="card-none2", name="None Card 2", type_line="Creature", produced_mana=[]
+        )
     )
     await db_session.commit()
     await db_session.refresh(user)
@@ -807,7 +937,9 @@ async def test_two_deck_mirror_match_self_target_never_touches_opponent_zones(
     user = User(email="mirror@example.com", google_sub="mirror_sub")
     db_session.add(user)
     db_session.add(
-        Card(id="card-mirror", name="Mirror Card", type_line="Land", produced_mana=["C"])
+        Card(
+            id="card-mirror", name="Mirror Card", type_line="Land", produced_mana=["C"]
+        )
     )
     await db_session.commit()
     await db_session.refresh(user)
@@ -901,10 +1033,9 @@ async def test_opponent_target_draw_label_and_self_zones_unchanged(
     assert response.status_code == 200
     node = response.json()
     assert node["label"] == "Opponent: Drew Opponent Draw Card"
-    assert (
-        node["state"]["opponent_zones"]["hand"]
-        == opponent_hand_before + [opponent_library_before[0]]
-    )
+    assert node["state"]["opponent_zones"]["hand"] == opponent_hand_before + [
+        opponent_library_before[0]
+    ]
     assert node["state"]["opponent_zones"]["library"] == opponent_library_before[1:]
 
     # An opponent-target action must never touch the self side.
@@ -918,11 +1049,19 @@ async def test_opponent_target_draw_label_and_self_zones_unchanged(
 @pytest.mark.asyncio
 async def test_opponent_target_play_land_label(client: AsyncClient, db_session) -> None:
     db_session.add(
-        Card(id="card-p-pl", name="Primary PL Card", type_line="Land", produced_mana=["C"])
+        Card(
+            id="card-p-pl",
+            name="Primary PL Card",
+            type_line="Land",
+            produced_mana=["C"],
+        )
     )
     db_session.add(
         Card(
-            id="card-o-pl", name="Opponent PL Card", type_line="Land", produced_mana=["C"]
+            id="card-o-pl",
+            name="Opponent PL Card",
+            type_line="Land",
+            produced_mana=["C"],
         )
     )
     await db_session.commit()
@@ -955,16 +1094,20 @@ async def test_opponent_target_play_land_label(client: AsyncClient, db_session) 
     assert node["label"] == "Opponent: Played Opponent PL Card"
     assert node["state"]["opponent_zones"]["battlefield"] == [opponent_card_id]
     # All copies share one card_id, so check count, not membership.
-    assert len(node["state"]["opponent_zones"]["hand"]) == len(
-        opening["state"]["opponent_zones"]["hand"]
-    ) - 1
+    assert (
+        len(node["state"]["opponent_zones"]["hand"])
+        == len(opening["state"]["opponent_zones"]["hand"]) - 1
+    )
 
 
 @pytest.mark.asyncio
 async def test_opponent_target_cast_label(client: AsyncClient, db_session) -> None:
     db_session.add(
         Card(
-            id="card-p-cast", name="Primary Cast Card", type_line="Land", produced_mana=["C"]
+            id="card-p-cast",
+            name="Primary Cast Card",
+            type_line="Land",
+            produced_mana=["C"],
         )
     )
     db_session.add(
@@ -993,26 +1136,39 @@ async def test_opponent_target_cast_label(client: AsyncClient, db_session) -> No
         f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
         json={
             "parent_id": opening["id"],
-            "action": {"type": "cast", "card_id": opponent_card_id, "target": "opponent"},
+            "action": {
+                "type": "cast",
+                "card_id": opponent_card_id,
+                "target": "opponent",
+            },
         },
     )
     assert response.status_code == 200
     node = response.json()
     assert node["label"] == "Opponent: Cast Opponent Cast Card"
     assert node["state"]["opponent_zones"]["battlefield"] == [opponent_card_id]
-    assert len(node["state"]["opponent_zones"]["hand"]) == len(
-        opening["state"]["opponent_zones"]["hand"]
-    ) - 1
+    assert (
+        len(node["state"]["opponent_zones"]["hand"])
+        == len(opening["state"]["opponent_zones"]["hand"]) - 1
+    )
 
 
 @pytest.mark.asyncio
 async def test_opponent_target_move_zone_label(client: AsyncClient, db_session) -> None:
     db_session.add(
-        Card(id="card-p-mz", name="Primary MZ Card", type_line="Land", produced_mana=["C"])
+        Card(
+            id="card-p-mz",
+            name="Primary MZ Card",
+            type_line="Land",
+            produced_mana=["C"],
+        )
     )
     db_session.add(
         Card(
-            id="card-o-mz", name="Opponent MZ Card", type_line="Land", produced_mana=["C"]
+            id="card-o-mz",
+            name="Opponent MZ Card",
+            type_line="Land",
+            produced_mana=["C"],
         )
     )
     await db_session.commit()
@@ -1046,19 +1202,28 @@ async def test_opponent_target_move_zone_label(client: AsyncClient, db_session) 
     node = response.json()
     assert node["label"] == "Opponent: Moved Opponent MZ Card from hand to graveyard"
     assert node["state"]["opponent_zones"]["graveyard"] == [opponent_card_id]
-    assert len(node["state"]["opponent_zones"]["hand"]) == len(
-        opening["state"]["opponent_zones"]["hand"]
-    ) - 1
+    assert (
+        len(node["state"]["opponent_zones"]["hand"])
+        == len(opening["state"]["opponent_zones"]["hand"]) - 1
+    )
 
 
 @pytest.mark.asyncio
 async def test_opponent_target_shuffle_label(client: AsyncClient, db_session) -> None:
     db_session.add(
-        Card(id="card-p-sh", name="Primary SH Card", type_line="Land", produced_mana=["C"])
+        Card(
+            id="card-p-sh",
+            name="Primary SH Card",
+            type_line="Land",
+            produced_mana=["C"],
+        )
     )
     db_session.add(
         Card(
-            id="card-o-sh", name="Opponent SH Card", type_line="Land", produced_mana=["C"]
+            id="card-o-sh",
+            name="Opponent SH Card",
+            type_line="Land",
+            produced_mana=["C"],
         )
     )
     await db_session.commit()
@@ -1259,7 +1424,9 @@ async def test_opening_hand_asymmetry_primary_empty_opponent_full(
     client: AsyncClient, db_session
 ) -> None:
     db_session.add(
-        Card(id="card-o-full", name="Full O Card", type_line="Land", produced_mana=["C"])
+        Card(
+            id="card-o-full", name="Full O Card", type_line="Land", produced_mana=["C"]
+        )
     )
     await db_session.commit()
 
@@ -1345,7 +1512,7 @@ async def test_action_against_pre_3d_state_missing_opponent_zones_key(
 
 
 @pytest.mark.asyncio
-async def test_state_dict_has_eight_keys_including_opponent_zones(
+async def test_state_dict_has_ten_keys_including_mana_spent(
     client: AsyncClient, db_session
 ) -> None:
     _user, deck_id = await _make_deck_with_cards(
@@ -1367,6 +1534,8 @@ async def test_state_dict_has_eight_keys_including_opponent_zones(
         "life_total",
         "opponent_life_total",
         "opponent_zones",
+        "mana_spent",
+        "opponent_mana_spent",
     }
 
 
@@ -1398,3 +1567,215 @@ async def test_next_turn_never_touches_opponent_zones_in_two_deck_session(
     assert turn_res.status_code == 200
     node = turn_res.json()
     assert node["state"]["opponent_zones"] == opponent_zones_before
+
+
+# --- Phase 8: total mana spent tracker -------------------------------------
+
+
+def test_gamestate_backfills_mana_spent_for_missing_keys():
+    """A stored state dict from before Phase 8 has neither key at all; pydantic
+    must default both to 0, same zero-migration mechanism 3b/3d relied on."""
+    state = GameState(
+        library=[],
+        hand=[],
+        battlefield=[],
+        graveyard=[],
+        exile=[],
+        life_total=20,
+        opponent_life_total=20,
+    )
+    assert state.mana_spent == 0
+    assert state.opponent_mana_spent == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "card_id,expected_cmc",
+    [
+        ("mana-generic", 2),  # {2}
+        ("mana-color", 1),  # {R}
+        ("mana-hybrid", 1),  # {G/U}
+        ("mana-phyrexian", 1),  # {G/P}
+        ("mana-x", 1),  # {X}{R} -> X contributes 0, R contributes 1
+    ],
+)
+async def test_cast_increments_mana_spent_by_cmc(
+    client: AsyncClient, db_session, card_id, expected_cmc
+) -> None:
+    _user, deck_id = await _make_deck_with_mana_cards(
+        client, db_session, f"mana_{card_id}@example.com", f"mana_{card_id}_sub"
+    )
+    session_id = (
+        await client.post(
+            f"{settings.API_V1_STR}/goldfish/sessions", json={"deck_id": deck_id}
+        )
+    ).json()["id"]
+    root = await _get_root(client, session_id)
+    assert root["state"]["mana_spent"] == 0
+
+    moved = await _move_to_hand(client, session_id, root["id"], card_id)
+    cast_node = await _cast(client, session_id, moved["id"], card_id)
+
+    assert cast_node["state"]["mana_spent"] == expected_cmc
+    assert cast_node["state"]["opponent_mana_spent"] == 0
+
+
+@pytest.mark.asyncio
+async def test_cast_accumulates_mana_spent_across_multiple_casts(
+    client: AsyncClient, db_session
+) -> None:
+    _user, deck_id = await _make_deck_with_mana_cards(
+        client, db_session, "mana_accum@example.com", "mana_accum_sub"
+    )
+    session_id = (
+        await client.post(
+            f"{settings.API_V1_STR}/goldfish/sessions", json={"deck_id": deck_id}
+        )
+    ).json()["id"]
+    root = await _get_root(client, session_id)
+
+    moved1 = await _move_to_hand(client, session_id, root["id"], "mana-generic")
+    cast1 = await _cast(client, session_id, moved1["id"], "mana-generic")
+    assert cast1["state"]["mana_spent"] == 2
+
+    moved2 = await _move_to_hand(client, session_id, cast1["id"], "mana-color")
+    cast2 = await _cast(client, session_id, moved2["id"], "mana-color")
+    assert cast2["state"]["mana_spent"] == 3  # 2 + 1
+
+
+@pytest.mark.asyncio
+async def test_cast_opponent_target_increments_opponent_mana_spent_only(
+    client: AsyncClient, db_session
+) -> None:
+    db_session.add(
+        Card(
+            id="card-p-mana",
+            name="Primary Mana Card",
+            type_line="Land",
+            mana_cost="",
+            produced_mana=["C"],
+        )
+    )
+    db_session.add(
+        Card(
+            id="card-o-mana",
+            name="Opponent Mana Card",
+            type_line="Creature",
+            mana_cost="{3}{G}",
+            produced_mana=[],
+        )
+    )
+    await db_session.commit()
+
+    _user, session_id, tree = await _make_two_deck_session(
+        client,
+        db_session,
+        "opp_mana@example.com",
+        "opp_mana_sub",
+        [{"card_id": "card-p-mana", "quantity": 10, "board": "main"}],
+        [{"card_id": "card-o-mana", "quantity": 10, "board": "main"}],
+    )
+    root = next(n for n in tree["nodes"] if n["parent_id"] is None)
+    opening = next(n for n in tree["nodes"] if n["parent_id"] == root["id"])
+    opponent_card_id = opening["state"]["opponent_zones"]["hand"][0]
+
+    cast_node = await _cast(
+        client, session_id, opening["id"], opponent_card_id, target="opponent"
+    )
+
+    assert cast_node["state"]["opponent_mana_spent"] == 4  # {3}{G}
+    assert cast_node["state"]["mana_spent"] == 0
+
+
+@pytest.mark.asyncio
+async def test_play_land_does_not_change_mana_spent(
+    client: AsyncClient, db_session
+) -> None:
+    _user, deck_id = await _make_deck_with_mana_cards(
+        client, db_session, "mana_land@example.com", "mana_land_sub"
+    )
+    session_id = (
+        await client.post(
+            f"{settings.API_V1_STR}/goldfish/sessions", json={"deck_id": deck_id}
+        )
+    ).json()["id"]
+    root = await _get_root(client, session_id)
+
+    moved = await _move_to_hand(client, session_id, root["id"], "mana-land")
+    play_res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={
+            "parent_id": moved["id"],
+            "action": {"type": "play_land", "card_id": "mana-land"},
+        },
+    )
+    assert play_res.status_code == 200
+    node = play_res.json()
+    assert node["state"]["mana_spent"] == 0
+    assert node["state"]["opponent_mana_spent"] == 0
+
+
+@pytest.mark.asyncio
+async def test_other_actions_carry_mana_spent_forward_unchanged(
+    client: AsyncClient, db_session
+) -> None:
+    _user, deck_id = await _make_deck_with_mana_cards(
+        client, db_session, "mana_carry@example.com", "mana_carry_sub"
+    )
+    session_id = (
+        await client.post(
+            f"{settings.API_V1_STR}/goldfish/sessions", json={"deck_id": deck_id}
+        )
+    ).json()["id"]
+    root = await _get_root(client, session_id)
+
+    moved = await _move_to_hand(client, session_id, root["id"], "mana-generic")
+    cast_node = await _cast(client, session_id, moved["id"], "mana-generic")
+    assert cast_node["state"]["mana_spent"] == 2
+
+    # draw
+    draw_res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={"parent_id": cast_node["id"], "action": {"type": "draw"}},
+    )
+    assert draw_res.json()["state"]["mana_spent"] == 2
+
+    # move_zone
+    battlefield_card_id = cast_node["state"]["battlefield"][0]
+    move_res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={
+            "parent_id": cast_node["id"],
+            "action": {
+                "type": "move_zone",
+                "card_id": battlefield_card_id,
+                "from_zone": "battlefield",
+                "to_zone": "graveyard",
+            },
+        },
+    )
+    assert move_res.json()["state"]["mana_spent"] == 2
+
+    # set_life
+    life_res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={
+            "parent_id": cast_node["id"],
+            "action": {"type": "set_life", "life_total": 15},
+        },
+    )
+    assert life_res.json()["state"]["mana_spent"] == 2
+
+    # shuffle
+    shuffle_res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={"parent_id": cast_node["id"], "action": {"type": "shuffle"}},
+    )
+    assert shuffle_res.json()["state"]["mana_spent"] == 2
+
+    # next_turn
+    turn_res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions/{session_id}/nodes",
+        json={"parent_id": cast_node["id"], "action": {"type": "next_turn"}},
+    )
+    assert turn_res.json()["state"]["mana_spent"] == 2

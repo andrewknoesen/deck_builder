@@ -19,6 +19,7 @@ dependencies = [
     "chromadb>=0.4.22",
     "sentence-transformers>=2.3.0",
     "aiohttp>=3.9.0",
+    "mcp<2",
 ]
 
 [dependency-groups]
