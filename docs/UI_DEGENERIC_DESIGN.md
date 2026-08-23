@@ -1,9 +1,16 @@
 # De-genericizing the UI: why it still reads "AI-generated"
 
-> **Status: audit/recommendation, not tracked as a PLAN.md phase (as of 2026-08-23).** No evidence
-> in `PLAN.md` or `git log` that the "Suggested order of work" below has been picked up — treat
-> this as an open backlog item, not a record of what shipped. If picking it up, route through
-> `mtg-ux`/`mtg-frontend` as the doc itself recommends, and add it to `PLAN.md` as a real phase.
+> **Status: mostly implemented (corrected 2026-08-23) — never tracked as a `PLAN.md` phase, which
+> is why an earlier version of this banner wrongly claimed it was unactioned.** Items 1-3 below
+> (font, landing-page layout, landing-page copy) were fixed in
+> [`0b8f770`](https://github.com/andrewknoesen/deck_builder/commit/0b8f770) (2026-08-06,
+> "design: de-genericize landing page, switch palette to dark slate" — reviewed by `mtg-ux` and
+> `mtg-em`, two rounds), landed one day after this audit and never linked back to it or `PLAN.md`.
+> **Item 4 is genuinely still open**: `DeckBuilder.tsx`/`AgentChat.tsx`/`Collection.tsx`/
+> `DeckList.tsx` still use stock `@mui/icons-material` icons, not the bespoke glyphs the landing
+> page got — confirmed directly against current code, not assumed. If picking that up, route
+> through `mtg-ux`/`mtg-frontend` and add it to `PLAN.md` as a real phase, so this doesn't happen
+> again.
 
 Audit date: 2026-08-06. Scope: `frontend/src/pages/LandingPage.tsx` + `frontend/src/theme.ts`,
 extrapolated to the rest of the app's component patterns (`DeckBuilder`, `AgentChat`,
@@ -32,9 +39,11 @@ Cross-referenced against multiple 2025–2026 write-ups on why AI-generated UI c
 [BrainGrid](https://www.braingrid.ai/blog/design-system-optimized-for-ai-coding)) — they
 converge on the same four fingerprints. Below, each is graded against what's actually in this repo.
 
-### 1. Font — ❌ still generic
+### 1. Font — ✅ fixed, 2026-08-06
 
-`theme.ts:36`:
+`theme.ts` now sets `h1`-`h4` to `"Besley", serif`, keeping Inter only for body/UI chrome — exactly
+the fix suggested below. Original finding kept for context:
+
 ```ts
 fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
 ```
@@ -50,9 +59,14 @@ typography, not a SaaS dashboard). Keep Inter or similar for body/UI chrome wher
 small sizes matters, but stop using it for `h1`–`h3`. This alone changes the landing page's
 silhouette more than any other single fix.
 
-### 2. Layout — ❌ textbook "three cards/rows" pattern
+### 2. Layout — ✅ fixed on the landing page, 2026-08-06; ⚠️ item 4 (other pages) still open
 
-`LandingPage.tsx` (rendered, see screenshot evidence below) is, structurally:
+The landing page now uses an asymmetric primary-feature/paired-row/illustrated-row layout with
+live Scryfall card art and five bespoke glyph icons (`CardGlyphIcon`, `ManaCurveGlyphIcon`,
+`CardStackGlyphIcon`, `BinderGlyphIcon`, `BranchGlyphIcon`), no sparkle emoji. Original finding
+kept for context — this described the pre-fix layout:
+
+`LandingPage.tsx` (rendered, see screenshot evidence below) was, structurally:
 - Centered hero: giant bold headline with one word in accent color, one line of gray subtext,
   divider.
 - One "hero card": sparkle icon (✨) → bold heading → two lines of gray body copy → pill CTA
@@ -76,7 +90,12 @@ but it's the same information architecture.
   the hero instead of flat `#110c07`. Right now the hero is compositionally identical to any
   B2B SaaS landing page with the copy swapped out.
 
-### 3. Copy — ❌ swappable marketing voice
+### 3. Copy — ✅ fixed, 2026-08-06
+
+The landing page headline is now "Goldfish your list before you sleeve it up" with a subhead
+citing real, falsifiable mechanics ("hypergeometric draw-odds instead of a rule of thumb") —
+almost exactly the fix suggested below, including the MTG-native phrasing example. Original
+finding kept for context — this described the pre-fix copy:
 
 "Build decks that actually win." / "Start Brewing" / "no guesswork" / "Instant card search with
 live previews." Every one of these lines could be true of a different product with a find-and-replace
@@ -119,14 +138,16 @@ Two things worth being explicit about so this doc doesn't get over-applied:
 
 ## Suggested order of work
 
-1. Typography pass (`theme.ts` font stack + a scale that isn't MUI defaults) — highest
-   visual impact for the effort, touches every page at once via the theme.
-2. Landing page hero/feature-section rewrite — asymmetric layout, card-art texture, kill the
-   sparkle emoji, MTG-specific iconography.
-3. Copy pass across `LandingPage.tsx` — can happen in parallel with (2), same file.
-4. Spot-check `DeckBuilder`, `AgentChat`, `Collection`, `DeckList` for the same three-card/generic-icon
-   pattern once the landing page establishes the new visual language, so the rest of the app
-   doesn't feel like a different product.
+1. ✅ **Done, 2026-08-06.** Typography pass (`theme.ts` font stack + a scale that isn't MUI
+   defaults) — highest visual impact for the effort, touches every page at once via the theme.
+2. ✅ **Done, 2026-08-06.** Landing page hero/feature-section rewrite — asymmetric layout,
+   card-art texture, kill the sparkle emoji, MTG-specific iconography.
+3. ✅ **Done, 2026-08-06.** Copy pass across `LandingPage.tsx` — can happen in parallel with (2),
+   same file.
+4. ⚠️ **Still open, confirmed 2026-08-23.** Spot-check `DeckBuilder`, `AgentChat`, `Collection`,
+   `DeckList` for the same three-card/generic-icon pattern now that the landing page has
+   established the new visual language — they still use stock `@mui/icons-material` icons, not
+   the bespoke glyph set. This is the one real remaining item from this doc.
 
 Route this to `mtg-ux` for the actual visual/interaction redesign and `mtg-frontend` for
 implementation, per the existing subagent split in `CLAUDE.md`.

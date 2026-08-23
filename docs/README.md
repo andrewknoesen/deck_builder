@@ -61,7 +61,7 @@ banner before trusting its details over the actual code:
 | [`design_rulings_agent.md`](design_rulings_agent.md) | Superseded — kept for historical context. |
 | [`rules_ingestion_pipeline.md`](rules_ingestion_pipeline.md) | Directionally accurate, some details drifted. |
 | [`rules_ingestion_guide.md`](rules_ingestion_guide.md) | Directionally accurate, some details drifted. |
-| [`UI_DEGENERIC_DESIGN.md`](UI_DEGENERIC_DESIGN.md) | Open backlog item — not picked up as a `PLAN.md` phase yet. |
+| [`UI_DEGENERIC_DESIGN.md`](UI_DEGENERIC_DESIGN.md) | 3 of 4 findings fixed (never as a `PLAN.md` phase); one genuinely open. |
 
 ## Exploring the codebase structurally
 
