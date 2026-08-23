@@ -1,16 +1,10 @@
 # De-genericizing the UI: why it still reads "AI-generated"
 
-> **Status: mostly implemented (corrected 2026-08-23) — never tracked as a `PLAN.md` phase, which
-> is why an earlier version of this banner wrongly claimed it was unactioned.** Items 1-3 below
-> (font, landing-page layout, landing-page copy) were fixed in
-> [`0b8f770`](https://github.com/andrewknoesen/deck_builder/commit/0b8f770) (2026-08-06,
-> "design: de-genericize landing page, switch palette to dark slate" — reviewed by `mtg-ux` and
-> `mtg-em`, two rounds), landed one day after this audit and never linked back to it or `PLAN.md`.
-> **Item 4 is genuinely still open**: `DeckBuilder.tsx`/`AgentChat.tsx`/`Collection.tsx`/
-> `DeckList.tsx` still use stock `@mui/icons-material` icons, not the bespoke glyphs the landing
-> page got — confirmed directly against current code, not assumed. If picking that up, route
-> through `mtg-ux`/`mtg-frontend` and add it to `PLAN.md` as a real phase, so this doesn't happen
-> again.
+> **Status: fully implemented (2026-08-23).** Items 1-3 (font, landing-page layout, landing-page
+> copy) were fixed in [`0b8f770`](https://github.com/andrewknoesen/deck_builder/commit/0b8f770)
+> (2026-08-06, reviewed by `mtg-ux`/`mtg-em`). Item 4 (extending bespoke glyph icons to the rest of
+> the app) shipped 2026-08-23 via `mtg-frontend` — see `PLAN.md`'s Phase 11 for the full record.
+> All four findings closed; no open items remain from this audit.
 
 Audit date: 2026-08-06. Scope: `frontend/src/pages/LandingPage.tsx` + `frontend/src/theme.ts`,
 extrapolated to the rest of the app's component patterns (`DeckBuilder`, `AgentChat`,
@@ -59,12 +53,14 @@ typography, not a SaaS dashboard). Keep Inter or similar for body/UI chrome wher
 small sizes matters, but stop using it for `h1`–`h3`. This alone changes the landing page's
 silhouette more than any other single fix.
 
-### 2. Layout — ✅ fixed on the landing page, 2026-08-06; ⚠️ item 4 (other pages) still open
+### 2. Layout — ✅ fixed, 2026-08-06 (landing page) + 2026-08-23 (rest of the app, item 4)
 
-The landing page now uses an asymmetric primary-feature/paired-row/illustrated-row layout with
-live Scryfall card art and five bespoke glyph icons (`CardGlyphIcon`, `ManaCurveGlyphIcon`,
-`CardStackGlyphIcon`, `BinderGlyphIcon`, `BranchGlyphIcon`), no sparkle emoji. Original finding
-kept for context — this described the pre-fix layout:
+The landing page uses an asymmetric primary-feature/paired-row/illustrated-row layout with live
+Scryfall card art and five bespoke glyph icons (`CardGlyphIcon`, `ManaCurveGlyphIcon`,
+`CardStackGlyphIcon`, `BinderGlyphIcon`, `BranchGlyphIcon`), no sparkle emoji. `DeckBuilder`,
+`Collection`, and `DeckList` now reuse those same glyphs for their feature/concept icons instead
+of stock Material icons (see item 4 in "Suggested order of work" below for the exact mapping).
+Original finding kept for context — this described the pre-fix layout:
 
 `LandingPage.tsx` (rendered, see screenshot evidence below) was, structurally:
 - Centered hero: giant bold headline with one word in accent color, one line of gray subtext,
@@ -144,10 +140,16 @@ Two things worth being explicit about so this doc doesn't get over-applied:
    card-art texture, kill the sparkle emoji, MTG-specific iconography.
 3. ✅ **Done, 2026-08-06.** Copy pass across `LandingPage.tsx` — can happen in parallel with (2),
    same file.
-4. ⚠️ **Still open, confirmed 2026-08-23.** Spot-check `DeckBuilder`, `AgentChat`, `Collection`,
-   `DeckList` for the same three-card/generic-icon pattern now that the landing page has
-   established the new visual language — they still use stock `@mui/icons-material` icons, not
-   the bespoke glyph set. This is the one real remaining item from this doc.
+4. ✅ **Done, 2026-08-23.** Spot-checked `DeckBuilder`, `Collection`, `DeckList` and swapped their
+   feature/concept icons for the existing bespoke glyphs: `BarChartIcon`→`ManaCurveGlyphIcon`
+   (Stats tab), `SportsEsportsIcon`→`BranchGlyphIcon` (Practice Mode button),
+   `GridViewIcon`→`CardStackGlyphIcon` (empty-deck state), `CollectionsIcon`→`BinderGlyphIcon`
+   (Collection header + empty state), `AutoStoriesIcon`/`LayersIcon`→`CardStackGlyphIcon` (deck
+   list title + empty state). Functional UI chrome (back/add/upload/chevron arrows) was
+   deliberately left alone — conventional affordances, not the tell. `SmartToyIcon` (AI
+   Advisor/AI Rules Judge, in both `DeckBuilder.tsx` and `AgentChat.tsx`) was also deliberately
+   left alone: it's an accurate literal label for "this is an AI feature," not a lazy generic
+   default — no MTG-flavored replacement was created for it, and none is required.
 
 Route this to `mtg-ux` for the actual visual/interaction redesign and `mtg-frontend` for
 implementation, per the existing subagent split in `CLAUDE.md`.

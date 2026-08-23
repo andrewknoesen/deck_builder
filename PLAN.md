@@ -153,8 +153,18 @@ below for the full record, including the genuine MCP wire-protocol client verifi
 (`mtg-architect`) then scope review (`mtg-em`) before implementation, all three interview
 questions resolved (refresh stale docs now, generate the previously-aspirational
 `graphify-out/wiki/`, route through `mtg-em` before writing). `docs/README.md` is now the central
-routing index for both agents and human developers — see "Shipped" under Phase 10 below for the
-full record.
+routing index for both agents and human developers, also published as a hosted mkdocs site at
+`https://andrewknoesen.github.io/deck_builder/` (a same-day follow-up — GitHub Pages + a new,
+narrowly path-filtered GitHub Actions workflow, the first CI in this repo). Two more same-day
+follow-ups: two dead links found on the live site got fixed, and `docs/UI_DEGENERIC_DESIGN.md`'s
+own status banner turned out to be wrong (3 of 4 findings were already fixed back in
+2026-08-06, just never linked back) — corrected. See "Shipped" and the follow-up entries under
+Phase 10 below for the full record.
+
+**Phase 11 (De-genericize the rest of the app) shipped, 2026-08-23** — the one item Phase 10's
+correction found genuinely still open: `DeckBuilder`/`Collection`/`DeckList` now reuse the landing
+page's bespoke MTG glyph icons instead of stock Material icons, closing out
+`docs/UI_DEGENERIC_DESIGN.md` entirely. See Phase 11 below for the full record.
 
 ---
 
@@ -2768,11 +2778,107 @@ browser: Home and Architecture pages both rendered correctly with the Material t
 and working nav. Scratch venv and build output deleted after — nothing left behind, `/site` was
 already gitignored beforehand.
 
-**One manual step still outstanding, deliberately not done here**: GitHub Pages itself isn't
-enabled on the repo yet (confirmed via `gh api repos/andrewknoesen/deck_builder/pages` → 404) —
-the first push of this workflow will create the `gh-pages` branch, but the repo's Settings → Pages
-source still needs pointing at it once, which is a repo-settings change outside git and needs the
-product owner's own action or explicit go-ahead, not something to do silently.
+**Manual step resolved same day**: GitHub Pages wasn't enabled on the repo yet (confirmed via
+`gh api repos/andrewknoesen/deck_builder/pages` → 404) when this was built — a repo-settings
+change outside git, correctly not done silently. Asked the product owner explicitly; they said
+yes, enabled via `gh api -X POST repos/andrewknoesen/deck_builder/pages` pointing at the
+`gh-pages` branch. Confirmed live: the site is public and reachable at
+`https://andrewknoesen.github.io/deck_builder/` — the repo itself is public, so the docs site
+inherits that (no login, no access restriction; discussed explicitly with the product owner, who
+confirmed public is fine for this content).
+
+### Follow-up, same day: two dead links found on the live site
+
+User reported "strange formatting" under Workflow Assignments on the hosted `auth_specs.md` page.
+Root cause: three links to `#mtg-integrations`/`#mtg-backend`/`#mtg-frontend` anchors that don't
+exist on the page, using the retired `/mtg-*` manual-slash-command style CLAUDE.md's roster
+section already documents as replaced by automatic dispatch. Fixed to plain `mtg-integrations`/
+`mtg-backend`/`mtg-frontend` references. Also fixed a second dead link caught by the same
+`mkdocs build --strict` pass in `UI_DEGENERIC_DESIGN.md` (a relative path resolving above the
+repo root) — converted to a real GitHub commit URL. Re-ran `mkdocs build --strict` clean before
+pushing.
+
+### Follow-up, same day: UI_DEGENERIC_DESIGN.md's own status banner was wrong
+
+User asked whether the open items in `UI_DEGENERIC_DESIGN.md` were still real. They weren't —
+checking git history for `frontend/src/pages/LandingPage.tsx` specifically (not just `PLAN.md` and
+a general `git log`, which is what the original Phase 10 banner-writing pass had checked) found
+[`0b8f770`](https://github.com/andrewknoesen/deck_builder/commit/0b8f770) (2026-08-06, reviewed by
+`mtg-ux`/`mtg-em`, two rounds) had already fixed items 1-3 (font, layout, copy) one day after the
+audit — it just never linked back to the doc or became a tracked `PLAN.md` phase, which is exactly
+why the earlier check missed it. Item 4 (spot-checking `DeckBuilder`/`AgentChat`/`Collection`/
+`DeckList` for the same generic-icon pattern) was confirmed genuinely still open — those pages
+still used stock `@mui/icons-material` icons, not the bespoke glyph set. Corrected the doc's status
+banner and per-item markers accordingly. See Phase 11 below for item 4 itself shipping the same
+day.
+
+---
+
+## Phase 11 — De-genericize the rest of the app (item 4 of docs/UI_DEGENERIC_DESIGN.md) (shipped, 2026-08-23)
+
+### Why this one, and why now
+
+Item 4 from `docs/UI_DEGENERIC_DESIGN.md`'s original "Suggested order of work" — spot-check
+`DeckBuilder`/`AgentChat`/`Collection`/`DeckList` for the same generic-icon pattern the landing
+page had, now that Phase 10's follow-up correctly identified it as the one genuinely open item
+from that audit (see the Phase 10 follow-up above). User-requested directly: "Have mtg-frontend
+fix item 4."
+
+### Ground truth this plan is built on
+
+Grepped every `@mui/icons-material` import across the four named pages and mapped each to its
+actual usage context before dispatching, rather than guessing which were "feature/concept" icons
+(the actual tell) versus conventional UI chrome (not the tell, per the doc's own "What generic is
+not, here" section):
+
+- `frontend/src/components/icons/` already had five bespoke glyph components from the Phase-10-
+  adjacent landing-page redesign (`0b8f770`): `CardGlyphIcon`, `ManaCurveGlyphIcon`,
+  `CardStackGlyphIcon`, `BinderGlyphIcon`, `BranchGlyphIcon` — each a small `SvgIcon`-based
+  component with a doc comment naming the generic icon it replaces and why.
+- Clear semantic matches existed for most of the stock icons in scope: `BarChartIcon` (Deck Stats
+  tab) ↔ `ManaCurveGlyphIcon`, `SportsEsportsIcon` (Practice Mode button) ↔ `BranchGlyphIcon`,
+  `CollectionsIcon` (Collection header + empty state) ↔ `BinderGlyphIcon`, `AutoStoriesIcon`/
+  `LayersIcon` (deck-list title + empty state) ↔ `CardStackGlyphIcon`.
+- Some icons in scope are conventional interaction chrome, not concept icons — `ArrowBackIcon`,
+  `AddIcon`, `UploadFileIcon`, `ChevronRightIcon` — and swapping those would be exactly the
+  over-application the doc's own "What generic is not, here" section warns against.
+- `SmartToyIcon` (DeckBuilder's AI Advisor tab, AgentChat's page title/avatar) doesn't clearly fall
+  into either bucket — a robot icon is an accurate literal label for "AI feature," not obviously a
+  lazy generic default, so it was flagged as the implementer's judgment call rather than mapped.
+
+### Concrete steps (as implemented)
+
+Routed directly to `mtg-frontend` per the user's explicit instruction (not `mtg-ux` first, unlike
+the original landing-page redesign) — reasonable given the visual language was already established
+and this was applying an existing pattern consistently, not designing something new.
+
+1. `DeckBuilder.tsx`: `BarChartIcon`→`ManaCurveGlyphIcon` (Stats tab), `SportsEsportsIcon`→
+   `BranchGlyphIcon` (Practice Mode button), `GridViewIcon`→`CardStackGlyphIcon` (empty-deck
+   state — chosen over `CardGlyphIcon` since `CardStackGlyphIcon` is already the established
+   "Your Decks" glyph and reads better for "no cards yet").
+2. `Collection.tsx`: `CollectionsIcon`→`BinderGlyphIcon`, both the header title and the empty
+   state.
+3. `DeckList.tsx`: `AutoStoriesIcon`→`CardStackGlyphIcon` (page title), `LayersIcon`→
+   `CardStackGlyphIcon` (empty state — reused rather than picking a distinct glyph, consistent
+   with the title).
+4. Left alone as designed: `ArrowBackIcon`, `AddIcon`, `UploadFileIcon`, `ChevronRightIcon`
+   (conventional chrome) and `SmartToyIcon` in both files (judgment call — no new glyph created,
+   none required).
+5. No new glyph components created — all five existing ones covered the actual need.
+
+### Verify
+
+`npx tsc -b` / `npx eslint .` in `frontend/` both clean (confirmed independently, not just taking
+the implementer's word). Live-verified against the docker stack: `DeckList` (header + empty
+state), `DeckBuilder` (stats-tab icon, practice-mode button, empty-deck state), `Collection`
+(header + empty state), and `AgentChat` (spot-checked as a no-change control) — all rendered
+correctly in the app's dark-slate theme, no console errors beyond two pre-existing startup-timing
+`ERR_CONNECTION_RESET` entries unrelated to this change, all API calls 200. `git diff` confirmed
+exactly the three files in scope changed, unused icon imports cleanly removed.
+
+`docs/UI_DEGENERIC_DESIGN.md` updated: all four findings now marked done, status banner corrected
+to "fully implemented," no open items remain from that audit. `docs/README.md`'s status table
+updated to match.
 
 ---
 

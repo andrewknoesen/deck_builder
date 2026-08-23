@@ -14,12 +14,12 @@ import {
     Card,
     CardMedia
 } from '@mui/material';
-import CollectionsIcon from '@mui/icons-material/Collections';
 import { apiClient } from '../api/client';
 import type { ScryfallCard, CollectionCard } from '../types/mtg';
 import { DeckBuilderSearch } from '../components/DeckBuilderSearch';
 import { CollectionCardComponent } from '../components/CollectionCardComponent';
 import { CardGlyphIcon } from '../components/icons/CardGlyphIcon';
+import { BinderGlyphIcon } from '../components/icons/BinderGlyphIcon';
 import { useCardHover } from "../context/useCardHover";
 
 // Helper to determine primary type for grouping (reused logic)
@@ -138,7 +138,7 @@ export const Collection: React.FC = () => {
                 <Box className="collection-header">
                     <Box className="collection-title">
                         <Typography variant="h5" fontWeight="900" sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <CollectionsIcon /> My Collection
+                            <BinderGlyphIcon /> My Collection
                         </Typography>
                         <Box className="collection-count-badge">
                             {totalCards} Cards
@@ -159,7 +159,7 @@ export const Collection: React.FC = () => {
                     ) : collection.length === 0 ? (
                         <Box className="collection-empty">
                             <Box className="collection-empty-icon">
-                                <CollectionsIcon sx={{ fontSize: 40, color: 'text.secondary' }} />
+                                <BinderGlyphIcon sx={{ fontSize: 40, color: 'text.secondary' }} />
                             </Box>
                             <Box>
                                 <Typography variant="h5" fontWeight="800" color="text.primary">Empty Collection</Typography>

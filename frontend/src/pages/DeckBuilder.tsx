@@ -24,11 +24,11 @@ import {
   isCardLegal,
   isValidCommander,
 } from "../utils/deckValidation";
-import BarChartIcon from "@mui/icons-material/BarChart";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
-import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import GridViewIcon from "@mui/icons-material/GridView";
+import { ManaCurveGlyphIcon } from "../components/icons/ManaCurveGlyphIcon";
+import { BranchGlyphIcon } from "../components/icons/BranchGlyphIcon";
+import { CardStackGlyphIcon } from "../components/icons/CardStackGlyphIcon";
 import { apiClient } from "../api/client";
 import type { ScryfallCard, Deck, DeckCard } from "../types/mtg";
 import { getFlippableFaces } from "../utils/cardFaces";
@@ -509,7 +509,7 @@ export const DeckBuilder: React.FC = () => {
                   disabled={!deck?.id}
                   className="deck-builder-practice-btn"
                 >
-                  <SportsEsportsIcon fontSize="small" />
+                  <BranchGlyphIcon fontSize="small" />
                 </IconButton>
               </span>
             </Tooltip>
@@ -564,7 +564,7 @@ export const DeckBuilder: React.FC = () => {
           {deckCards.length === 0 ? (
             <Box className="deck-builder-empty">
               <Box className="deck-builder-empty-icon">
-                <GridViewIcon sx={{ fontSize: 40, color: "text.secondary" }} />
+                <CardStackGlyphIcon sx={{ fontSize: 40, color: "text.secondary" }} />
               </Box>
               <Box>
                 <Typography variant="h5" fontWeight="800" color="text.primary">
@@ -641,7 +641,7 @@ export const DeckBuilder: React.FC = () => {
               onClick={() => setRightPaneTab("stats")}
               color={rightPaneTab === "stats" ? "primary" : "default"}
             >
-              <BarChartIcon />
+              <ManaCurveGlyphIcon />
             </IconButton>
             <IconButton
               size="small"

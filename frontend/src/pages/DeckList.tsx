@@ -15,10 +15,9 @@ import {
   DialogActions,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import LayersIcon from "@mui/icons-material/Layers";
-import AutoStoriesIcon from "@mui/icons-material/AutoStories";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
+import { CardStackGlyphIcon } from "../components/icons/CardStackGlyphIcon";
 import { apiClient } from "../api/client";
 import type { Deck } from "../types/mtg";
 import { DeckListItem } from "../components/DeckListItem";
@@ -88,7 +87,7 @@ export const DeckList: React.FC = () => {
             gutterBottom
             className="deck-list-title"
           >
-            <AutoStoriesIcon sx={{ fontSize: 40, color: "primary.main" }} /> My
+            <CardStackGlyphIcon sx={{ fontSize: 40, color: "primary.main" }} /> My
             Grimoire
           </Typography>
           <Typography
@@ -129,7 +128,7 @@ export const DeckList: React.FC = () => {
       {decks.length === 0 ? (
         <Box className="deck-list-empty">
           <Box className="deck-list-empty-icon">
-            <LayersIcon sx={{ fontSize: 40, color: "text.secondary" }} />
+            <CardStackGlyphIcon sx={{ fontSize: 40, color: "text.secondary" }} />
           </Box>
           <Typography variant="h4" fontWeight="800" gutterBottom>
             No decks found
