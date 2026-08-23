@@ -16,7 +16,7 @@ We will use **Google OAuth 2.0** for authentication.
 ## Workflow Assignments
 
 ### 1. Google Project Setup
-**Agent**: [`/mtg-integrations`](#mtg-integrations)
+**Agent**: `mtg-integrations`
 *   [ ] Create/Configure Google Cloud Project.
 *   [ ] Configure OAuth Consent Screen.
 *   [ ] Create OAuth 2.0 Client ID (Web Application).
@@ -24,7 +24,7 @@ We will use **Google OAuth 2.0** for authentication.
 *   [ ] Securely store `GOOGLE_CLIENT_ID` in `frontend/.env` and `backend/.env`.
 
 ### 2. Backend Implementation
-**Agent**: [`/mtg-backend`](#mtg-backend)
+**Agent**: `mtg-backend`
 *   [ ] **Dependency**: Install `google-auth` and `pyjwt` (or `python-jose`).
 *   [ ] **Model**: Ensure `User` model exists (email, google_id, avatar_url).
 *   [ ] **Service**: Create `AuthService` to:
@@ -36,7 +36,7 @@ We will use **Google OAuth 2.0** for authentication.
     *   `GET /api/users/me`: Returns current user profile (protected dependency).
 
 ### 3. Frontend Implementation
-**Agent**: [`/mtg-frontend`](#mtg-frontend)
+**Agent**: `mtg-frontend`
 *   [ ] **Package**: Install `@react-oauth/google`.
 *   [ ] **Provider**: Wrap app in `GoogleOAuthProvider`.
 *   [ ] **Component**: Create `LoginButton` component.

@@ -7,7 +7,8 @@
 
 Audit date: 2026-08-06. Scope: `frontend/src/pages/LandingPage.tsx` + `frontend/src/theme.ts`,
 extrapolated to the rest of the app's component patterns (`DeckBuilder`, `AgentChat`,
-`Collection`, `DeckList`). Triggered by [f4b67ff](../../commit/f4b67ff) (the warm/gold palette
+`Collection`, `DeckList`). Triggered by
+[f4b67ff](https://github.com/andrewknoesen/deck_builder/commit/f4b67ff) (the warm/gold palette
 work) — the palette fix was real progress, but it's one of four tells, and the other three are
 untouched.
 
