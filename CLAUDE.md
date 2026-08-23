@@ -111,7 +111,13 @@ docker compose up
 should be able to find everything (architecture, subsystem design docs, the decision-making
 process, the subagent roster, how to explore the codebase structurally) without already knowing a
 file exists. This file (`CLAUDE.md`) is always loaded automatically and doesn't need routing to;
-`docs/README.md`'s job is bridging from here to everything else.
+`docs/README.md`'s job is bridging from here to everything else. It's also published as a hosted
+mkdocs site (`mkdocs.yml`, `.github/workflows/docs.yml` — builds on every `docs/**` push to
+`main`) for human browsing; agents should keep reading the raw files directly via `Read`/`Grep`
+rather than fetching the hosted URL. Links inside `docs/README.md` that point outside `docs/`
+(e.g. to this file, or to `backend/app/ai/README.md`) are full GitHub URLs rather than relative
+paths, since mkdocs only serves the `docs/` folder — keep that convention for any new outbound
+link added there.
 
 **Convention**: any new persistent doc file anywhere in the repo (`docs/*.md`, a new subdirectory
 `README.md`, a new `.claude/agents/*.md`) gets linked from `docs/README.md` as part of that

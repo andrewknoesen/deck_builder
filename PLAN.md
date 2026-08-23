@@ -2728,6 +2728,52 @@ trusting the design pass's citations blindly. Confirmed `graphify-out/wiki/index
 and non-empty (172-line index, 154 community articles). No code paths touched — nothing to run
 `pytest`/`tsc`/`eslint` against; this phase is docs and one gitignore change only.
 
+### Follow-up, same day: pivot to an actual hosted mkdocs wiki
+
+User follow-up, same day: the in-repo `docs/README.md` routing index wasn't enough — wanted a
+real hosted site. Two product-owner decisions needed first (both asked directly, smaller in scope
+than a full `mtg-architect` design pass): **hosting target** (GitHub Pages, the recommended
+default — free, no new account, matches the repo's own GitHub location) and **deploy mechanism**,
+since this repo has deliberately had no CI at all until now (see Deferred below) — the
+**non-default** choice was taken here: a GitHub Actions workflow auto-deploying on every push to
+`main` that touches `docs/**`/`mkdocs.yml`/`requirements-docs.txt`, rather than a manual
+`mkdocs gh-deploy` run by hand matching this repo's existing manual-script convention.
+
+**Built**: `mkdocs.yml` (Material theme, explicit `nav` so `docs/README.md` — not the mkdocs
+convention `index.md` — is the site homepage, no file rename needed since GitHub's own folder
+auto-render also depends on the `README.md` name); `requirements-docs.txt` (`mkdocs`,
+`mkdocs-material`, pinned to major version); `.github/workflows/docs.yml` (path-filtered, `pip
+install -r requirements-docs.txt && mkdocs gh-deploy --force`, `permissions: contents: write` for
+the `gh-pages` branch push).
+
+**Real problem caught before shipping, not after**: mkdocs' `docs_dir` is `docs/` only — every
+outbound link in `docs/README.md` pointing *outside* that folder (`../CLAUDE.md`,
+`../backend/app/ai/README.md`, `../frontend/README.md`, `../backend/README.md`,
+`../graphify-out/GRAPH_REPORT.md`) would 404 on the built site, since those files never get copied
+into it. Considered a plugin (`mkdocs-same-dir`) to widen `docs_dir` to the repo root; rejected as
+new complexity for what a link-format change solves for free. **Fix**: those specific links
+became full `https://github.com/andrewknoesen/deck_builder/blob/main/...` URLs instead of relative
+paths — resolves correctly both on the hosted site and on GitHub's own file browser, and these
+files are genuinely "go look at the source repo" pointers regardless of which surface is reading
+them. `graphify-out/wiki/index.md` (gitignored, never committed) was left as a plain local-path
+mention rather than a link of either kind, since neither surface can serve a file that was never
+pushed. Content links *within* `docs/` were left as plain relative paths — unaffected, both
+audiences resolve those correctly.
+
+**Verified**: built with a scratch venv (`mkdocs build --strict`) — clean, exit 0, only three
+non-blocking `INFO`-level notes (an unrelated external commit link, two intra-page anchors in
+`auth_specs.md`/`UI_DEGENERIC_DESIGN.md` that reference the subagent roster's names as prose, not
+real page anchors — harmless). Served it locally (`mkdocs serve`) and drove it in the actual
+browser: Home and Architecture pages both rendered correctly with the Material theme, dark mode,
+and working nav. Scratch venv and build output deleted after — nothing left behind, `/site` was
+already gitignored beforehand.
+
+**One manual step still outstanding, deliberately not done here**: GitHub Pages itself isn't
+enabled on the repo yet (confirmed via `gh api repos/andrewknoesen/deck_builder/pages` → 404) —
+the first push of this workflow will create the `gh-pages` branch, but the repo's Settings → Pages
+source still needs pointing at it once, which is a repo-settings change outside git and needs the
+product owner's own action or explicit go-ahead, not something to do silently.
+
 ---
 
 ## Deferred (explicit choice, not an oversight)
@@ -2745,7 +2791,9 @@ here so it isn't forgotten, not because it's next:
   judgment**, confirmed 2026-08-04: release to friends/family happens whenever they personally deem
   the app "complete and finished," not on a fixed date — real auth is a pre-release blocker at that
   point, not something to build proactively before then.
-- **CI**: only Renovate (dependency bumps) runs in `.github/workflows/` — nothing runs
+- **CI**: Renovate (dependency bumps) and, as of Phase 10's mkdocs follow-up, a narrowly
+  path-filtered docs-deploy workflow (`.github/workflows/docs.yml`, builds/deploys the mkdocs
+  site on `docs/**` changes only) are the only workflows in `.github/workflows/`. Nothing runs
   `pytest`/`ruff`/`eslint` on PRs. The pytest-collection break fixed in Phase 0 could sit
   undetected indefinitely under this setup.
 - **Deployment target**: no `fly.toml`/`render.yaml`/Procfile/etc. anywhere — `docker-compose.yml`

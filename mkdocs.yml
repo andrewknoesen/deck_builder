@@ -1,0 +1,46 @@
+site_name: deck_builder docs
+site_description: Central docs index for the MTG deck_builder project — architecture, subsystem design docs, and how to expand the project.
+repo_url: https://github.com/andrewknoesen/deck_builder
+repo_name: andrewknoesen/deck_builder
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - content.action.edit
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - tables
+
+nav:
+  - Home: README.md
+  - Architecture: ARCHITECTURE.md
+  - AI / MCP:
+      - MCP server: mcp_server.md
+  - Subsystem design docs:
+      - Deck import: DECK_IMPORT_DESIGN.md
+      - Deck statistics: deck_statistics_spec.md
+      - Auth (not implemented): auth_specs.md
+      - Rulings agent (superseded): design_rulings_agent.md
+      - Rules ingestion pipeline: rules_ingestion_pipeline.md
+      - Rules ingestion guide: rules_ingestion_guide.md
+      - UI de-genericizing (open backlog): UI_DEGENERIC_DESIGN.md

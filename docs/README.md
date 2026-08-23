@@ -1,5 +1,10 @@
 # deck_builder docs index
 
+Also published as a hosted site via [mkdocs](https://www.mkdocs.org/) + Material
+(`mkdocs.yml` at the repo root, deployed by `.github/workflows/docs.yml` on every push to `main`
+that touches `docs/**`) — this file is that site's homepage either way, so reading it here or on
+the hosted site is the same content.
+
 This is the central entry point for every doc in this repo — agents and developers alike should
 be able to find what they need starting here, without already knowing a file exists. If you add a
 new persistent doc anywhere in the repo (`docs/*.md`, a new subdirectory `README.md`, a new
@@ -8,7 +13,8 @@ new persistent doc anywhere in the repo (`docs/*.md`, a new subdirectory `README
 
 ## Start here
 
-1. **Read root [`CLAUDE.md`](../CLAUDE.md) first.** Agents already do this automatically (it's
+1. **Read root [`CLAUDE.md`](https://github.com/andrewknoesen/deck_builder/blob/main/CLAUDE.md)
+   first.** Agents already do this automatically (it's
    loaded into every session and subagent) — human developers should read it manually, since it
    holds the project overview, directory tree, dev setup, and key conventions that everything else
    here assumes.
@@ -34,9 +40,11 @@ and every shipped phase gets a "Shipped" writeup in `PLAN.md` recording what act
 - **[`ARCHITECTURE.md`](ARCHITECTURE.md)** — the real, current shape: layer overview, the full API
   table (every router/endpoint), auth status, and an explicit "what's not built yet" list kept
   current on purpose. Start here for "how does this actually work today."
-- **[`backend/app/ai/README.md`](../backend/app/ai/README.md)** — the AI/agent layer in detail:
-  directory structure, each agent, each tool, RAG modules, ingestion scripts, and the MCP server.
-- **[`frontend/README.md`](../frontend/README.md)** / **[`backend/README.md`](../backend/README.md)**
+- **[`backend/app/ai/README.md`](https://github.com/andrewknoesen/deck_builder/blob/main/backend/app/ai/README.md)**
+  — the AI/agent layer in detail: directory structure, each agent, each tool, RAG modules,
+  ingestion scripts, and the MCP server.
+- **[`frontend/README.md`](https://github.com/andrewknoesen/deck_builder/blob/main/frontend/README.md)**
+  / **[`backend/README.md`](https://github.com/andrewknoesen/deck_builder/blob/main/backend/README.md)**
   — per-package dev notes.
 
 ## Subsystem design docs
@@ -63,12 +71,12 @@ reading source directly:
 
 - `graphify query "<question>"`, `graphify path "<A>" "<B>"`, `graphify explain "<concept>"` —
   the fastest way to answer a specific structural question.
-- [`../graphify-out/wiki/index.md`](../graphify-out/wiki/index.md) — a generated wiki (one article
-  per detected community) for broad navigation, if you're exploring rather than asking a specific
-  question. Gitignored (regenerated locally, not checked in) — if it's missing, run
-  `graphify update .` then `graphify export wiki`.
-- [`../graphify-out/GRAPH_REPORT.md`](../graphify-out/GRAPH_REPORT.md) — broad architecture review,
-  for when query/path/explain don't surface enough context.
+- `graphify-out/wiki/index.md` (local path, not a link here — it's gitignored, regenerated
+  locally, not checked into the repo or this hosted site) — a generated wiki (one article per
+  detected community) for broad navigation, if you're exploring rather than asking a specific
+  question. If it's missing, run `graphify update .` then `graphify export wiki`.
+- [`graphify-out/GRAPH_REPORT.md`](https://github.com/andrewknoesen/deck_builder/blob/main/graphify-out/GRAPH_REPORT.md)
+  — broad architecture review, for when query/path/explain don't surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current.
 
 See `CLAUDE.md`'s `## graphify` section for the full rules.
