@@ -2812,6 +2812,23 @@ still used stock `@mui/icons-material` icons, not the bespoke glyph set. Correct
 banner and per-item markers accordingly. See Phase 11 below for item 4 itself shipping the same
 day.
 
+### Follow-up, same day: mermaid architecture diagram
+
+User-requested: a mermaid diagram of the architecture in the wiki. Added `pymdownx.superfences`
+with the custom `mermaid` fence config to `mkdocs.yml`'s `markdown_extensions` (Material's native
+Mermaid rendering — no extra JS needed, bundled by the theme) and a `graph TB` diagram at the top
+of `docs/ARCHITECTURE.md`, right after the status banner: frontend → REST API → DB/Scryfall, the
+`/ai` routes → ADK agent layer → Gemini + AI tools, the AI tools' fan-out to Postgres/Chroma/
+Scryfall, and the MCP server's separate stdio process calling the same tools directly (bypassing
+ADK, per Phase 9's own design) for an external MCP client. Also fixed a stale nav label in
+`mkdocs.yml` ("UI de-genericizing (open backlog)" → "(implemented)") caught while in the file for
+this change.
+
+Verified before pushing, not assumed: `mkdocs build --strict` clean, then actually served the site
+locally and screenshotted the rendered page in the browser — all subgraphs, labels, and arrows
+render correctly. Renders on GitHub's own file view too (native Mermaid support), so the diagram
+works whether read via the hosted site or the raw repo.
+
 ---
 
 ## Phase 11 — De-genericize the rest of the app (item 4 of docs/UI_DEGENERIC_DESIGN.md) (shipped, 2026-08-23)

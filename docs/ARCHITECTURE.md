@@ -6,6 +6,50 @@
 > `search_cards`/`get_deck_stats` tools) that were never built as specified. See `docs/README.md`
 > for the full docs index — this page is linked from there, not a replacement for it.
 
+## Architecture Diagram
+
+```mermaid
+graph TB
+    subgraph Client
+        FE["Frontend<br/>React + Vite + TS"]
+    end
+
+    subgraph Backend["Backend — FastAPI (/api/v1)"]
+        API["REST routers<br/>auth · users · cards · decks · collection · ai · goldfish"]
+        Agents["Agent layer (Google ADK)<br/>rules_agent · deck_advisor_agent"]
+        Tools["AI tools (plain functions)<br/>search_cards · search_cards_semantic<br/>query_comprehensive_rules · lookup_glossary_term<br/>lookup_card_rulings"]
+    end
+
+    subgraph MCPProc["MCP server — separate process, stdio"]
+        MCP["backend/app/mcp/server.py<br/>(FastMCP, bypasses ADK)"]
+    end
+
+    subgraph Data["Data stores"]
+        DB[("Postgres / SQLite<br/>decks · cards · users · goldfish")]
+        Chroma[("ChromaDB<br/>RulesRAG · CardRAG")]
+    end
+
+    Scryfall["Scryfall API"]
+    Gemini["Gemini<br/>(via ADK)"]
+    ExtClient["External MCP client<br/>Claude Desktop, etc."]
+
+    FE -->|HTTP| API
+    API --> DB
+    API -->|card search / lookup| Scryfall
+    API -->|"/ai/chat, /ai/suggest"| Agents
+    Agents --> Gemini
+    Agents --> Tools
+    Tools --> DB
+    Tools --> Chroma
+    Tools --> Scryfall
+    MCP -->|direct import, no ADK| Tools
+    ExtClient -->|stdio| MCP
+```
+
+Renders on the hosted mkdocs site and directly on GitHub. Keep this in sync with section 1 below
+when the shape of the system actually changes — don't let it drift the way the rest of this doc
+already did once (see the status banner above).
+
 ## 1. Overview
 
 - **Frontend**: React 18 + TypeScript + Vite, styled with Tailwind and MUI. Talks to the backend

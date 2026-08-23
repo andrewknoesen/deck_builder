@@ -31,6 +31,11 @@ markdown_extensions:
   - toc:
       permalink: true
   - tables
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 
 nav:
   - Home: README.md
@@ -44,4 +49,4 @@ nav:
       - Rulings agent (superseded): design_rulings_agent.md
       - Rules ingestion pipeline: rules_ingestion_pipeline.md
       - Rules ingestion guide: rules_ingestion_guide.md
-      - UI de-genericizing (open backlog): UI_DEGENERIC_DESIGN.md
+      - UI de-genericizing (implemented): UI_DEGENERIC_DESIGN.md
