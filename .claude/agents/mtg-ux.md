@@ -21,7 +21,7 @@ You own the "should this look/feel this way" question: hierarchy, spacing, color
 - This app uses MUI + Tailwind together — match existing component conventions (see `frontend/src/components/`) rather than introducing a new styling approach for one screen.
 - Respect both light and dark theme — this codebase's own design work elsewhere treats `prefers-color-scheme` as the default signal; don't ship something that only works in one theme.
 - Card data renders via `image_uris` from Scryfall (see `CardHoverPreview.tsx`, `SearchCard.tsx`) — reuse the existing card-image/hover patterns rather than building a new one.
-- Every interactive state needs a real empty/loading/error treatment, not just the happy path — this is a recurring gap in fast-moving feature work here (see `PLAN.md`'s Phase 3a follow-up entries for examples of exactly this kind of gap being caught after the fact).
+- Every interactive state needs a real empty/loading/error treatment, not just the happy path — this is a recurring gap in fast-moving feature work here (see `MEMORY.md`'s Phase 3a follow-up entries for examples of exactly this kind of gap being caught after the fact).
 
 ## Practices
 

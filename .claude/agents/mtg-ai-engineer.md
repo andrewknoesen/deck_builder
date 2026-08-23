@@ -10,7 +10,7 @@ You are the AI engineer for `deck_builder`'s agent layer (`backend/app/ai/`), bu
 
 ## Before anything else
 
-Read `CLAUDE.md`'s Agent Layer section and `backend/app/ai/README.md`. Read `PLAN.md`'s Phase 1 (AI Deck Advisor) and Phase 4 (Scryfall ingestion) sections — they record the actual design decisions and a real architectural blocker (ADK tool functions have no FastAPI-style request-scoped DI, so `Depends(get_db)` doesn't work inside a tool; see `backend/app/ai/tools/db.py` for the pattern that was built instead).
+Read `CLAUDE.md`'s Agent Layer section and `backend/app/ai/README.md`. Read `MEMORY.md`'s Phase 1 (AI Deck Advisor) and Phase 4 (Scryfall ingestion) sections — they record the actual design decisions and a real architectural blocker (ADK tool functions have no FastAPI-style request-scoped DI, so `Depends(get_db)` doesn't work inside a tool; see `backend/app/ai/tools/db.py` for the pattern that was built instead).
 
 ## Conventions
 

@@ -10,7 +10,7 @@ You are the integrations engineer for `deck_builder`'s external APIs: Scryfall (
 
 ## Before anything else
 
-Read `CLAUDE.md`'s Key Conventions and `PLAN.md`'s Phase 4 (Scryfall bulk-data ingestion) and Deferred (real auth) sections in full — both areas have real, hard-won history here that's easy to re-break.
+Read `CLAUDE.md`'s Key Conventions, `MEMORY.md`'s Phase 4 (Scryfall bulk-data ingestion) section, and `PLAN.md`'s Deferred (real auth) section in full — both areas have real, hard-won history here that's easy to re-break.
 
 ## Scryfall
 

@@ -1,6 +1,7 @@
 # AI Module Documentation
 
-> **Status: refreshed 2026-08-23**, current through Phase 9 (`PLAN.md`). See `docs/README.md` for
+> **Status: refreshed 2026-08-23**, current through Phase 9 (`PLAN.md`'s Status section; full
+> phase detail in `MEMORY.md`). See `docs/README.md` for
 > the full docs index.
 
 This directory (`backend/app/ai`) contains the core logic for the application's AI features, including RAG (Retrieval-Augmented Generation) and Agentic capabilities.
@@ -50,7 +51,7 @@ already handles the model loop and tool dispatch, so there's no in-repo base cla
     with the rules/glossary/ruling tools below.
 -   **`deck_advisor/deck_advisor_agent.py`**: `deck_advisor_agent` — suggests additions/cuts for a
     specific deck, using `search_cards`/`search_cards_semantic` plus deck stats/list folded into
-    its prompt context (no DB-aware tools, by design — see Phase 1 in `PLAN.md`).
+    its prompt context (no DB-aware tools, by design — see Phase 1 in `MEMORY.md`).
 -   **`factory.py`**: `make_agent(name, description, prompt, tools)` — the shared factory both
     agents above are built from (extracted once a second agent showed real
     `model=settings.AI_MODEL_NAME`-style duplication, per the "resist a class hierarchy" rule

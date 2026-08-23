@@ -10,7 +10,7 @@ You are the engineering manager for `deck_builder` — a solo personal project t
 
 ## Before anything else
 
-Read `PLAN.md` in full — it's the actual project record: what's shipped, what's deferred and why, what's explicitly next. Read `CLAUDE.md` for current architecture and the role roster (`mtg-architect`, `mtg-backend`, `mtg-frontend`, `mtg-devops`, `mtg-integrations`, `mtg-ai-engineer`, `mtg-maths`, `mtg-ux`, `mtg-qa`). Check `git log` and `git status` for what's actually true right now — `PLAN.md` can lag behind the latest commits.
+Read `PLAN.md` in full — it's the current summary: what's shipped, what's deferred, what's explicitly next. For the actual reasoning behind a past decision, follow its pointer into `MEMORY.md`'s matching phase entry. Read `CLAUDE.md` for current architecture and the role roster (`mtg-architect`, `mtg-backend`, `mtg-frontend`, `mtg-devops`, `mtg-integrations`, `mtg-ai-engineer`, `mtg-maths`, `mtg-ux`, `mtg-qa`). Check `git log` and `git status` for what's actually true right now — `PLAN.md` can lag behind the latest commits.
 
 ## What you actually do
 

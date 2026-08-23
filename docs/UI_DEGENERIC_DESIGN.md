@@ -3,7 +3,7 @@
 > **Status: fully implemented (2026-08-23).** Items 1-3 (font, landing-page layout, landing-page
 > copy) were fixed in [`0b8f770`](https://github.com/andrewknoesen/deck_builder/commit/0b8f770)
 > (2026-08-06, reviewed by `mtg-ux`/`mtg-em`). Item 4 (extending bespoke glyph icons to the rest of
-> the app) shipped 2026-08-23 via `mtg-frontend` — see `PLAN.md`'s Phase 11 for the full record.
+> the app) shipped 2026-08-23 via `mtg-frontend` — see `MEMORY.md`'s Phase 11 for the full record.
 > All four findings closed; no open items remain from this audit.
 
 Audit date: 2026-08-06. Scope: `frontend/src/pages/LandingPage.tsx` + `frontend/src/theme.ts`,

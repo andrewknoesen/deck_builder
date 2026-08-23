@@ -19,7 +19,7 @@ directly from `app.ai.tools.*` with their original names and docstrings:
 - `lookup_card_rulings` — official Scryfall rulings for named cards
 
 Nothing here mutates a deck, collection, or goldfish session — deck-mutating
-capabilities aren't exposed via MCP today. See `PLAN.md`'s Phase 9 for the
+capabilities aren't exposed via MCP today. See `MEMORY.md`'s Phase 9 for the
 full design rationale.
 
 ## Running it

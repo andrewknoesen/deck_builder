@@ -119,6 +119,13 @@ rather than fetching the hosted URL. Links inside `docs/README.md` that point ou
 paths, since mkdocs only serves the `docs/` folder — keep that convention for any new outbound
 link added there.
 
+`PLAN.md` (project status/roadmap) and `MEMORY.md` (full per-phase history) are a matched pair at
+the repo root, split specifically to keep `PLAN.md` short: `PLAN.md` holds only the current
+summary and what's still actionable; every phase's detailed Why/Ground truth/Design/Shipped
+writeup lives in `MEMORY.md` instead. When a phase ships, its detail goes in `MEMORY.md`, with
+only a short pointer paragraph added to `PLAN.md`'s Status section — don't let `PLAN.md` grow the
+detailed writeups back in.
+
 **Convention**: any new persistent doc file anywhere in the repo (`docs/*.md`, a new subdirectory
 `README.md`, a new `.claude/agents/*.md`) gets linked from `docs/README.md` as part of that
 phase's Concrete Steps — the same "update the doc" discipline `PLAN.md` already applies to

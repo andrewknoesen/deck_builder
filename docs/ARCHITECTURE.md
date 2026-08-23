@@ -1,6 +1,7 @@
 # MTG Deck Builder - Architecture
 
-> **Status: refreshed 2026-08-23**, current through Phase 9 (`PLAN.md`). Originally written
+> **Status: refreshed 2026-08-23**, current through Phase 9 (`PLAN.md`'s Status section; full
+> phase detail in `MEMORY.md`). Originally written
 > 2026-07-08; this replaces the earlier `ARCHITECTURE.md`/`AI_ARCHITECTURE.md`, which were
 > pre-implementation planning docs describing features (a `DeckAdvisorAgent` chat widget with
 > `search_cards`/`get_deck_stats` tools) that were never built as specified. See `docs/README.md`
@@ -111,7 +112,7 @@ Kept here deliberately so this doc doesn't silently go stale again the way its p
   library/hand/battlefield/graveyard/exile state, structured actions, mini-playmat UI), and 3d
   (a second, fully-manual opponent board) are all built — see the `goldfish` router above. 3c
   (rules-aware legality/resolution) is not — explicitly parked, no next-pick-up trigger, see
-  `PLAN.md`'s Phase 3 for the staged design.
+  `MEMORY.md`'s Phase 3 for the staged design.
 - **Scryfall bulk-data ingestion — refresh script built, scheduling still open**:
   `backend/app/ai/ingestion/scryfall_ingestion.py`'s `run_ingestion()` pulls Scryfall's
   `default_cards` bulk file and upserts it into the local `Card` table (batched insert/update, not

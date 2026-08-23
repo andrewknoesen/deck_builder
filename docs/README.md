@@ -27,12 +27,16 @@ new persistent doc anywhere in the repo (`docs/*.md`, a new subdirectory `README
 shipped, what's in progress, what's deferred, and why. It is **not summarized here on purpose**:
 `PLAN.md`'s own Status section explicitly refuses to characterize or summarize its own history,
 because every attempt at that has itself introduced drift or overclaiming. Read `PLAN.md` directly
-— start with its Status section at the top, then the phase you care about.
+— start with its Status section at the top, then follow its pointer into
+[`MEMORY.md`](https://github.com/andrewknoesen/deck_builder/blob/main/MEMORY.md) for the phase you
+care about. `PLAN.md` deliberately stays lean (current summary + what's still actionable);
+`MEMORY.md` holds the full per-phase history (Why/Ground truth/Design/Interview outcome/Concrete
+steps/Shipped writeups) so `PLAN.md` doesn't have to.
 
 The short version of the process, if you're about to start new work: anything crossing more than
 one layer (backend+frontend, or a new backend subsystem) gets a design pass from `mtg-architect`
 first, real open questions get resolved via a product-owner interview before any code is written,
-and every shipped phase gets a "Shipped" writeup in `PLAN.md` recording what actually happened
+and every shipped phase gets a "Shipped" writeup in `MEMORY.md` recording what actually happened
 (including deviations from the plan) — not just a checkbox.
 
 ## Architecture and current API/data-model shape
@@ -93,12 +97,14 @@ individual `.claude/agents/<name>.md` file for that agent's actual grounding and
 This is the actual answer to "how do I add something new here":
 
 1. Read `PLAN.md`'s Status section to see what's already shipped, in progress, or deliberately
-   deferred — don't duplicate or conflict with something already decided.
+   deferred — don't duplicate or conflict with something already decided. Follow into `MEMORY.md`
+   for the full reasoning behind any past decision that's relevant to what you're about to build.
 2. If the change crosses more than one layer, or isn't obviously a one-file change, start with a
    design pass from `mtg-architect` (read-only — it hands off implementation, doesn't do it).
 3. Resolve any real open questions via a product-owner interview before writing code — this
    project's convention is to decide ambiguity explicitly, not guess and hope.
 4. Route implementation to the specialist(s) whose scope matches the change (see "The subagent
    team" above).
-5. Once shipped: update `PLAN.md` with a "Shipped" writeup (what was built, any deviation from the
-   plan, how it was verified), and link any new persistent doc file from this page.
+5. Once shipped: add a "Shipped" writeup to `MEMORY.md` (what was built, any deviation from the
+   plan, how it was verified), a one-paragraph pointer to it in `PLAN.md`'s Status section, and
+   link any new persistent doc file from this page.
