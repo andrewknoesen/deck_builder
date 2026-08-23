@@ -1,4 +1,5 @@
 site_name: deck_builder docs
+site_url: https://andrewknoesen.github.io/deck_builder/
 site_description: Central docs index for the MTG deck_builder project — architecture, subsystem design docs, and how to expand the project.
 repo_url: https://github.com/andrewknoesen/deck_builder
 repo_name: andrewknoesen/deck_builder
