@@ -16,6 +16,7 @@ import {
   useTheme,
   ToggleButtonGroup,
   ToggleButton,
+  Badge,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/DeleteOutline";
@@ -49,21 +50,25 @@ export const GoldfishSessionPage: React.FC = () => {
   const isNarrow = useMediaQuery(theme.breakpoints.down("md"));
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
   const [actionText, setActionText] = useState("");
-  const [showDeckList, setShowDeckList] = useState(!isNarrow);
-  const [showTree, setShowTree] = useState(!isNarrow);
+  // Both side panels default closed - the playmat (bigger cards now) is the
+  // primary thing being looked at, and 260-380px of sidebar eaten by default
+  // was the main complaint. The toggle buttons in the header still open them.
+  const [showDeckList, setShowDeckList] = useState(false);
+  const [showTree, setShowTree] = useState(false);
   const [trackerDraft, setTrackerDraft] = useState<Record<string, number>>({});
 
-  // The useState initializers above only run once, at mount. If the layout
-  // crosses the isNarrow breakpoint afterwards (resizing an already-open
-  // desktop window, rotating a tablet), showDeckList/showTree don't follow —
-  // stale "true" values from a wide mount mean both panels render as
-  // simultaneously-open overlay Drawers on a now-narrow screen, hiding the
-  // playmat underneath both of them. Re-sync whenever the breakpoint itself
-  // changes.
+  // If the layout crosses into the isNarrow breakpoint after mount (resizing
+  // an already-open desktop window, rotating a tablet), an open side panel
+  // would render as an overlay Drawer burying the playmat. Force-close on
+  // the way *into* narrow only - never force-open on the way back out, or
+  // it would silently undo the "default closed" behavior above on every
+  // resize back to desktop width.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setShowDeckList(!isNarrow);
-    setShowTree(!isNarrow);
+    if (isNarrow) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowDeckList(false);
+      setShowTree(false);
+    }
   }, [isNarrow]);
 
   const queryKey = ["goldfishTree", sessionId];
@@ -344,14 +349,20 @@ export const GoldfishSessionPage: React.FC = () => {
         >
           <LayersIcon fontSize="small" />
         </IconButton>
-        <IconButton
-          onClick={() => setShowTree((v) => !v)}
-          size="small"
-          color={showTree ? "primary" : "default"}
-          title="Toggle branch tree"
+        <Badge
+          badgeContent={data.nodes.length}
+          color="primary"
+          invisible={showTree || data.nodes.length <= 1}
         >
-          <AccountTreeIcon fontSize="small" />
-        </IconButton>
+          <IconButton
+            onClick={() => setShowTree((v) => !v)}
+            size="small"
+            color={showTree ? "primary" : "default"}
+            title="Toggle branch tree"
+          >
+            <AccountTreeIcon fontSize="small" />
+          </IconButton>
+        </Badge>
       </Box>
 
       <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>

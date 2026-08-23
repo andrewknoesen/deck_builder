@@ -131,6 +131,25 @@ export const DeckBuilder: React.FC = () => {
     enabled: !isNew,
   });
 
+  const [startingPractice, setStartingPractice] = useState(false);
+
+  const handleStartPractice = useCallback(async () => {
+    if (!deck?.id || startingPractice) return;
+    setStartingPractice(true);
+    try {
+      const res = await apiClient.post("/goldfish/sessions", { deck_id: deck.id });
+      navigate(`/goldfish/${res.data.id}`);
+    } catch (err) {
+      console.error("Failed to start practice session", err);
+      setSnackbar({
+        open: true,
+        message: "Couldn't start a practice session. Try again.",
+        severity: "error",
+      });
+      setStartingPractice(false);
+    }
+  }, [deck, startingPractice, navigate]);
+
   // Sync remote data to local state ONLY on initial load. Intentionally one-shot
   // (guarded by isInitialLoad) rather than derived, since local state diverges
   // from the query result the moment the user starts editing.
@@ -497,19 +516,22 @@ export const DeckBuilder: React.FC = () => {
             <Tooltip
               title={
                 deck?.id
-                  ? "Practice with this deck"
+                  ? "Start a practice session with this deck"
                   : "Save this deck first to practice with it"
               }
             >
               <span>
                 <IconButton
-                  component={RouterLink}
-                  to={deck?.id ? `/goldfish?deckId=${deck.id}` : "#"}
+                  onClick={handleStartPractice}
                   size="small"
-                  disabled={!deck?.id}
+                  disabled={!deck?.id || startingPractice}
                   className="deck-builder-practice-btn"
                 >
-                  <BranchGlyphIcon fontSize="small" />
+                  {startingPractice ? (
+                    <CircularProgress size={16} />
+                  ) : (
+                    <BranchGlyphIcon fontSize="small" />
+                  )}
                 </IconButton>
               </span>
             </Tooltip>

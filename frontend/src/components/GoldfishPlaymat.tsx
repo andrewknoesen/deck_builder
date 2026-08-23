@@ -5,6 +5,7 @@ import {
   Button,
   IconButton,
   Chip,
+  Divider,
   Popover,
   List,
   ListItem,
@@ -32,22 +33,32 @@ interface GoldfishPlaymatProps {
   opponentDeckTitle?: string;
 }
 
+// Two explicit size tiers rather than one uniform bump: hand cards are what
+// you're actively deciding whether to play, so they get the most room;
+// battlefield cards are read at a glance (what's in play) and need to stay
+// small enough that a wide board doesn't need to scroll.
+const CARD_SIZES = {
+  hand: { xs: 92, sm: 110, md: 130 },
+  battlefield: { xs: 72, sm: 84, md: 96 },
+} as const;
+
 const CardThumb: React.FC<{
   cardId: string;
   cardById: Record<string, ScryfallCard>;
-}> = ({ cardId, cardById }) => {
+  size: "hand" | "battlefield";
+}> = ({ cardId, cardById, size }) => {
   const { setHoveredCard } = useCardHover();
   const card = cardById[cardId];
   return (
     <Box
       component="img"
-      src={card?.image_uris?.small}
+      src={card?.image_uris?.normal}
       alt={card?.name ?? cardId}
       onMouseEnter={() => card && setHoveredCard(card)}
       onMouseLeave={() => setHoveredCard(null)}
       sx={{
-        width: 56,
-        height: 78,
+        width: CARD_SIZES[size],
+        aspectRatio: "2.5/3.5",
         objectFit: "cover",
         borderRadius: 1,
         bgcolor: "action.hover",
@@ -144,15 +155,36 @@ const ZoneCountChip: React.FC<{
   zone: GoldfishZone;
 }> = ({ label, cardIds, cardById, onRetrieve }) => {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const isEmpty = cardIds.length === 0;
 
   return (
     <>
-      <Chip
-        label={`${label}: ${cardIds.length}`}
-        size="small"
-        onClick={(e) => cardIds.length > 0 && setAnchorEl(e.currentTarget)}
-        sx={{ cursor: cardIds.length > 0 ? "pointer" : "default" }}
-      />
+      <Box
+        onClick={(e) => !isEmpty && setAnchorEl(e.currentTarget)}
+        sx={{
+          width: 52,
+          height: 72,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 0.25,
+          borderRadius: 1,
+          bgcolor: "action.hover",
+          border: 1,
+          borderColor: "divider",
+          cursor: isEmpty ? "default" : "pointer",
+          opacity: isEmpty ? 0.6 : 1,
+          flexShrink: 0,
+        }}
+      >
+        <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10, lineHeight: 1 }}>
+          {label}
+        </Typography>
+        <Typography variant="body2" fontWeight="700" sx={{ lineHeight: 1 }}>
+          {cardIds.length}
+        </Typography>
+      </Box>
       <Popover
         open={!!anchorEl}
         anchorEl={anchorEl}
@@ -225,10 +257,27 @@ const GoldfishPlayerBoard: React.FC<GoldfishPlayerBoardProps> = ({
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-      <Typography variant="overline" color="text.secondary" fontWeight="700">
-        {ownerLabel}
-      </Typography>
+      {/* Identity strip: owner label + life + mana spent together on one
+          line, rather than life/mana pinned to the far right of the action
+          toolbar below. */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+        <Typography variant="overline" color="text.secondary" fontWeight="700">
+          {ownerLabel}
+        </Typography>
+        <LifeCounter label="Life" value={lifeTotal} disabled={disabled} onChange={onLifeChange} />
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+          <Typography variant="caption" color="text.secondary">
+            Mana Spent
+          </Typography>
+          <Typography variant="body2" sx={{ minWidth: 16, textAlign: "center" }}>
+            {manaSpent}
+          </Typography>
+        </Box>
+      </Box>
 
+      {/* Action + zone toolbar. Stays above the (now much taller) card rows
+          - Draw is the most-clicked control in a session and shouldn't be
+          buried below two card rows. */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
         <Button
           size="small"
@@ -238,6 +287,16 @@ const GoldfishPlayerBoard: React.FC<GoldfishPlayerBoardProps> = ({
           onClick={() => onAction({ type: "shuffle" })}
         >
           Shuffle
+        </Button>
+
+        <Button
+          size="small"
+          variant="contained"
+          startIcon={<AddIcon />}
+          disabled={disabled || zones.library.length === 0}
+          onClick={() => onAction({ type: "draw" })}
+        >
+          Draw
         </Button>
 
         <ZoneCountChip
@@ -282,27 +341,92 @@ const GoldfishPlayerBoard: React.FC<GoldfishPlayerBoardProps> = ({
             })
           }
         />
+      </Box>
 
-        <Button
-          size="small"
-          variant="contained"
-          startIcon={<AddIcon />}
-          disabled={disabled || zones.library.length === 0}
-          onClick={() => onAction({ type: "draw" })}
+      {/* Battlefield above hand - matches Moxfield and general MTG UI
+          convention. Fixed minHeight so the row doesn't visibly jump when
+          the first permanent enters play. */}
+      <Box>
+        <Typography variant="overline" color="text.secondary">
+          {battlefieldLabel}
+        </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            flexWrap: "wrap",
+            mt: 0.5,
+            minHeight: 134,
+            ...(zones.battlefield.length === 0 && {
+              border: "1px dashed",
+              borderColor: "divider",
+              borderRadius: 1,
+              px: 2,
+            }),
+          }}
         >
-          Draw
-        </Button>
-
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, ml: "auto" }}>
-          <LifeCounter label="Life" value={lifeTotal} disabled={disabled} onChange={onLifeChange} />
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-            <Typography variant="caption" color="text.secondary">
-              Mana Spent
+          {zones.battlefield.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No permanents in play yet
             </Typography>
-            <Typography variant="body2" sx={{ minWidth: 16, textAlign: "center" }}>
-              {manaSpent}
-            </Typography>
-          </Box>
+          ) : (
+            zones.battlefield.map((cardId, i) => (
+              <Box
+                key={`${cardId}-${i}`}
+                sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}
+              >
+                <CardThumb cardId={cardId} cardById={cardById} size="battlefield" />
+                <Box sx={{ display: "flex", gap: 0.5 }}>
+                  <Button
+                    size="small"
+                    disabled={disabled}
+                    onClick={() =>
+                      onAction({
+                        type: "move_zone",
+                        card_id: cardId,
+                        from_zone: "battlefield",
+                        to_zone: "graveyard",
+                      })
+                    }
+                    sx={{ fontSize: 11, py: 0, minWidth: 0, px: 0.75 }}
+                  >
+                    GY
+                  </Button>
+                  <Button
+                    size="small"
+                    disabled={disabled}
+                    onClick={() =>
+                      onAction({
+                        type: "move_zone",
+                        card_id: cardId,
+                        from_zone: "battlefield",
+                        to_zone: "hand",
+                      })
+                    }
+                    sx={{ fontSize: 11, py: 0, minWidth: 0, px: 0.75 }}
+                  >
+                    Hand
+                  </Button>
+                  <Button
+                    size="small"
+                    disabled={disabled}
+                    onClick={() =>
+                      onAction({
+                        type: "move_zone",
+                        card_id: cardId,
+                        from_zone: "battlefield",
+                        to_zone: "exile",
+                      })
+                    }
+                    sx={{ fontSize: 11, py: 0, minWidth: 0, px: 0.75 }}
+                  >
+                    Exile
+                  </Button>
+                </Box>
+              </Box>
+            ))
+          )}
         </Box>
       </Box>
 
@@ -310,92 +434,49 @@ const GoldfishPlayerBoard: React.FC<GoldfishPlayerBoardProps> = ({
         <Typography variant="overline" color="text.secondary">
           {handLabel}
         </Typography>
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 0.5 }}>
-          {zones.hand.map((cardId, i) => (
-            <Box
-              key={`${cardId}-${i}`}
-              sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}
-            >
-              <CardThumb cardId={cardId} cardById={cardById} />
-              <Button
-                size="small"
-                variant="outlined"
-                disabled={disabled}
-                onClick={() =>
-                  onAction({
-                    type: isLand(cardId) ? "play_land" : "cast",
-                    card_id: cardId,
-                  })
-                }
-                sx={{ fontSize: 11, py: 0, minWidth: 0, px: 1 }}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            flexWrap: "wrap",
+            mt: 0.5,
+            ...(zones.hand.length === 0 && {
+              minHeight: 134,
+              border: "1px dashed",
+              borderColor: "divider",
+              borderRadius: 1,
+              px: 2,
+            }),
+          }}
+        >
+          {zones.hand.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              Hand is empty
+            </Typography>
+          ) : (
+            zones.hand.map((cardId, i) => (
+              <Box
+                key={`${cardId}-${i}`}
+                sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}
               >
-                {isLand(cardId) ? "Play" : "Cast"}
-              </Button>
-            </Box>
-          ))}
-        </Box>
-      </Box>
-
-      <Box>
-        <Typography variant="overline" color="text.secondary">
-          {battlefieldLabel}
-        </Typography>
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 0.5 }}>
-          {zones.battlefield.map((cardId, i) => (
-            <Box
-              key={`${cardId}-${i}`}
-              sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}
-            >
-              <CardThumb cardId={cardId} cardById={cardById} />
-              <Box sx={{ display: "flex", gap: 0.5 }}>
+                <CardThumb cardId={cardId} cardById={cardById} size="hand" />
                 <Button
                   size="small"
+                  variant="outlined"
                   disabled={disabled}
                   onClick={() =>
                     onAction({
-                      type: "move_zone",
+                      type: isLand(cardId) ? "play_land" : "cast",
                       card_id: cardId,
-                      from_zone: "battlefield",
-                      to_zone: "graveyard",
                     })
                   }
-                  sx={{ fontSize: 10, py: 0, minWidth: 0, px: 0.5 }}
                 >
-                  GY
-                </Button>
-                <Button
-                  size="small"
-                  disabled={disabled}
-                  onClick={() =>
-                    onAction({
-                      type: "move_zone",
-                      card_id: cardId,
-                      from_zone: "battlefield",
-                      to_zone: "hand",
-                    })
-                  }
-                  sx={{ fontSize: 10, py: 0, minWidth: 0, px: 0.5 }}
-                >
-                  Hand
-                </Button>
-                <Button
-                  size="small"
-                  disabled={disabled}
-                  onClick={() =>
-                    onAction({
-                      type: "move_zone",
-                      card_id: cardId,
-                      from_zone: "battlefield",
-                      to_zone: "exile",
-                    })
-                  }
-                  sx={{ fontSize: 10, py: 0, minWidth: 0, px: 0.5 }}
-                >
-                  Exile
+                  {isLand(cardId) ? "Play" : "Cast"}
                 </Button>
               </Box>
-            </Box>
-          ))}
+            ))
+          )}
         </Box>
       </Box>
     </Box>
@@ -462,19 +543,22 @@ export const GoldfishPlaymat: React.FC<GoldfishPlaymatProps> = ({
       />
 
       {state.opponent_zones && (
-        <GoldfishPlayerBoard
-          zones={state.opponent_zones}
-          cardById={cardById}
-          lifeTotal={state.opponent_life_total}
-          onLifeChange={(newValue) =>
-            onAction({ type: "set_life", life_total: newValue, target: "opponent" })
-          }
-          manaSpent={state.opponent_mana_spent ?? 0}
-          onAction={(action) => onAction({ ...action, target: "opponent" })}
-          ownerLabel={opponentOwnerLabel(opponentDeckTitle)}
-          isSelf={false}
-          disabled={disabled}
-        />
+        <>
+          <Divider sx={{ my: 1 }} />
+          <GoldfishPlayerBoard
+            zones={state.opponent_zones}
+            cardById={cardById}
+            lifeTotal={state.opponent_life_total}
+            onLifeChange={(newValue) =>
+              onAction({ type: "set_life", life_total: newValue, target: "opponent" })
+            }
+            manaSpent={state.opponent_mana_spent ?? 0}
+            onAction={(action) => onAction({ ...action, target: "opponent" })}
+            ownerLabel={opponentOwnerLabel(opponentDeckTitle)}
+            isSelf={false}
+            disabled={disabled}
+          />
+        </>
       )}
     </Box>
   );
