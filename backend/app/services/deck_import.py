@@ -130,9 +130,19 @@ async def resolve_entries(
             continue  # everything in this chunk falls through to `missing` below
 
         for card in result.get("data", []):
-            matches = by_printing.get(
-                (card.get("set", "").lower(), card.get("collector_number", "")), []
-            ) + by_name.get(card.get("name", "").lower(), [])
+            # Scryfall always returns the combined "Front // Back" name for
+            # split/adventure/MDFC/transform cards, even when queried by the
+            # front face alone (the way decklists normally spell them) - fall
+            # back to matching on the front face so those cards resolve.
+            full_name = card.get("name", "").lower()
+            front_name = full_name.split(" // ")[0]
+            matches = (
+                by_printing.get(
+                    (card.get("set", "").lower(), card.get("collector_number", "")), []
+                )
+                + by_name.get(full_name, [])
+                + by_name.get(front_name, [])
+            )
             for entry in matches:
                 if id(entry) in resolved_entry_ids:
                     continue

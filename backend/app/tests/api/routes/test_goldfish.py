@@ -4,6 +4,7 @@ from app.main import app
 from app.api.deps import get_current_user
 from app.models.user import User
 from httpx import AsyncClient
+from sqlalchemy import text
 
 
 async def _make_user_and_deck(client: AsyncClient, db_session, email: str, sub: str):
@@ -42,6 +43,40 @@ async def test_create_and_list_sessions(client: AsyncClient, db_session) -> None
     sessions = list_res.json()
     assert len(sessions) == 1
     assert sessions[0]["id"] == session_data["id"]
+
+
+@pytest.mark.asyncio
+async def test_delete_deck_with_goldfish_session_cascades(
+    client: AsyncClient, db_session
+) -> None:
+    """
+    Regression test: deck_id/opponent_deck_id had no ON DELETE rule, so
+    Postgres's default RESTRICT turned deleting any deck with a practice
+    session into an unhandled IntegrityError (500) instead of cascading.
+    The test DB is SQLite, which ignores FK constraints unless explicitly
+    turned on per-connection - do that here (scoped to this test's own
+    connection) so the assertion actually exercises ondelete=CASCADE
+    instead of trivially passing because nothing enforces the FK.
+    """
+    await db_session.execute(text("PRAGMA foreign_keys=ON"))
+
+    _user, deck_id = await _make_user_and_deck(
+        client, db_session, "goldfish_delete@example.com", "gf_sub_delete"
+    )
+    session_res = await client.post(
+        f"{settings.API_V1_STR}/goldfish/sessions",
+        json={"deck_id": deck_id, "name": "To be orphaned"},
+    )
+    assert session_res.status_code == 200
+    session_id = session_res.json()["id"]
+
+    delete_res = await client.delete(f"{settings.API_V1_STR}/decks/{deck_id}")
+    assert delete_res.status_code == 200
+
+    list_res = await client.get(
+        f"{settings.API_V1_STR}/goldfish/sessions", params={"deck_id": deck_id}
+    )
+    assert session_id not in [s["id"] for s in list_res.json()]
 
 
 @pytest.mark.asyncio

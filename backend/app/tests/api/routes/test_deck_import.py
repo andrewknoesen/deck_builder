@@ -174,6 +174,30 @@ async def test_import_deck_partial_failure_reports_missing_cards(
 
 
 @pytest.mark.asyncio
+async def test_import_deck_resolves_adventure_card_by_front_face(
+    client: AsyncClient, db_session
+):
+    """
+    Regression test: Scryfall's /cards/collection always returns adventure/
+    split/MDFC cards under their combined "Front // Back" name, even when
+    queried by the front face alone (the way decklists spell them, e.g.
+    "Sagu Wildling" for "Sagu Wildling // Roost Seek"). Resolution must fall
+    back to matching on the front face or these cards get reported missing.
+    """
+    mock = _collection_mock(
+        {"sagu wildling": _card("sagu-1", "Sagu Wildling // Roost Seek")}
+    )
+    app.dependency_overrides[get_scryfall_service] = lambda: mock
+    await _create_user(db_session)
+
+    resp = await client.post("/api/v1/decks/import", json={"text": "2 Sagu Wildling"})
+    app.dependency_overrides.clear()
+
+    assert resp.status_code == 200
+    assert resp.json()["missing_cards"] == []
+
+
+@pytest.mark.asyncio
 async def test_import_deck_scryfall_error_still_reports_missing_not_500(
     client: AsyncClient, db_session
 ):

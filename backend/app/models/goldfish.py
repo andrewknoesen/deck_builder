@@ -68,11 +68,11 @@ class GoldfishActionIn(BaseModel):
 
 
 class GoldfishSessionBase(SQLModel):
-    deck_id: int = Field(foreign_key="deck.id", index=True)
+    deck_id: int = Field(foreign_key="deck.id", index=True, ondelete="CASCADE")
     user_id: int = Field(foreign_key="user.id", index=True)
     name: str
     opponent_deck_id: Optional[int] = Field(
-        default=None, foreign_key="deck.id", index=True
+        default=None, foreign_key="deck.id", index=True, ondelete="SET NULL"
     )
     # Manual, session-level, freely editable outcome (Phase 7) — not tied to
     # any specific tree branch/node, since a session's tree can have multiple
@@ -101,7 +101,9 @@ class GoldfishSessionPublic(GoldfishSessionBase):
 
 
 class GoldfishNodeBase(SQLModel):
-    session_id: int = Field(foreign_key="goldfishsession.id", index=True)
+    session_id: int = Field(
+        foreign_key="goldfishsession.id", index=True, ondelete="CASCADE"
+    )
     parent_id: Optional[int] = Field(
         default=None, foreign_key="goldfishnode.id", index=True
     )
