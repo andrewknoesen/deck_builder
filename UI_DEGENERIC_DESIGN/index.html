@@ -1,0 +1,1146 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Central docs index for the MTG deck_builder project — architecture, subsystem design docs, and how to expand the project.">
+      
+      
+      
+        <link rel="canonical" href="https://andrewknoesen.github.io/deck_builder/UI_DEGENERIC_DESIGN/">
+      
+      
+        <link rel="prev" href="../rules_ingestion_guide/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>UI de-genericizing (implemented) - deck_builder docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#de-genericizing-the-ui-why-it-still-reads-ai-generated" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="deck_builder docs" class="md-header__button md-logo" aria-label="deck_builder docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            deck_builder docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              UI de-genericizing (implemented)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/andrewknoesen/deck_builder" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    andrewknoesen/deck_builder
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="deck_builder docs" class="md-nav__button md-logo" aria-label="deck_builder docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    deck_builder docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/andrewknoesen/deck_builder" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    andrewknoesen/deck_builder
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI / MCP
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    AI / MCP
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp_server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subsystem design docs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Subsystem design docs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DECK_IMPORT_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deck import
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deck_statistics_spec/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deck statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../auth_specs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Auth (not implemented)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design_rulings_agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rulings agent (superseded)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rules_ingestion_pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rules ingestion pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rules_ingestion_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rules ingestion guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI de-genericizing (implemented)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI de-genericizing (implemented)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-this-matters-here-specifically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this matters here specifically
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-four-tells-and-where-this-codebase-has-each-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The four tells, and where this codebase has each one
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The four tells, and where this codebase has each one">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-font-fixed-2026-08-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Font — ✅ fixed, 2026-08-06
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-layout-fixed-2026-08-06-landing-page-2026-08-23-rest-of-the-app-item-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Layout — ✅ fixed, 2026-08-06 (landing page) + 2026-08-23 (rest of the app, item 4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-copy-fixed-2026-08-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Copy — ✅ fixed, 2026-08-06
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-color-deliberately-overridden-still-not-the-tell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Color — ✅ deliberately overridden, still not the tell
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-generic-is-not-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What "generic" is not, here
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suggested-order-of-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suggested order of work
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sources
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-this-matters-here-specifically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this matters here specifically
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-four-tells-and-where-this-codebase-has-each-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The four tells, and where this codebase has each one
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The four tells, and where this codebase has each one">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-font-fixed-2026-08-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Font — ✅ fixed, 2026-08-06
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-layout-fixed-2026-08-06-landing-page-2026-08-23-rest-of-the-app-item-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Layout — ✅ fixed, 2026-08-06 (landing page) + 2026-08-23 (rest of the app, item 4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-copy-fixed-2026-08-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Copy — ✅ fixed, 2026-08-06
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-color-deliberately-overridden-still-not-the-tell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Color — ✅ deliberately overridden, still not the tell
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-generic-is-not-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What "generic" is not, here
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suggested-order-of-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suggested order of work
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sources
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/andrewknoesen/deck_builder/edit/main/docs/UI_DEGENERIC_DESIGN.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="de-genericizing-the-ui-why-it-still-reads-ai-generated">De-genericizing the UI: why it still reads "AI-generated"<a class="headerlink" href="#de-genericizing-the-ui-why-it-still-reads-ai-generated" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Status: fully implemented (2026-08-23).</strong> Items 1-3 (font, landing-page layout, landing-page
+copy) were fixed in <a href="https://github.com/andrewknoesen/deck_builder/commit/0b8f770"><code>0b8f770</code></a>
+(2026-08-06, reviewed by <code>mtg-ux</code>/<code>mtg-em</code>). Item 4 (extending bespoke glyph icons to the rest of
+the app) shipped 2026-08-23 via <code>mtg-frontend</code> — see <code>MEMORY.md</code>'s Phase 11 for the full record.
+All four findings closed; no open items remain from this audit.</p>
+</blockquote>
+<p>Audit date: 2026-08-06. Scope: <code>frontend/src/pages/LandingPage.tsx</code> + <code>frontend/src/theme.ts</code>,
+extrapolated to the rest of the app's component patterns (<code>DeckBuilder</code>, <code>AgentChat</code>,
+<code>Collection</code>, <code>DeckList</code>). Triggered by
+<a href="https://github.com/andrewknoesen/deck_builder/commit/f4b67ff">f4b67ff</a> (the warm/gold palette
+work) — the palette fix was real progress, but it's one of four tells, and the other three are
+untouched.</p>
+<h2 id="why-this-matters-here-specifically">Why this matters here specifically<a class="headerlink" href="#why-this-matters-here-specifically" title="Permanent link">&para;</a></h2>
+<p>The "AI slop" look isn't really about any single choice being <em>bad</em> — Inter is a fine font,
+gold-on-black is a good palette, three feature bullets is a reasonable IA. It's that every choice
+is the <strong>statistically safest default</strong>, so the product reads as <em>a</em> SaaS tool rather than <em>this</em>
+SaaS tool. For an MTG deck builder, that's a wasted opportunity: Magic has 30 years of extremely
+specific, recognizable visual language (mana symbols, card frames, set symbols, foil texture,
+rarity gems) that no generic AI output would ever reach for on its own, because it isn't in the
+median of "landing page" training data. Leaning on that domain vocabulary is the cheapest way to
+stop looking generic, because a competitor's AI-assisted clone literally cannot default into it.</p>
+<h2 id="the-four-tells-and-where-this-codebase-has-each-one">The four tells, and where this codebase has each one<a class="headerlink" href="#the-four-tells-and-where-this-codebase-has-each-one" title="Permanent link">&para;</a></h2>
+<p>Cross-referenced against multiple 2025–2026 write-ups on why AI-generated UI converges
+(<a href="https://smoothui.dev/blog/ai-design-slop">SmoothUI</a>,
+<a href="https://www.925studios.co/blog/ai-slop-design-tells">925 Studios</a>,
+<a href="https://superdesign.dev/blog/why-ai-design-looks-generic">Superdesign</a>,
+<a href="https://www.braingrid.ai/blog/design-system-optimized-for-ai-coding">BrainGrid</a>) — they
+converge on the same four fingerprints. Below, each is graded against what's actually in this repo.</p>
+<h3 id="1-font-fixed-2026-08-06">1. Font — ✅ fixed, 2026-08-06<a class="headerlink" href="#1-font-fixed-2026-08-06" title="Permanent link">&para;</a></h3>
+<p><code>theme.ts</code> now sets <code>h1</code>-<code>h4</code> to <code>"Besley", serif</code>, keeping Inter only for body/UI chrome — exactly
+the fix suggested below. Original finding kept for context:</p>
+<p><div class="highlight"><pre><span></span><code><span class="nx">fontFamily</span><span class="o">:</span><span class="w"> </span><span class="s1">'"Inter", "Roboto", "Helvetica", "Arial", sans-serif'</span><span class="p">,</span>
+</code></pre></div>
+This is the single most-cited tell. Inter is "the most-used interface font in [an LLM's] training
+data" — using it undifferentiated, with the stock MUI fallback stack behind it, is the
+typographic equivalent of not making a choice at all. The color work in <code>theme.ts</code> has a
+paragraph of deliberate reasoning behind it (OKLCH, WCAG contrast, "not Tailwind's stock
+Slate scale"); the font has zero.</p>
+<p><strong>Fix:</strong> pick a display face for headlines that has actual character — MTG's own branding leans
+on serif/slab display faces for card names and set text (think the weight of card-frame
+typography, not a SaaS dashboard). Keep Inter or similar for body/UI chrome where legibility at
+small sizes matters, but stop using it for <code>h1</code>–<code>h3</code>. This alone changes the landing page's
+silhouette more than any other single fix.</p>
+<h3 id="2-layout-fixed-2026-08-06-landing-page-2026-08-23-rest-of-the-app-item-4">2. Layout — ✅ fixed, 2026-08-06 (landing page) + 2026-08-23 (rest of the app, item 4)<a class="headerlink" href="#2-layout-fixed-2026-08-06-landing-page-2026-08-23-rest-of-the-app-item-4" title="Permanent link">&para;</a></h3>
+<p>The landing page uses an asymmetric primary-feature/paired-row/illustrated-row layout with live
+Scryfall card art and five bespoke glyph icons (<code>CardGlyphIcon</code>, <code>ManaCurveGlyphIcon</code>,
+<code>CardStackGlyphIcon</code>, <code>BinderGlyphIcon</code>, <code>BranchGlyphIcon</code>), no sparkle emoji. <code>DeckBuilder</code>,
+<code>Collection</code>, and <code>DeckList</code> now reuse those same glyphs for their feature/concept icons instead
+of stock Material icons (see item 4 in "Suggested order of work" below for the exact mapping).
+Original finding kept for context — this described the pre-fix layout:</p>
+<p><code>LandingPage.tsx</code> (rendered, see screenshot evidence below) was, structurally:
+- Centered hero: giant bold headline with one word in accent color, one line of gray subtext,
+  divider.
+- One "hero card": sparkle icon (✨) → bold heading → two lines of gray body copy → pill CTA
+  button with a trailing arrow.
+- Three feature rows: generic thin-line icon → bold one-line heading → one line of gray
+  description → divider. (<code>Your Decks</code>, <code>Collection</code>, <code>Practice Mode</code>.)</p>
+<p>This is, near-verbatim, the pattern named in every source above: "three cards, each with an icon,
+a heading, and two lines of text," "a bounce on every hover," generic pill CTAs with arrows. It's
+implemented as a vertical list instead of a horizontal card row, which hides it at first glance,
+but it's the same information architecture.</p>
+<p><strong>Fix:</strong> break the symmetry. Options, roughly in order of effort:
+- Give the three features <em>unequal</em> visual weight instead of identical icon+heading+line rows —
+  e.g. one gets a real screenshot/mini-demo, the other two stay text.
+  Asymmetry is called out specifically as the fix for the "three-card" tell.
+  - Replace the sparkle emoji with something MTG-specific — a mana symbol, a stylized card
+  silhouette, a set-symbol-style glyph. ✨ is itself a cliché "AI magic" signifier and reads as
+  doubly generic here.
+- Use actual card art (Scryfall images the app already has access to) as background/texture in
+  the hero instead of flat <code>#110c07</code>. Right now the hero is compositionally identical to any
+  B2B SaaS landing page with the copy swapped out.</p>
+<h3 id="3-copy-fixed-2026-08-06">3. Copy — ✅ fixed, 2026-08-06<a class="headerlink" href="#3-copy-fixed-2026-08-06" title="Permanent link">&para;</a></h3>
+<p>The landing page headline is now "Goldfish your list before you sleeve it up" with a subhead
+citing real, falsifiable mechanics ("hypergeometric draw-odds instead of a rule of thumb") —
+almost exactly the fix suggested below, including the MTG-native phrasing example. Original
+finding kept for context — this described the pre-fix copy:</p>
+<p>"Build decks that actually win." / "Start Brewing" / "no guesswork" / "Instant card search with
+live previews." Every one of these lines could be true of a different product with a find-and-replace
+of nouns. This is what the SmoothUI/925 Studios pieces call "weightless headline copy" — the tell
+isn't grammatical, it's that nothing in the sentence is falsifiable or specific to <em>this</em> tool.</p>
+<p><strong>Fix:</strong> replace generic claims with specifics only this app can say — an actual number
+(cards indexed, rules ingested, formats supported), a real mechanic ("hypergeometric draw-odds,
+not a rule of thumb"), or MTG-native language a player would actually use ("goldfish your list
+before you sleeve it up" instead of "stress-test decks"). The existing subhead
+("real Scryfall data, real mana-curve math, no guesswork") is already halfway there — "real
+Scryfall data" is specific; "no guesswork" is filler. Cut the filler half.</p>
+<h3 id="4-color-deliberately-overridden-still-not-the-tell">4. Color — ✅ deliberately overridden, still not the tell<a class="headerlink" href="#4-color-deliberately-overridden-still-not-the-tell" title="Permanent link">&para;</a></h3>
+<p><strong>Update, 2026-08-06:</strong> the original gold-on-warm-black palette was replaced with a dark slate
+theme at the product owner's explicit request (personal preference — the gold/red/green combo
+read as "neon," not an AI-slop finding). Current values live in <code>theme.ts:10-33</code>: a muted
+steel-blue accent (<code>#5b7fa3</code>) on cool near-black neutrals (<code>#12151a</code>/<code>#1a1e25</code>), with desaturated
+danger/success colors. This does <strong>not</strong> reopen the color tell. The tell named in the sources
+below is specifically <em>unmodified Tailwind defaults with zero justification</em> — indigo-to-purple
+gradients, raw <code>indigo-500</code>, decorative rather than functional color use. A considered, documented,
+non-purple, non-gradient accent on neutral slate isn't that, even though the earlier version of
+this doc used "slate" as shorthand for the generic case. The things to keep watching for as this
+palette gets implemented:
+- Don't let the accent drift toward indigo/purple or reintroduce a gradient.
+- Keep it non-decorative — accent color still gated to primary actions/selection state only.
+- Keep the "why" comment in <code>theme.ts</code> current (it already documents this change) — that inline
+  justification is the actual anti-generic discipline here, independent of which hue is chosen.</p>
+<h2 id="what-generic-is-not-here">What "generic" is not, here<a class="headerlink" href="#what-generic-is-not-here" title="Permanent link">&para;</a></h2>
+<p>Two things worth being explicit about so this doc doesn't get over-applied:
+- <strong>Sharp (non-rounded) <code>MuiCard</code> panels vs. rounded buttons</strong> (<code>theme.ts:53,61</code>) is already a
+  deliberate, documented asymmetry — don't "fix" it by rounding everything to match, that would
+  be reverting toward the default, not away from it.
+- Dark mode + a single accent color is not itself a tell. Purple/indigo specifically is the tell,
+  because it's Tailwind's <code>indigo-500</code> default. Gold was fine; the current muted steel-blue is
+  fine too — see the color update in item 4 above.</p>
+<h2 id="suggested-order-of-work">Suggested order of work<a class="headerlink" href="#suggested-order-of-work" title="Permanent link">&para;</a></h2>
+<ol>
+<li>✅ <strong>Done, 2026-08-06.</strong> Typography pass (<code>theme.ts</code> font stack + a scale that isn't MUI
+   defaults) — highest visual impact for the effort, touches every page at once via the theme.</li>
+<li>✅ <strong>Done, 2026-08-06.</strong> Landing page hero/feature-section rewrite — asymmetric layout,
+   card-art texture, kill the sparkle emoji, MTG-specific iconography.</li>
+<li>✅ <strong>Done, 2026-08-06.</strong> Copy pass across <code>LandingPage.tsx</code> — can happen in parallel with (2),
+   same file.</li>
+<li>✅ <strong>Done, 2026-08-23.</strong> Spot-checked <code>DeckBuilder</code>, <code>Collection</code>, <code>DeckList</code> and swapped their
+   feature/concept icons for the existing bespoke glyphs: <code>BarChartIcon</code>→<code>ManaCurveGlyphIcon</code>
+   (Stats tab), <code>SportsEsportsIcon</code>→<code>BranchGlyphIcon</code> (Practice Mode button),
+   <code>GridViewIcon</code>→<code>CardStackGlyphIcon</code> (empty-deck state), <code>CollectionsIcon</code>→<code>BinderGlyphIcon</code>
+   (Collection header + empty state), <code>AutoStoriesIcon</code>/<code>LayersIcon</code>→<code>CardStackGlyphIcon</code> (deck
+   list title + empty state). Functional UI chrome (back/add/upload/chevron arrows) was
+   deliberately left alone — conventional affordances, not the tell. <code>SmartToyIcon</code> (AI
+   Advisor/AI Rules Judge, in both <code>DeckBuilder.tsx</code> and <code>AgentChat.tsx</code>) was also deliberately
+   left alone: it's an accurate literal label for "this is an AI feature," not a lazy generic
+   default — no MTG-flavored replacement was created for it, and none is required.</li>
+</ol>
+<p>Route this to <code>mtg-ux</code> for the actual visual/interaction redesign and <code>mtg-frontend</code> for
+implementation, per the existing subagent split in <code>CLAUDE.md</code>.</p>
+<h2 id="sources">Sources<a class="headerlink" href="#sources" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="https://smoothui.dev/blog/ai-design-slop">AI Design Slop: Why AI-Generated UI Looks Generic — and the Fix (SmoothUI)</a></li>
+<li><a href="https://www.925studios.co/blog/ai-slop-design-tells">AI Slop Fonts and Gradients: The Tells That Give Away AI Design (925 Studios)</a></li>
+<li><a href="https://superdesign.dev/blog/why-ai-design-looks-generic">Why AI Design Looks Generic (Superdesign)</a></li>
+<li><a href="https://www.braingrid.ai/blog/design-system-optimized-for-ai-coding">Design Systems for AI Coding: Stop Getting Purple Gradients (BrainGrid)</a></li>
+<li><a href="https://medium.com/@cssamithpitigala/why-ai-generated-ui-looks-good-but-often-feels-generic-020a9b1b8492">Why AI-Generated UI Looks Good But Often Feels Generic (Medium)</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "content.action.edit", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

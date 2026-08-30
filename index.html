@@ -1,0 +1,1077 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Central docs index for the MTG deck_builder project — architecture, subsystem design docs, and how to expand the project.">
+      
+      
+      
+        <link rel="canonical" href="https://andrewknoesen.github.io/deck_builder/">
+      
+      
+      
+        <link rel="next" href="ARCHITECTURE/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>deck_builder docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#deck_builder-docs-index" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="." title="deck_builder docs" class="md-header__button md-logo" aria-label="deck_builder docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            deck_builder docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Home
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/andrewknoesen/deck_builder" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    andrewknoesen/deck_builder
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="." title="deck_builder docs" class="md-nav__button md-logo" aria-label="deck_builder docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    deck_builder docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/andrewknoesen/deck_builder" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    andrewknoesen/deck_builder
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="." class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#start-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start here
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-this-project-makes-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How this project makes decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture-and-current-apidata-model-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture and current API/data-model shape
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subsystem-design-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subsystem design docs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exploring-the-codebase-structurally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exploring the codebase structurally
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-subagent-team" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The subagent team
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#expanding-this-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expanding this project
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI / MCP
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    AI / MCP
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mcp_server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subsystem design docs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Subsystem design docs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="DECK_IMPORT_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deck import
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="deck_statistics_spec/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deck statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="auth_specs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Auth (not implemented)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="design_rulings_agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rulings agent (superseded)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="rules_ingestion_pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rules ingestion pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="rules_ingestion_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rules ingestion guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="UI_DEGENERIC_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI de-genericizing (implemented)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#start-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start here
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-this-project-makes-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How this project makes decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture-and-current-apidata-model-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture and current API/data-model shape
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subsystem-design-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subsystem design docs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exploring-the-codebase-structurally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exploring the codebase structurally
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-subagent-team" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The subagent team
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#expanding-this-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expanding this project
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/andrewknoesen/deck_builder/edit/main/docs/README.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="deck_builder-docs-index">deck_builder docs index<a class="headerlink" href="#deck_builder-docs-index" title="Permanent link">&para;</a></h1>
+<p>Also published as a hosted site via <a href="https://www.mkdocs.org/">mkdocs</a> + Material
+(<code>mkdocs.yml</code> at the repo root, deployed by <code>.github/workflows/docs.yml</code> on every push to <code>main</code>
+that touches <code>docs/**</code>) — this file is that site's homepage either way, so reading it here or on
+the hosted site is the same content.</p>
+<p>This is the central entry point for every doc in this repo — agents and developers alike should
+be able to find what they need starting here, without already knowing a file exists. If you add a
+new persistent doc anywhere in the repo (<code>docs/*.md</code>, a new subdirectory <code>README.md</code>, a new
+<code>.claude/agents/*.md</code>), link it from here as part of that phase's Concrete Steps — see
+<code>CLAUDE.md</code>'s <code>## Documentation</code> section.</p>
+<h2 id="start-here">Start here<a class="headerlink" href="#start-here" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Read root <a href="https://github.com/andrewknoesen/deck_builder/blob/main/CLAUDE.md"><code>CLAUDE.md</code></a>
+   first.</strong> Agents already do this automatically (it's
+   loaded into every session and subagent) — human developers should read it manually, since it
+   holds the project overview, directory tree, dev setup, and key conventions that everything else
+   here assumes.</li>
+<li><strong>Then this page</strong> for everything CLAUDE.md doesn't hold: architecture detail, subsystem design
+   docs, and how decisions actually get made on this project.</li>
+</ol>
+<h2 id="how-this-project-makes-decisions">How this project makes decisions<a class="headerlink" href="#how-this-project-makes-decisions" title="Permanent link">&para;</a></h2>
+<p><code>PLAN.md</code> is the live planning tool and single source of truth for project status — what's
+shipped, what's in progress, what's deferred, and why. It is <strong>not summarized here on purpose</strong>:
+<code>PLAN.md</code>'s own Status section explicitly refuses to characterize or summarize its own history,
+because every attempt at that has itself introduced drift or overclaiming. Read <code>PLAN.md</code> directly
+— start with its Status section at the top, then follow its pointer into
+<a href="https://github.com/andrewknoesen/deck_builder/blob/main/MEMORY.md"><code>MEMORY.md</code></a> for the phase you
+care about. <code>PLAN.md</code> deliberately stays lean (current summary + what's still actionable);
+<code>MEMORY.md</code> holds the full per-phase history (Why/Ground truth/Design/Interview outcome/Concrete
+steps/Shipped writeups) so <code>PLAN.md</code> doesn't have to.</p>
+<p>The short version of the process, if you're about to start new work: anything crossing more than
+one layer (backend+frontend, or a new backend subsystem) gets a design pass from <code>mtg-architect</code>
+first, real open questions get resolved via a product-owner interview before any code is written,
+and every shipped phase gets a "Shipped" writeup in <code>MEMORY.md</code> recording what actually happened
+(including deviations from the plan) — not just a checkbox.</p>
+<h2 id="architecture-and-current-apidata-model-shape">Architecture and current API/data-model shape<a class="headerlink" href="#architecture-and-current-apidata-model-shape" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong><a href="ARCHITECTURE/"><code>ARCHITECTURE.md</code></a></strong> — the real, current shape: layer overview, the full API
+  table (every router/endpoint), auth status, and an explicit "what's not built yet" list kept
+  current on purpose. Start here for "how does this actually work today."</li>
+<li><strong><a href="https://github.com/andrewknoesen/deck_builder/blob/main/backend/app/ai/README.md"><code>backend/app/ai/README.md</code></a></strong>
+  — the AI/agent layer in detail: directory structure, each agent, each tool, RAG modules,
+  ingestion scripts, and the MCP server.</li>
+<li><strong><a href="https://github.com/andrewknoesen/deck_builder/blob/main/frontend/README.md"><code>frontend/README.md</code></a></strong>
+  / <strong><a href="https://github.com/andrewknoesen/deck_builder/blob/main/backend/README.md"><code>backend/README.md</code></a></strong>
+  — per-package dev notes.</li>
+</ul>
+<h2 id="subsystem-design-docs">Subsystem design docs<a class="headerlink" href="#subsystem-design-docs" title="Permanent link">&para;</a></h2>
+<p>Each of these is a point-in-time design or audit document, not a live reference — check its status
+banner before trusting its details over the actual code:</p>
+<table>
+<thead>
+<tr>
+<th>Doc</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="mcp_server/"><code>mcp_server.md</code></a></td>
+<td>Current — matches the shipped Phase 9 implementation.</td>
+</tr>
+<tr>
+<td><a href="DECK_IMPORT_DESIGN/"><code>DECK_IMPORT_DESIGN.md</code></a></td>
+<td>Implemented, with one noted refinement.</td>
+</tr>
+<tr>
+<td><a href="deck_statistics_spec/"><code>deck_statistics_spec.md</code></a></td>
+<td>Implemented — treat as the math reference.</td>
+</tr>
+<tr>
+<td><a href="auth_specs/"><code>auth_specs.md</code></a></td>
+<td>Not implemented — describes the intended design only.</td>
+</tr>
+<tr>
+<td><a href="design_rulings_agent/"><code>design_rulings_agent.md</code></a></td>
+<td>Superseded — kept for historical context.</td>
+</tr>
+<tr>
+<td><a href="rules_ingestion_pipeline/"><code>rules_ingestion_pipeline.md</code></a></td>
+<td>Directionally accurate, some details drifted.</td>
+</tr>
+<tr>
+<td><a href="rules_ingestion_guide/"><code>rules_ingestion_guide.md</code></a></td>
+<td>Directionally accurate, some details drifted.</td>
+</tr>
+<tr>
+<td><a href="UI_DEGENERIC_DESIGN/"><code>UI_DEGENERIC_DESIGN.md</code></a></td>
+<td>Fully implemented — all 4 findings fixed.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="exploring-the-codebase-structurally">Exploring the codebase structurally<a class="headerlink" href="#exploring-the-codebase-structurally" title="Permanent link">&para;</a></h2>
+<p>For "what connects to what" questions (god nodes, community structure, cross-file relationships),
+use <code>graphify</code> rather than raw grepping — it returns a scoped subgraph, usually much smaller than
+reading source directly:</p>
+<ul>
+<li><code>graphify query "&lt;question&gt;"</code>, <code>graphify path "&lt;A&gt;" "&lt;B&gt;"</code>, <code>graphify explain "&lt;concept&gt;"</code> —
+  the fastest way to answer a specific structural question.</li>
+<li><code>graphify-out/wiki/index.md</code> (local path, not a link here — it's gitignored, regenerated
+  locally, not checked into the repo or this hosted site) — a generated wiki (one article per
+  detected community) for broad navigation, if you're exploring rather than asking a specific
+  question. If it's missing, run <code>graphify update .</code> then <code>graphify export wiki</code>.</li>
+<li><a href="https://github.com/andrewknoesen/deck_builder/blob/main/graphify-out/GRAPH_REPORT.md"><code>graphify-out/GRAPH_REPORT.md</code></a>
+  — broad architecture review, for when query/path/explain don't surface enough context.</li>
+<li>After modifying code, run <code>graphify update .</code> to keep the graph current.</li>
+</ul>
+<p>See <code>CLAUDE.md</code>'s <code>## graphify</code> section for the full rules.</p>
+<h2 id="the-subagent-team">The subagent team<a class="headerlink" href="#the-subagent-team" title="Permanent link">&para;</a></h2>
+<p><code>.claude/agents/*.md</code> defines this project's specialist subagents (backend, frontend, AI, devops,
+integrations, maths, QA, UX, EM, architect) — Claude dispatches to the right one(s) automatically.
+See <code>CLAUDE.md</code>'s "Subagent roster" section for the current list and each agent's scope; see the
+individual <code>.claude/agents/&lt;name&gt;.md</code> file for that agent's actual grounding and standards.</p>
+<h2 id="expanding-this-project">Expanding this project<a class="headerlink" href="#expanding-this-project" title="Permanent link">&para;</a></h2>
+<p>This is the actual answer to "how do I add something new here":</p>
+<ol>
+<li>Read <code>PLAN.md</code>'s Status section to see what's already shipped, in progress, or deliberately
+   deferred — don't duplicate or conflict with something already decided. Follow into <code>MEMORY.md</code>
+   for the full reasoning behind any past decision that's relevant to what you're about to build.</li>
+<li>If the change crosses more than one layer, or isn't obviously a one-file change, start with a
+   design pass from <code>mtg-architect</code> (read-only — it hands off implementation, doesn't do it).</li>
+<li>Resolve any real open questions via a product-owner interview before writing code — this
+   project's convention is to decide ambiguity explicitly, not guess and hope.</li>
+<li>Route implementation to the specialist(s) whose scope matches the change (see "The subagent
+   team" above).</li>
+<li>Once shipped: add a "Shipped" writeup to <code>MEMORY.md</code> (what was built, any deviation from the
+   plan, how it was verified), a one-paragraph pointer to it in <code>PLAN.md</code>'s Status section, and
+   link any new persistent doc file from this page.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.instant", "navigation.tracking", "content.action.edit", "content.code.copy"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
