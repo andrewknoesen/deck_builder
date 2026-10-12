@@ -1,0 +1,1733 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Central docs index for the MTG deck_builder project — architecture, subsystem design docs, and how to expand the project.">
+      
+      
+      
+        <link rel="canonical" href="https://andrewknoesen.github.io/deck_builder/deck_statistics_spec/">
+      
+      
+        <link rel="prev" href="../DECK_IMPORT_DESIGN/">
+      
+      
+        <link rel="next" href="../auth_specs/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Deck statistics - deck_builder docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#mtg-deck-statistics-specification" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="deck_builder docs" class="md-header__button md-logo" aria-label="deck_builder docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            deck_builder docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Deck statistics
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/andrewknoesen/deck_builder" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    andrewknoesen/deck_builder
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="deck_builder docs" class="md-nav__button md-logo" aria-label="deck_builder docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    deck_builder docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/andrewknoesen/deck_builder" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    andrewknoesen/deck_builder
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI / MCP
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    AI / MCP
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp_server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subsystem design docs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Subsystem design docs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DECK_IMPORT_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deck import
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deck statistics
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deck statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-mana-curve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Mana Curve
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Mana Curve">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backend-response-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend Response Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-color-distribution-pip-count-vs-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Color Distribution (Pip Count vs. Sources)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Color Distribution (Pip Count vs. Sources)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-colored-pips-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. Colored Pips (Requirements)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-mana-sources-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Mana Sources (Production)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backend-response-schema_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend Response Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c-recommended-sources-karstens-heuristic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C. Recommended Sources (Karsten's Heuristic)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="C. Recommended Sources (Karsten&#39;s Heuristic)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#lookup-table-simplified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lookup Table (Simplified)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backend-response-schema_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend Response Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-land-count-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Land Count Recommendations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Land Count Recommendations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#heuristic-frank-karstens-formula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heuristic (Frank Karsten's Formula)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Heuristic (Frank Karsten&#39;s Formula)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#standard-60-card-constructed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standard / 60-Card Constructed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#commander-99-card-constructed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commander / 99-Card Constructed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#algorithm_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backend-response-schema_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend Response Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-draw-probability-hypergeometric-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Draw Probability (Hypergeometric Distribution)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Draw Probability (Hypergeometric Distribution)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#formula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formula
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-scenarios-to-calculate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Scenarios to Calculate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backend-response-schema_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend Response Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-proposed-backend-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Proposed Backend Implementation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Proposed Backend Implementation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Location
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-library" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python Library
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-endpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Endpoint
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="API Endpoint">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-response-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Response Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../auth_specs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Auth (not implemented)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design_rulings_agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rulings agent (superseded)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rules_ingestion_pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rules ingestion pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rules_ingestion_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rules ingestion guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UI_DEGENERIC_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI de-genericizing (implemented)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-mana-curve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Mana Curve
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Mana Curve">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backend-response-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend Response Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-color-distribution-pip-count-vs-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Color Distribution (Pip Count vs. Sources)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Color Distribution (Pip Count vs. Sources)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-colored-pips-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. Colored Pips (Requirements)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-mana-sources-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Mana Sources (Production)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backend-response-schema_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend Response Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c-recommended-sources-karstens-heuristic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C. Recommended Sources (Karsten's Heuristic)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="C. Recommended Sources (Karsten&#39;s Heuristic)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#lookup-table-simplified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lookup Table (Simplified)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backend-response-schema_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend Response Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-land-count-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Land Count Recommendations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Land Count Recommendations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#heuristic-frank-karstens-formula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heuristic (Frank Karsten's Formula)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Heuristic (Frank Karsten&#39;s Formula)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#standard-60-card-constructed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standard / 60-Card Constructed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#commander-99-card-constructed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commander / 99-Card Constructed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#algorithm_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backend-response-schema_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend Response Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-draw-probability-hypergeometric-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Draw Probability (Hypergeometric Distribution)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Draw Probability (Hypergeometric Distribution)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#formula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formula
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-scenarios-to-calculate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Scenarios to Calculate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backend-response-schema_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend Response Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-proposed-backend-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Proposed Backend Implementation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Proposed Backend Implementation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Location
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-library" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python Library
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-endpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Endpoint
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="API Endpoint">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-response-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Response Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/andrewknoesen/deck_builder/edit/main/docs/deck_statistics_spec.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="mtg-deck-statistics-specification">MTG Deck Statistics Specification<a class="headerlink" href="#mtg-deck-statistics-specification" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Status: implemented (2026-07-08).</strong> The formulas here (mana curve, pip counts, Karsten's
+heuristic for recommended sources, draw-probability odds) match
+<code>backend/app/services/stats.py::calculate_stats</code>, exposed via <code>GET /api/v1/decks/{deck_id}/stats</code>.
+Treat this doc as the math reference; the exact response envelope may have drifted slightly —
+check the schema in <code>backend/app/schemas/</code> for the current contract.</p>
+</blockquote>
+<p>This document defines the mathematical formulas, algorithms, and data structures required to implement the "Deck Stats" feature. It is intended for the Backend Engineer (FastAPI) and Frontend Engineer (React).</p>
+<h2 id="1-mana-curve">1. Mana Curve<a class="headerlink" href="#1-mana-curve" title="Permanent link">&para;</a></h2>
+<p><strong>Goal</strong>: Visualize the distribution of mana costs in the deck to assess early-game vs. late-game weight.</p>
+<h3 id="definition">Definition<a class="headerlink" href="#definition" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Filter</strong>: Non-land cards only.</li>
+<li><strong>X-Axis</strong>: Converted Mana Cost (CMC) / Mana Value. Buckets: <code>0</code>, <code>1</code>, <code>2</code>, <code>3</code>, <code>4</code>, <code>5</code>, <code>6</code>, <code>7+</code>.</li>
+<li><strong>Y-Axis</strong>: Count of cards.</li>
+</ul>
+<h3 id="algorithm">Algorithm<a class="headerlink" href="#algorithm" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Iterate through all cards in the deck.</li>
+<li>Skip lands (<code>card.type_line</code> contains "Land" -- <em>Note: Be careful with Modal Double-Faced Cards, usually check front face</em>).</li>
+<li>Calculate CMC (already available on <code>Card</code> model as <code>mana_cost</code> string converted to number, or <code>cmc</code> field if we add it).</li>
+<li>Increment the count for the corresponding bucket.</li>
+<li>All cards with Cmc &gt;= 7 go into the <code>7+</code> bucket.</li>
+</ol>
+<h3 id="backend-response-schema">Backend Response Schema<a class="headerlink" href="#backend-response-schema" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"mana_curve"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"0"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"1"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"2"</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"3"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"4"</span><span class="p">:</span><span class="w"> </span><span class="mi">6</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"5"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"6"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"7+"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"average_cmc"</span><span class="p">:</span><span class="w"> </span><span class="mf">3.15</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="2-color-distribution-pip-count-vs-sources">2. Color Distribution (Pip Count vs. Sources)<a class="headerlink" href="#2-color-distribution-pip-count-vs-sources" title="Permanent link">&para;</a></h2>
+<p><strong>Goal</strong>: Ensure the deck has enough mana sources of a specific color to cast spells of that color reliably.</p>
+<h3 id="a-colored-pips-requirements">A. Colored Pips (Requirements)<a class="headerlink" href="#a-colored-pips-requirements" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Definition</strong>: The total number of specific colored mana symbols ({W}, {U}, {B}, {R}, {G}) appearing in the mana costs of cards in the deck.</li>
+<li><strong>Algorithm</strong>:<ol>
+<li>Parse the <code>mana_cost</code> string of each card (e.g., <code>{1}{W}{W}</code> has 2 White pips).</li>
+<li>Sum the occurrences of <code>{W}</code>, <code>{U}</code>, <code>{B}</code>, <code>{R}</code>, <code>{G}</code> across all mainboard cards.</li>
+<li>Ignore generic mana <code>{1}</code>, <code>{X}</code>, etc.</li>
+</ol>
+</li>
+</ul>
+<h3 id="b-mana-sources-production">B. Mana Sources (Production)<a class="headerlink" href="#b-mana-sources-production" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Definition</strong>: The count of lands (and artifacts/dorks) that <em>produce</em> specific colors.</li>
+<li><strong>Algorithm</strong>:<ol>
+<li>Iterate through cards.</li>
+<li>Use the <code>produced_mana</code> field (Array of strings, e.g., <code>["W", "U"]</code>).</li>
+<li>Sum unique production capabilities. <em>Heuristic</em>: If a card produces multiple colors (e.g., Command Tower), increment for <em>all</em> those colors.</li>
+</ol>
+</li>
+</ul>
+<h3 id="backend-response-schema_1">Backend Response Schema<a class="headerlink" href="#backend-response-schema_1" title="Permanent link">&para;</a></h3>
+<h3 id="c-recommended-sources-karstens-heuristic">C. Recommended Sources (Karsten's Heuristic)<a class="headerlink" href="#c-recommended-sources-karstens-heuristic" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Goal</strong>: Estimate how many sources of a color are needed to consistently cast spells of that color on curve (90% probability).</li>
+<li><strong>Reference</strong>: Based on Frank Karsten's "How Many Colored Mana Sources Do You Need?"</li>
+<li><strong>Algorithm</strong>:<ol>
+<li>For each color (W, U, B, R, G):</li>
+<li>Identify the "most demanding" card in the deck for that color.</li>
+<li>"Demand" is determined by the specific mana cost symbols and the card's CMC (Turn played).</li>
+<li>Use the table below to find the recommended source count.</li>
+</ol>
+</li>
+</ul>
+<h4 id="lookup-table-simplified">Lookup Table (Simplified)<a class="headerlink" href="#lookup-table-simplified" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Cost Pattern</th>
+<th style="text-align: left;">Example</th>
+<th style="text-align: left;">Turn (CMC)</th>
+<th style="text-align: left;">Rec. Sources (60-Card)</th>
+<th style="text-align: left;">Rec. Sources (Commander)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>{C}</strong></td>
+<td style="text-align: left;">{R}</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">14</td>
+<td style="text-align: left;">23</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>{1}{C}</strong></td>
+<td style="text-align: left;">{1}{R}</td>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">13</td>
+<td style="text-align: left;">20</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>{C}{C}</strong></td>
+<td style="text-align: left;">{R}{R}</td>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">20</td>
+<td style="text-align: left;">33</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>{2}{C}</strong></td>
+<td style="text-align: left;">{2}{R}</td>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">12</td>
+<td style="text-align: left;">19</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>{1}{C}{C}</strong></td>
+<td style="text-align: left;">{1}{R}{R}</td>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">18</td>
+<td style="text-align: left;">29</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>{C}{C}{C}</strong></td>
+<td style="text-align: left;">{R}{R}{R}</td>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">23</td>
+<td style="text-align: left;">38</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>{3}{C}</strong></td>
+<td style="text-align: left;">{3}{R}</td>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">11</td>
+<td style="text-align: left;">18</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>{2}{C}{C}</strong></td>
+<td style="text-align: left;">{2}{R}{R}</td>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">16</td>
+<td style="text-align: left;">26</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Logic</strong>:<ul>
+<li>Iterate all non-land cards.</li>
+<li>For each color, find the max required sources from the table above based on that card's cost.</li>
+<li>Example: A deck has <em>Lightning Bolt</em> ({R}) and <em>Goblin Chainwhirler</em> ({R}{R}{R}).<ul>
+<li>Bolt -&gt; Needs 14.</li>
+<li>Chainwhirler -&gt; Needs 23.</li>
+<li>Max Requirement for Red = 23.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="backend-response-schema_2">Backend Response Schema<a class="headerlink" href="#backend-response-schema_2" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"colors"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"W"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"pips"</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span><span class="w"> </span><span class="nt">"sources"</span><span class="p">:</span><span class="w"> </span><span class="mi">14</span><span class="p">,</span><span class="w"> </span><span class="nt">"recommended_sources"</span><span class="p">:</span><span class="w"> </span><span class="mi">18</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">"U"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"pips"</span><span class="p">:</span><span class="w"> </span><span class="mi">24</span><span class="p">,</span><span class="w"> </span><span class="nt">"sources"</span><span class="p">:</span><span class="w"> </span><span class="mi">18</span><span class="p">,</span><span class="w"> </span><span class="nt">"recommended_sources"</span><span class="p">:</span><span class="w"> </span><span class="mi">18</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">"B"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"pips"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"sources"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"recommended_sources"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">"R"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"pips"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="nt">"sources"</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="nt">"recommended_sources"</span><span class="p">:</span><span class="w"> </span><span class="mi">13</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">"G"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"pips"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"sources"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"recommended_sources"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">"C"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"pips"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="nt">"sources"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="nt">"recommended_sources"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="3-land-count-recommendations">3. Land Count Recommendations<a class="headerlink" href="#3-land-count-recommendations" title="Permanent link">&para;</a></h2>
+<p><strong>Goal</strong>: Suggest an optimal number of lands based on the deck's average CMC.</p>
+<h3 id="heuristic-frank-karstens-formula">Heuristic (Frank Karsten's Formula)<a class="headerlink" href="#heuristic-frank-karstens-formula" title="Permanent link">&para;</a></h3>
+<h4 id="standard-60-card-constructed">Standard / 60-Card Constructed<a class="headerlink" href="#standard-60-card-constructed" title="Permanent link">&para;</a></h4>
+<p><code>Recommended Lands = 16 + 3.14 * AverageCMC</code></p>
+<h4 id="commander-99-card-constructed">Commander / 99-Card Constructed<a class="headerlink" href="#commander-99-card-constructed" title="Permanent link">&para;</a></h4>
+<p><code>Recommended Lands = 31.42 + 3.13 * AverageCMC</code></p>
+<ul>
+<li><strong>Adjustments</strong> (Applied to both):<ul>
+<li><strong>Cheap Ramp</strong>: -0.5 lands per cheap ramp spell (CMC &lt;= 2, e.g., Llanowar Elves, Arcane Signet).</li>
+<li><strong>Cheap Draw/Cantrips</strong>: -0.25 lands per cheap cantrip (CMC &lt;= 2, e.g., Opt, Ponder).</li>
+</ul>
+</li>
+</ul>
+<h3 id="algorithm_1">Algorithm<a class="headerlink" href="#algorithm_1" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Calculate <code>AverageCMC</code> of non-land cards.</li>
+<li>Count <code>Ramp</code> cards (heuristic: <code>type_line</code> contains "Creature" or "Artifact" AND <code>oracle_text</code> contains "add" AND <code>cmc</code> &lt;= 2).</li>
+<li>Count <code>Cantrip</code> cards (heuristic: <code>oracle_text</code> contains "draw a card" AND <code>cmc</code> &lt;= 2).</li>
+<li>Determine format (passed as argument or inferred from deck size).<ul>
+<li><strong>If Commander (&gt;80 cards)</strong>:
+    <code>Base = 31.42 + (3.13 * AvgCMC)</code></li>
+<li><strong>Else (60 cards)</strong>:
+    <code>Base = 16 + (3.14 * AvgCMC)</code></li>
+</ul>
+</li>
+<li>Apply adjustments: <code>Count = Base - (0.5 * RampCount) - (0.25 * CantripCount)</code>.</li>
+<li>Clamp result logic:<ul>
+<li>Commander: Clamp between 30 and 42.</li>
+<li>60-Card: Clamp between 18 and 30.</li>
+</ul>
+</li>
+</ol>
+<h3 id="backend-response-schema_3">Backend Response Schema<a class="headerlink" href="#backend-response-schema_3" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"recommendations"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"land_count"</span><span class="p">:</span><span class="w"> </span><span class="mi">24</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"min_lands"</span><span class="p">:</span><span class="w"> </span><span class="mi">23</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"max_lands"</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"reasoning"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Based on average CMC of 3.1 and 4 ramp sources."</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="4-draw-probability-hypergeometric-distribution">4. Draw Probability (Hypergeometric Distribution)<a class="headerlink" href="#4-draw-probability-hypergeometric-distribution" title="Permanent link">&para;</a></h2>
+<p><strong>Goal</strong>: Determine the likelihood of drawing specific cards or categories by a certain turn.</p>
+<h3 id="formula">Formula<a class="headerlink" href="#formula" title="Permanent link">&para;</a></h3>
+<p>The probability of drawing exactly $k$ successes in $n$ draws from a population $N$ containing $K$ total successes is:</p>
+<p>$$ P(X=k) = \frac{\binom{K}{k} \binom{N-K}{n-k}}{\binom{N}{n}} $$</p>
+<p>For "at least $k$" (cumulative), sum $P(X=i)$ for $i$ from $k$ to $\min(n, K)$.</p>
+<ul>
+<li><strong>N (Population)</strong>: Cards remaining in deck (Start: 60).</li>
+<li><strong>K (Successes)</strong>: Number of target cards in deck (e.g., 24 Lands).</li>
+<li><strong>n (Draws)</strong>: Opening hand (7) + Cards drawn per turn (Turn number - 1).</li>
+<li><strong>k (Target)</strong>: Minimum desired copies (e.g., At least 3 lands).</li>
+</ul>
+<h3 id="key-scenarios-to-calculate">Key Scenarios to Calculate<a class="headerlink" href="#key-scenarios-to-calculate" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Mana Screw</strong>: Probability of having &lt; 2 lands in Opening Hand (7 cards).</li>
+<li><strong>Mana Flood</strong>: Probability of having &gt; 5 lands in Opening Hand.</li>
+<li><strong>On Curve</strong>: Probability of having &gt;= X lands by Turn X (for X=3, 4, 5).</li>
+</ol>
+<h3 id="backend-response-schema_4">Backend Response Schema<a class="headerlink" href="#backend-response-schema_4" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"probabilities"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"opening_hand"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"lands_at_least_2"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.85</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"lands_at_least_3"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.60</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"lands_at_least_4"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.30</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">"on_curve"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"turn_3_land_drop"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.75</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"turn_4_land_drop"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.55</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="5-proposed-backend-implementation">5. Proposed Backend Implementation<a class="headerlink" href="#5-proposed-backend-implementation" title="Permanent link">&para;</a></h2>
+<h3 id="location">Location<a class="headerlink" href="#location" title="Permanent link">&para;</a></h3>
+<p><code>backend/app/services/stats.py</code></p>
+<h3 id="python-library">Python Library<a class="headerlink" href="#python-library" title="Permanent link">&para;</a></h3>
+<p>Use <code>scipy.stats.hypergeom</code> or implement the factorial formula manually for standard library purity (math.comb).</p>
+<h3 id="api-endpoint">API Endpoint<a class="headerlink" href="#api-endpoint" title="Permanent link">&para;</a></h3>
+<p><code>GET /api/decks/{id}/stats</code></p>
+<h4 id="full-response-example">Full Response Example<a class="headerlink" href="#full-response-example" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"deck_id"</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"total_cards"</span><span class="p">:</span><span class="w"> </span><span class="mi">60</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"mana_curve"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"color_stats"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"recommendations"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"draw_odds"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "content.action.edit", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
