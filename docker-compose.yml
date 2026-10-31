@@ -91,7 +91,7 @@ services:
           memory: 512M
 
   frontend:
-    image: node:24-alpine
+    image: node:26-alpine
     working_dir: /app
     volumes:
       - ./frontend:/app
