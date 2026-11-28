@@ -37,7 +37,7 @@ services:
       - mtg-network
 
   db:
-    image: postgres:18-alpine
+    image: postgres:19-alpine
     volumes:
       - postgres_data:/var/lib/postgresql
     networks:
@@ -91,7 +91,7 @@ services:
           memory: 512M
 
   frontend:
-    image: node:24-alpine
+    image: node:26-alpine
     working_dir: /app
     volumes:
       - ./frontend:/app
